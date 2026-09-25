@@ -6,6 +6,7 @@ import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from '
 import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
 import { CurveDrivingCourse, CURVE_START, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
+import { DrivingCockpit } from './cockpit/DrivingCockpit'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -26,6 +27,9 @@ interface Vehicle {
   heading: number
   speed: number
   steering: number
+  throttle: number
+  brake: number
+  clutch: number
   gear: number
   engineOn: boolean
   handbrake: boolean
@@ -86,6 +90,9 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
     heading: reverseParking ? Math.PI : 0,
     speed: 0,
     steering: 0,
+    throttle: 0,
+    brake: 0,
+    clutch: 0,
     gear: 0,
     engineOn: false,
     handbrake: true,
@@ -170,16 +177,6 @@ function Road() {
   </group>
 }
 
-function CarVisual() {
-  return <group>
-    <mesh position={[0, .62, 0]}><boxGeometry args={[1.8, .42, 4.4]} /><meshStandardMaterial color="#111922" metalness={.35} roughness={.4} /></mesh>
-    <mesh position={[0, 1.02, -.48]}><boxGeometry args={[1.65, .16, .2]} /><meshStandardMaterial color="#232b31" /></mesh>
-    <mesh position={[-.56, 1.02, -.6]} rotation-x={Math.PI / 2.3}><torusGeometry args={[.27, .035, 12, 32]} /><meshStandardMaterial color="#111" /></mesh>
-    <mesh position={[-.96, 1.1, -.48]}><boxGeometry args={[.34, .15, .07]} /><meshStandardMaterial color="#7895a6" metalness={.7} /></mesh>
-    <mesh position={[.96, 1.1, -.48]}><boxGeometry args={[.34, .15, .07]} /><meshStandardMaterial color="#7895a6" metalness={.7} /></mesh>
-  </group>
-}
-
 function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session,
   onInfraction: (i: Infraction) => void, onTick: () => void,
@@ -234,6 +231,9 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
     const brake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
     const clutch = keys.current['c'] ? 1 : 0
     const steer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
+    v.throttle = throttle
+    v.brake = brake
+    v.clutch = clutch
     v.steering += (steer * .58 - v.steering) * Math.min(1, dt * 7)
 
     if (v.engineOn && !v.handbrake && v.gear !== 0) {
@@ -258,7 +258,13 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
       carGroup.current.position.set(v.x, roadPose.y, v.z)
       carGroup.current.rotation.set(roadPose.pitch, v.heading, 0)
     }
-    camera.position.set(v.x + Math.sin(v.heading) * .12, roadPose.y + 1.47, v.z - Math.cos(v.heading) * .15)
+    const driverOffsetX = -0.4
+    const driverForward = 0.1
+    camera.position.set(
+      v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
+      roadPose.y + 1.49,
+      v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
+    )
     camera.rotation.set(roadPose.pitch, v.heading + cameraYaw.current, 0)
 
     const limit = session.examId === 'subject3' ? 50 : 12
@@ -320,7 +326,7 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
     {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : <Road />}
-    <group ref={carGroup}><CarVisual /></group>
+    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={true} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
@@ -379,7 +385,6 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="mirror mirror-left"><span>左后视镜</span></div><div className="mirror mirror-center"><span>内后视镜</span></div><div className="mirror mirror-right"><span>右后视镜</span></div>
       <div className="instruction-card"><b>键盘驾驶</b><span>W 油门 · S 刹车 · A/D 方向 · C 离合</span><span>1–5 / N / R 挡位 · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光</span><span>Z/X 左右观察 · F 回头观察</span></div>
       <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
