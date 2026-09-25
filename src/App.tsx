@@ -22,7 +22,7 @@ type Phase = 'profile' | 'menu' | 'driving' | 'result'
 type ExamId = 'reverse-parking' | 'side-parking' | 'slope-start' | 'curve-driving' | 'right-angle' | 'subject2-exam' | 'subject3'
 type Mode = 'practice' | 'exam'
 type TimeOfDay = 'day' | 'night'
-type CameraMode = 'first' | 'second' | 'third'
+type CameraMode = 'first' | 'second' | 'third' | 'top'
 
 interface Candidate {
   name: string
@@ -257,7 +257,11 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
   const stallCount = useRef(0)
 
   const cycleCameraMode = () => {
-    const next: CameraMode = cameraMode === 'first' ? 'second' : cameraMode === 'second' ? 'third' : 'first'
+    const next: CameraMode =
+      cameraMode === 'first' ? 'second'
+        : cameraMode === 'second' ? 'third'
+          : cameraMode === 'third' ? 'top'
+            : 'first'
     onCameraModeChange(next)
   }
 
@@ -419,7 +423,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
         perspectiveCamera.fov = 52
         perspectiveCamera.updateProjectionMatrix()
       }
-    } else {
+    } else if (cameraMode === 'third') {
       const chase = vehicleCenter.clone()
         .add(forward.clone().multiplyScalar(-6.2))
       chase.y = roadPose.y + 3.0
@@ -428,6 +432,20 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
       camera.lookAt(vehicleCenter.clone().add(forward.clone().multiplyScalar(0.8)))
       if (perspectiveCamera.fov !== 58) {
         perspectiveCamera.fov = 58
+        perspectiveCamera.updateProjectionMatrix()
+      }
+    } else {
+      const overhead = vehicleCenter.clone()
+      overhead.y = roadPose.y + 11.5
+      camera.position.copy(overhead)
+
+      // Looking straight down makes the normal Y-up vector degenerate.
+      // Use the vehicle forward vector as camera-up so the car's nose stays
+      // at the top of the screen while preserving a truly vertical view.
+      camera.up.copy(forward).normalize()
+      camera.lookAt(new THREE.Vector3(v.x, roadPose.y, v.z))
+      if (perspectiveCamera.fov !== 42) {
+        perspectiveCamera.fov = 42
         perspectiveCamera.updateProjectionMatrix()
       }
     }
@@ -607,8 +625,13 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       <div className="hud-top">
         <div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
-          <button className="view-btn" onClick={() => setCameraMode(mode => mode === 'first' ? 'second' : mode === 'second' ? 'third' : 'first')}>
-            M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : '第三人称'}
+          <button className="view-btn" onClick={() => setCameraMode(mode =>
+            mode === 'first' ? 'second'
+              : mode === 'second' ? 'third'
+                : mode === 'third' ? 'top'
+                  : 'first'
+          )}>
+            M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
           </button>
           <button className="finish-btn" onClick={() => onDone(score, infractions, trajectory.current)}>结束并生成成绩</button>
         </div>
@@ -616,7 +639,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三人称视角</span></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
