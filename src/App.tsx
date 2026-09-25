@@ -13,6 +13,8 @@ import { DRIVING_RULES } from './rules/drivingRules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
+import { RacingWheelSetup } from './input/RacingWheelSetup'
+import { readRacingWheelControls } from './input/racingWheel'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -179,6 +181,7 @@ function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate,
       <div className="segmented"><button className={mode === 'practice' ? 'active' : ''} onClick={() => setMode('practice')}>训练模式</button><button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}>考试模式</button></div>
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
     </section>
+    <RacingWheelSetup />
     {recentHistory.length > 0 && <section className="recent-results">
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
@@ -328,18 +331,36 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
-    const throttle = controlsLocked ? 0 : (keys.current['w'] || keys.current['arrowup'] ? 1 : 0)
-    const brake = controlsLocked ? 0 : (keys.current['s'] || keys.current['arrowdown'] ? 1 : 0)
-    const clutch = controlsLocked || automatic
+    const wheel = readRacingWheelControls()
+    const keyboardThrottle = keys.current['w'] || keys.current['arrowup'] ? 1 : 0
+    const keyboardBrake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
+    const keyboardClutch = automatic
       ? 0
       : keys.current['c']
         ? 1
         : keys.current['shift']
           ? DRIVING_RULES.manualTransmission.biteClutchPosition
           : 0
-    const steer = controlsLocked ? 0 : ((keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0))
+    const keyboardSteer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
+
+    const throttle = controlsLocked ? 0 : wheel.deviceId ? wheel.throttle : keyboardThrottle
+    const brake = controlsLocked ? 0 : wheel.deviceId ? wheel.brake : keyboardBrake
+    const clutch = controlsLocked || automatic
+      ? 0
+      : wheel.deviceId && wheel.clutch != null
+        ? wheel.clutch
+        : keyboardClutch
+    const steer = controlsLocked || wheel.deviceId ? 0 : keyboardSteer
     const slopeBeforeStep = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
-    const physics = stepVehiclePhysics(v, { throttle, brake, clutch, steer }, dt, {
+    const physics = stepVehiclePhysics(v, {
+      throttle,
+      brake,
+      clutch,
+      steer,
+      steeringWheelTarget: controlsLocked || !wheel.deviceId
+        ? undefined
+        : wheel.steering * DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI,
+    }, dt, {
       automatic,
       grade: slopeBeforeStep.grade,
     })

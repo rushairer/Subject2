@@ -22,6 +22,7 @@ export interface PhysicsInput {
   brake: number
   clutch: number
   steer: number
+  steeringWheelTarget?: number
 }
 
 export interface PhysicsOptions {
@@ -58,13 +59,22 @@ export function stepVehiclePhysics(
 
   const maxSteeringWheelAngle = DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
   const steeringWheelRate = DRIVING_RULES.steering.wheelTurnsPerSecond * Math.PI * 2
-  vehicle.steeringWheelAngle = Math.max(
-    -maxSteeringWheelAngle,
-    Math.min(
-      maxSteeringWheelAngle,
-      vehicle.steeringWheelAngle + input.steer * steeringWheelRate * dt,
-    ),
-  )
+  vehicle.steeringWheelAngle = input.steeringWheelTarget == null
+    ? Math.max(
+        -maxSteeringWheelAngle,
+        Math.min(
+          maxSteeringWheelAngle,
+          vehicle.steeringWheelAngle + input.steer * steeringWheelRate * dt,
+        ),
+      )
+    : Math.max(
+        -maxSteeringWheelAngle,
+        Math.min(
+          maxSteeringWheelAngle,
+          vehicle.steeringWheelAngle +
+            (input.steeringWheelTarget - vehicle.steeringWheelAngle) * Math.min(1, dt * 28),
+        ),
+      )
   vehicle.steering =
     (vehicle.steeringWheelAngle / maxSteeringWheelAngle) *
     DRIVING_RULES.steering.roadWheelMaxAngleRadians
