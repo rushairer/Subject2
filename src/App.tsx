@@ -39,6 +39,7 @@ interface Vehicle {
   lowBeam: boolean
   highBeam: boolean
   horn: boolean
+  seatbelt: boolean
 }
 interface Infraction {
   id: string
@@ -103,6 +104,7 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
     lowBeam: false,
     highBeam: false,
     horn: false,
+    seatbelt: false,
   }
 }
 
@@ -247,6 +249,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
       if (automatic && k === 'g') v.gear = 1
       if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
       if (k === 'b') { v.horn = true; startHorn() }
+      if (k === 't') v.seatbelt = !v.seatbelt
       if (k === 'z') cameraYaw.current = -.62
       if (k === 'x') cameraYaw.current = .62
       if (k === 'f') cameraYaw.current = Math.PI
@@ -316,6 +319,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
       if (speedTimer.current > 1.2) onInfraction({ id: 'speed-control', title: '训练区域速度控制不当', points: 10 })
     } else speedTimer.current = 0
     if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
+    if (Math.abs(v.speed) > .25 && !v.seatbelt) onInfraction({ id: 'seatbelt-not-fastened', title: '起步或行驶时未按规定使用安全带', points: 100, fatal: true })
     if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
@@ -429,8 +433,8 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭</span><span>Z/X 左右观察 · F 回头观察</span></div>
-      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : automatic ? 'D' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>HORN</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
+      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : automatic ? 'D' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>HORN</span><span className={display.seatbelt ? 'on' : 'warn'}>BELT</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>

@@ -17,6 +17,7 @@ export interface CockpitVehicleState {
   lowBeam: boolean
   highBeam: boolean
   horn: boolean
+  seatbelt: boolean
 }
 
 interface MirrorRig {
@@ -52,6 +53,18 @@ function gearPosition(gear: number): [number, number] {
     5: [0.1, 0.07],
   }
   return positions[gear] ?? [0, 0]
+}
+
+
+function createInstrumentDisplay() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 640
+  canvas.height = 240
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  return { canvas, texture }
 }
 
 function Pedal({ x, active, wide = false }: { x: number; active: number; wide?: boolean }) {
@@ -90,6 +103,7 @@ export function DrivingCockpit({
   const rightHeadlight = useRef<THREE.SpotLight>(null)
   const headlightTarget = useRef<THREE.Object3D>(null)
   const mirrorAccumulator = useRef(0)
+  const displayAccumulator = useRef(0)
 
   const centerAnchor = useRef<THREE.Object3D>(null)
   const leftAnchor = useRef<THREE.Object3D>(null)
@@ -97,6 +111,8 @@ export function DrivingCockpit({
   const centerSurface = useRef<THREE.Mesh>(null)
   const leftSurface = useRef<THREE.Mesh>(null)
   const rightSurface = useRef<THREE.Mesh>(null)
+
+  const instrumentDisplay = useMemo(() => createInstrumentDisplay(), [])
 
   const mirrors = useMemo(() => {
     const centerTarget = createMirrorTarget(512, 190)
@@ -124,11 +140,13 @@ export function DrivingCockpit({
       mirrors.centerTarget.dispose()
       mirrors.leftTarget.dispose()
       mirrors.rightTarget.dispose()
+      instrumentDisplay.texture.dispose()
     }
-  }, [mirrors])
+  }, [instrumentDisplay, mirrors])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const v = vehicle.current
+    displayAccumulator.current += delta
     if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steering * 3.8
 
     if (gearLever.current) {
@@ -166,6 +184,45 @@ export function DrivingCockpit({
       material.emissive.set(v.horn ? '#7b1e16' : '#000000')
       material.emissiveIntensity = v.horn ? 1.2 : 0
     }
+    if (displayAccumulator.current >= 0.08) {
+      displayAccumulator.current = 0
+      const ctx = instrumentDisplay.canvas.getContext('2d')
+      if (ctx) {
+        const width = instrumentDisplay.canvas.width
+        const height = instrumentDisplay.canvas.height
+        ctx.clearRect(0, 0, width, height)
+        ctx.fillStyle = '#071018'
+        ctx.fillRect(0, 0, width, height)
+        ctx.fillStyle = '#152a38'
+        ctx.fillRect(0, height - 8, width, 8)
+        ctx.font = '700 108px system-ui, sans-serif'
+        ctx.fillStyle = '#eef8ff'
+        ctx.textAlign = 'left'
+        ctx.fillText(String(Math.round(Math.abs(v.speed) * 3.6)).padStart(2, '0'), 34, 128)
+        ctx.font = '600 28px system-ui, sans-serif'
+        ctx.fillStyle = '#86a7ba'
+        ctx.fillText('km/h', 42, 174)
+
+        const gear = v.gear === -1 ? 'R' : v.gear === 0 ? 'N' : automatic ? 'D' : String(v.gear)
+        ctx.font = '800 94px system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillStyle = '#69d7ff'
+        ctx.fillText(gear, 370, 132)
+
+        ctx.font = '700 23px system-ui, sans-serif'
+        ctx.textAlign = 'left'
+        ctx.fillStyle = v.engineOn ? '#70dfa0' : '#53636d'
+        ctx.fillText('ENGINE', 465, 56)
+        ctx.fillStyle = v.handbrake ? '#ff7368' : '#53636d'
+        ctx.fillText('P BRAKE', 465, 91)
+        ctx.fillStyle = v.seatbelt ? '#70dfa0' : '#ff7368'
+        ctx.fillText(v.seatbelt ? 'BELT OK' : 'BELT', 465, 126)
+        ctx.fillStyle = v.highBeam ? '#70b7ff' : v.lowBeam ? '#72d7ff' : '#53636d'
+        ctx.fillText(v.highBeam ? 'HIGH' : v.lowBeam ? 'LOW' : 'LIGHT', 465, 161)
+        instrumentDisplay.texture.needsUpdate = true
+      }
+    }
+
     const lightIntensity = v.highBeam ? 220 : v.lowBeam ? 95 : 0
     for (const light of [leftHeadlight.current, rightHeadlight.current]) {
       if (!light) continue
@@ -218,6 +275,10 @@ export function DrivingCockpit({
     <mesh position={[-0.43, 1.19, -0.76]} rotation-x={-0.18}>
       <boxGeometry args={[0.55, 0.18, 0.08]} />
       <meshStandardMaterial color="#080b0e" roughness={0.25} />
+    </mesh>
+    <mesh position={[0.25, 1.16, -0.775]} rotation-x={-0.18}>
+      <planeGeometry args={[0.58, 0.215]} />
+      <meshBasicMaterial map={instrumentDisplay.texture} toneMapped={false} />
     </mesh>
 
     <group ref={speedNeedle} position={[-0.43, 1.205, -0.805]}>
@@ -318,6 +379,10 @@ export function DrivingCockpit({
     <mesh position={[-0.43, 0.83, 0.48]}>
       <boxGeometry args={[0.52, 0.76, 0.82]} />
       <meshStandardMaterial color="#20262b" roughness={0.82} />
+    </mesh>
+    <mesh position={[-0.57, 1.08, 0.18]} rotation-z={v.seatbelt ? -0.48 : -0.05}>
+      <boxGeometry args={[0.045, 0.62, 0.022]} />
+      <meshStandardMaterial color={v.seatbelt ? '#3d4246' : '#24282b'} roughness={0.9} />
     </mesh>
 
     <object3D ref={headlightTarget} position={[0, 0.45, -40]} />
