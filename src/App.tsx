@@ -22,6 +22,7 @@ type Phase = 'profile' | 'menu' | 'driving' | 'result'
 type ExamId = 'reverse-parking' | 'side-parking' | 'slope-start' | 'curve-driving' | 'right-angle' | 'subject2-exam' | 'subject3'
 type Mode = 'practice' | 'exam'
 type TimeOfDay = 'day' | 'night'
+type CameraMode = 'first' | 'second' | 'third'
 
 interface Candidate {
   name: string
@@ -230,8 +231,10 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode, onCameraModeChange, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, controlsLocked: boolean,
+  cameraMode: CameraMode,
+  onCameraModeChange: (mode: CameraMode) => void,
   onInfraction: (i: Infraction) => void, onTick: () => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
@@ -252,6 +255,11 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
   const audioContext = useRef<AudioContext | null>(null)
   const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
   const stallCount = useRef(0)
+
+  const cycleCameraMode = () => {
+    const next: CameraMode = cameraMode === 'first' ? 'second' : cameraMode === 'second' ? 'third' : 'first'
+    onCameraModeChange(next)
+  }
 
   const startHorn = () => {
     if (hornNodes.current) return
@@ -308,6 +316,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       if (k === 'z') { cameraYaw.current = .62; v.lookLeft = true }
       if (k === 'x') { cameraYaw.current = -.62; v.lookRight = true }
       if (k === 'f') { cameraYaw.current = Math.PI; v.lookBack = true }
+      if (k === 'm' && !e.repeat) cycleCameraMode()
     }
     const up = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
@@ -326,7 +335,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       void audioContext.current?.close()
       audioContext.current = null
     }
-  }, [automatic, vehicle])
+  }, [automatic, cameraMode, onCameraModeChange, vehicle])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, .05)
@@ -380,14 +389,48 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       carGroup.current.position.set(v.x, roadPose.y, v.z)
       carGroup.current.rotation.set(roadPose.pitch, -v.heading, 0)
     }
-    const driverOffsetX = -0.4
-    const driverForward = 0.03
-    camera.position.set(
-      v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
-      roadPose.y + 1.47,
-      v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
-    )
-    camera.rotation.set(roadPose.pitch - 0.035, -v.heading + cameraYaw.current, 0)
+    const perspectiveCamera = camera as THREE.PerspectiveCamera
+    const forward = new THREE.Vector3(Math.sin(v.heading), 0, -Math.cos(v.heading))
+    const right = new THREE.Vector3(Math.cos(v.heading), 0, Math.sin(v.heading))
+    const vehicleCenter = new THREE.Vector3(v.x, roadPose.y + 0.9, v.z)
+
+    if (cameraMode === 'first') {
+      const driverOffsetX = -0.4
+      const driverForward = 0.03
+      camera.position.set(
+        v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
+        roadPose.y + 1.47,
+        v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
+      )
+      camera.rotation.set(roadPose.pitch - 0.035, -v.heading + cameraYaw.current, 0)
+      if (perspectiveCamera.fov !== 68) {
+        perspectiveCamera.fov = 68
+        perspectiveCamera.updateProjectionMatrix()
+      }
+    } else if (cameraMode === 'second') {
+      const observer = vehicleCenter.clone()
+        .add(forward.clone().multiplyScalar(4.8))
+        .add(right.clone().multiplyScalar(-2.6))
+      observer.y = roadPose.y + 1.9
+      camera.position.copy(observer)
+      camera.up.set(0, 1, 0)
+      camera.lookAt(vehicleCenter.clone().add(new THREE.Vector3(0, 0.1, 0)))
+      if (perspectiveCamera.fov !== 52) {
+        perspectiveCamera.fov = 52
+        perspectiveCamera.updateProjectionMatrix()
+      }
+    } else {
+      const chase = vehicleCenter.clone()
+        .add(forward.clone().multiplyScalar(-6.2))
+      chase.y = roadPose.y + 3.0
+      camera.position.copy(chase)
+      camera.up.set(0, 1, 0)
+      camera.lookAt(vehicleCenter.clone().add(forward.clone().multiplyScalar(0.8)))
+      if (perspectiveCamera.fov !== 58) {
+        perspectiveCamera.fov = 58
+        perspectiveCamera.updateProjectionMatrix()
+      }
+    }
 
     const limit = session.examId === 'subject3' ? 50 : 12
     if (Math.abs(v.speed) * 3.6 > limit) {
@@ -474,6 +517,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
   const [projectComplete, setProjectComplete] = useState(false)
   const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
+  const [cameraMode, setCameraMode] = useState<CameraMode>('first')
   const finishLatched = useRef(false)
   const lastUi = useRef(0)
   const sessionStartedAt = useRef(performance.now())
@@ -558,13 +602,21 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} controlsLocked={!lightTestDone} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCameraModeChange={setCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
-      <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions, trajectory.current)}>结束并生成成绩</button></div>
+      <div className="hud-top">
+        <div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
+        <div className="hud-actions">
+          <button className="view-btn" onClick={() => setCameraMode(mode => mode === 'first' ? 'second' : mode === 'second' ? 'third' : 'first')}>
+            M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : '第三人称'}
+          </button>
+          <button className="finish-btn" onClick={() => onDone(score, infractions, trajectory.current)}>结束并生成成绩</button>
+        </div>
+      </div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三人称视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
