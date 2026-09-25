@@ -219,8 +219,9 @@ function ribbonGeometry(points: Point[], width: number, offset = 0) {
 
 export function CurveDrivingCourse(): ReactElement {
   const road = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, CURVE_DRIVING.roadWidth), [])
-  const leftEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, CURVE_DRIVING.roadWidth / 2), [])
-  const rightEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, -CURVE_DRIVING.roadWidth / 2), [])
+  // ribbonGeometry uses the route-right normal, so positive offset is right.
+  const rightEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, CURVE_DRIVING.roadWidth / 2), [])
+  const leftEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, -CURVE_DRIVING.roadWidth / 2), [])
 
   return <group>
     <mesh geometry={road} position-y={0.01}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>

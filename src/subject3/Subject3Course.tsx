@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } 
 import * as THREE from 'three'
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import { sceneYawFromHeading, worldPointFromVehicle } from '../sim/vehicleFrame'
 import {
   CENTER_LINE_OFFSET,
   LANE_WIDTH,
@@ -393,7 +393,7 @@ function RoadSegmentMesh({ segment }: { segment: RouteSegment }) {
   const dashCount = Math.floor(segment.length / 14)
   return <group
     position={[(segment.a.x + segment.b.x) / 2, 0, (segment.a.z + segment.b.z) / 2]}
-    rotation-y={segment.heading}
+    rotation-y={sceneYawFromHeading(segment.heading)}
   >
     <mesh rotation-x={-Math.PI / 2} position={[ROAD_CENTER_OFFSET, -0.02, 0]}>
       <planeGeometry args={[ROAD_WIDTH, segment.length + 1]} />
@@ -450,7 +450,7 @@ function RouteSign({ distance, label, accent = '#176aa7' }: { distance: number; 
   const lateral = RIGHT_EDGE_OFFSET + 2.1
   return <group
     position={[pose.x + pose.rightX * lateral, 0, pose.z + pose.rightZ * lateral]}
-    rotation-y={pose.heading}
+    rotation-y={sceneYawFromHeading(pose.heading)}
   >
     <mesh position={[0, 1.5, 0]}>
       <cylinderGeometry args={[0.05, 0.06, 3, 8]} />
@@ -465,7 +465,7 @@ function RouteSign({ distance, label, accent = '#176aa7' }: { distance: number; 
 
 function Crosswalk({ distance }: { distance: number }) {
   const pose = poseAtRouteDistance(distance)
-  return <group position={[pose.x + pose.rightX * ROAD_CENTER_OFFSET, 0.012, pose.z + pose.rightZ * ROAD_CENTER_OFFSET]} rotation-y={pose.heading}>
+  return <group position={[pose.x + pose.rightX * ROAD_CENTER_OFFSET, 0.012, pose.z + pose.rightZ * ROAD_CENTER_OFFSET]} rotation-y={sceneYawFromHeading(pose.heading)}>
     {Array.from({ length: 8 }, (_, index) =>
       <mesh key={index} rotation-x={-Math.PI / 2} position={[0, 0, -3.1 + index * 0.88]}>
         <planeGeometry args={[ROAD_WIDTH - 0.8, 0.48]} />
@@ -477,7 +477,7 @@ function Crosswalk({ distance }: { distance: number }) {
 
 function TrafficLight({ distance }: { distance: number }) {
   const pose = poseAtRouteDistance(distance)
-  return <group position={[pose.x + pose.rightX * (RIGHT_EDGE_OFFSET + 1.7), 0, pose.z + pose.rightZ * (RIGHT_EDGE_OFFSET + 1.7)]} rotation-y={pose.heading}>
+  return <group position={[pose.x + pose.rightX * (RIGHT_EDGE_OFFSET + 1.7), 0, pose.z + pose.rightZ * (RIGHT_EDGE_OFFSET + 1.7)]} rotation-y={sceneYawFromHeading(pose.heading)}>
     <mesh position={[0, 2.4, 0]}><cylinderGeometry args={[0.07, 0.09, 4.8, 10]} /><meshStandardMaterial color="#555b5d" /></mesh>
     <mesh position={[0, 4.4, 0]}><boxGeometry args={[0.5, 1.15, 0.28]} /><meshStandardMaterial color="#16191b" /></mesh>
     <mesh position={[0, 4.72, 0.15]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#4b1717" /></mesh>
@@ -490,7 +490,7 @@ function StaticCar({ distance, lateral, opposite = false, color = '#d7d9dd' }: {
   const pose = poseAtRouteDistance(distance)
   return <group
     position={[pose.x + pose.rightX * lateral, 0.45, pose.z + pose.rightZ * lateral]}
-    rotation-y={-pose.heading + (opposite ? Math.PI : 0)}
+    rotation-y={sceneYawFromHeading(pose.heading) + (opposite ? Math.PI : 0)}
   >
     <mesh><boxGeometry args={[1.75, 0.65, 4.2]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
     <mesh position={[0, 0.45, -0.15]}><boxGeometry args={[1.5, 0.55, 1.9]} /><meshStandardMaterial color="#60707a" metalness={0.5} roughness={0.28} /></mesh>
@@ -572,7 +572,7 @@ function MovingTrafficCar({
     const world = actorWorldPosition(progress.current, lateral)
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = -world.pose.heading + (opposite ? Math.PI : 0)
+      group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + (opposite ? Math.PI : 0)
     }
     checkVehicleCollision(player, world.x, world.z, `subject3-collision-${id}`, onInfraction)
   })
@@ -600,7 +600,7 @@ function SuddenBrakeCar({
     const world = actorWorldPosition(progress.current, 0)
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = -world.pose.heading
+      group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
     }
     checkVehicleCollision(player, world.x, world.z, 'subject3-collision-sudden-brake', onInfraction)
   })
@@ -663,7 +663,7 @@ function CutInScooter({
     const world = actorWorldPosition(progress.current, lateral)
     if (group.current) {
       group.current.position.set(world.x, 0.18, world.z)
-      group.current.rotation.y = -world.pose.heading
+      group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
     }
     if (triggered.current) {
       checkVehicleCollision(player, world.x, world.z, 'subject3-collision-scooter', onInfraction, 1.55)

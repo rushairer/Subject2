@@ -48,6 +48,14 @@ export function normalizeHeadingDelta(delta: number) {
   return value
 }
 
+/**
+ * Three.js world yaw uses the opposite sign from the simulator heading.
+ * Always use this helper for route/vehicle visual orientation.
+ */
+export function sceneYawFromHeading(heading: number) {
+  return -heading
+}
+
 export type TurnDirection = 'left' | 'right' | 'straight'
 
 export function turnDirection(fromHeading: number, toHeading: number, epsilon = 1e-6): TurnDirection {

@@ -1,4 +1,11 @@
 import type { ReactElement } from 'react'
+import { CURVE_CENTERLINE, CURVE_DRIVING } from '../subject2/CurveDrivingCourse'
+import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
+import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
+import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
+import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
+import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
+import { toReplayLocal, type ReplayPoint } from './replayGeometry'
 
 export interface TrajectorySample {
   t: number
@@ -19,6 +26,13 @@ export interface ReplayInfraction {
   x?: number
   z?: number
   project?: string
+}
+
+type ReferenceKind = 'boundary' | 'control' | 'guide'
+
+interface ReferenceLine {
+  points: ReplayPoint[]
+  kind: ReferenceKind
 }
 
 function projectLabel(project: string) {
@@ -44,24 +58,123 @@ function pathStats(samples: TrajectorySample[]) {
   return { distance, maxSpeed, duration }
 }
 
+function rectangle(x1: number, x2: number, z1: number, z2: number): ReplayPoint[] {
+  return [
+    { x: x1, z: z1 },
+    { x: x2, z: z1 },
+    { x: x2, z: z2 },
+    { x: x1, z: z2 },
+    { x: x1, z: z1 },
+  ]
+}
+
+function offsetPolyline(points: ReplayPoint[], offset: number): ReplayPoint[] {
+  return points.map((point, index) => {
+    const previous = points[Math.max(0, index - 1)]
+    const next = points[Math.min(points.length - 1, index + 1)]
+    const tx = next.x - previous.x
+    const tz = next.z - previous.z
+    const length = Math.hypot(tx, tz) || 1
+    const rightX = -tz / length
+    const rightZ = tx / length
+    return {
+      x: point.x + rightX * offset,
+      z: point.z + rightZ * offset,
+    }
+  })
+}
+
+function referenceLinesForProject(project: string): ReferenceLine[] {
+  if (project === 'reverse-parking') {
+    const g = REVERSE_PARKING_GEOMETRY
+    return [
+      { points: rectangle(-g.laneHalf, g.laneHalf, -g.laneEndZ, g.laneEndZ), kind: 'boundary' },
+      { points: rectangle(g.bayMouthX, g.bayBackX, -g.bayHalf, g.bayHalf), kind: 'boundary' },
+      { points: [{ x: -g.laneHalf, z: g.startControlZ }, { x: g.laneHalf, z: g.startControlZ }], kind: 'control' },
+      { points: [{ x: -g.laneHalf, z: g.oppositeControlZ }, { x: g.laneHalf, z: g.oppositeControlZ }], kind: 'control' },
+    ]
+  }
+
+  if (project === 'side-parking') {
+    const g = SIDE_PARKING_GEOMETRY
+    return [
+      { points: rectangle(-g.laneHalf, g.laneHalf, g.laneEndZ, g.laneStartZ), kind: 'boundary' },
+      { points: rectangle(g.bayMouthX, g.bayBackX, -g.bayHalfLength, g.bayHalfLength), kind: 'boundary' },
+    ]
+  }
+
+  if (project === 'right-angle') {
+    const g = RIGHT_ANGLE_GEOMETRY
+    return [
+      { points: rectangle(-g.half, g.half, g.cornerCenterZ - g.half, g.entryMaxZ), kind: 'boundary' },
+      { points: rectangle(g.horizontalMinX, g.half, g.cornerCenterZ - g.half, g.cornerCenterZ + g.half), kind: 'boundary' },
+    ]
+  }
+
+  if (project === 'slope-start') {
+    const g = SLOPE_GEOMETRY
+    return [
+      { points: rectangle(-g.roadHalf, g.roadHalf, g.roadEndZ, g.roadStartZ), kind: 'boundary' },
+      { points: [{ x: -g.roadHalf, z: g.stopLineZ }, { x: g.roadHalf, z: g.stopLineZ }], kind: 'control' },
+    ]
+  }
+
+  if (project === 'curve-driving') {
+    const half = CURVE_DRIVING.roadWidth / 2
+    return [
+      { points: offsetPolyline(CURVE_CENTERLINE, half), kind: 'boundary' },
+      { points: offsetPolyline(CURVE_CENTERLINE, -half), kind: 'boundary' },
+      { points: CURVE_CENTERLINE, kind: 'guide' },
+    ]
+  }
+
+  if (project === 'subject3') {
+    return [{ points: SUBJECT3_ROUTE, kind: 'guide' }]
+  }
+
+  return []
+}
+
 function PathMap({
+  project,
   samples,
   infractions,
 }: {
+  project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
 }) {
   const width = 640
   const height = 310
-  const margin = 28
-  const xs = samples.map(item => item.x)
-  const zs = samples.map(item => item.z)
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minZ = Math.min(...zs)
-  const maxZ = Math.max(...zs)
-  const rangeX = Math.max(4, maxX - minX)
-  const rangeZ = Math.max(4, maxZ - minZ)
+  const margin = 30
+
+  const first = samples[0]
+  const frame = { originX: first.x, originZ: first.z, heading: first.heading }
+  const localSamples = samples.map(sample => ({
+    ...sample,
+    ...toReplayLocal(sample, frame),
+  }))
+  const localReferences = referenceLinesForProject(project).map(line => ({
+    ...line,
+    points: line.points.map(point => toReplayLocal(point, frame)),
+  }))
+
+  const allPoints = [
+    ...localSamples.map(({ x, z }) => ({ x, z })),
+    ...localReferences.flatMap(line => line.points),
+  ]
+  const xs = allPoints.map(item => item.x)
+  const zs = allPoints.map(item => item.z)
+  const rawMinX = Math.min(...xs)
+  const rawMaxX = Math.max(...xs)
+  const rawMinZ = Math.min(...zs)
+  const rawMaxZ = Math.max(...zs)
+  const rangeX = Math.max(4, rawMaxX - rawMinX)
+  const rangeZ = Math.max(4, rawMaxZ - rawMinZ)
+  const centerX = (rawMinX + rawMaxX) / 2
+  const centerZ = (rawMinZ + rawMaxZ) / 2
+  const minX = centerX - rangeX / 2
+  const minZ = centerZ - rangeZ / 2
   const scale = Math.min((width - margin * 2) / rangeX, (height - margin * 2) / rangeZ)
   const offsetX = (width - rangeX * scale) / 2
   const offsetY = (height - rangeZ * scale) / 2
@@ -70,24 +183,54 @@ function PathMap({
     height - (offsetY + (z - minZ) * scale),
   ] as const
 
-  const points = samples.map(item => mapPoint(item.x, item.z).join(',')).join(' ')
-  const start = mapPoint(samples[0].x, samples[0].z)
-  const end = mapPoint(samples[samples.length - 1].x, samples[samples.length - 1].z)
+  const points = localSamples.map(item => mapPoint(item.x, item.z).join(',')).join(' ')
+  const start = mapPoint(localSamples[0].x, localSamples[0].z)
+  const end = mapPoint(localSamples[localSamples.length - 1].x, localSamples[localSamples.length - 1].z)
 
-  return <svg className="replay-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="本次驾驶轨迹俯视图">
+  return <svg className="replay-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="本次驾驶轨迹俯视图；屏幕上方为车辆初始前进方向">
     <rect x="0" y="0" width={width} height={height} rx="18" className="replay-map-bg" />
+
+    {localReferences.map((line, index) => (
+      <polyline
+        key={`${line.kind}-${index}`}
+        points={line.points.map(point => mapPoint(point.x, point.z).join(',')).join(' ')}
+        className={`replay-reference ${line.kind}`}
+      />
+    ))}
+
     <polyline points={points} className="replay-path-shadow" />
     <polyline points={points} className="replay-path" />
+
+    <line x1={start[0]} y1={start[1] - 8} x2={start[0]} y2={start[1] - 23} className="replay-start-heading" />
+    <path d={`M ${start[0] - 4} ${start[1] - 20} L ${start[0]} ${start[1] - 27} L ${start[0] + 4} ${start[1] - 20} Z`} className="replay-start-heading-arrow" />
+
     <circle cx={start[0]} cy={start[1]} r="6" className="replay-start" />
     <circle cx={end[0]} cy={end[1]} r="6" className="replay-end" />
+
     {infractions.filter(item => item.x != null && item.z != null).map(item => {
-      const [x, y] = mapPoint(item.x!, item.z!)
+      const local = toReplayLocal({ x: item.x!, z: item.z! }, frame)
+      const [x, y] = mapPoint(local.x, local.z)
       return <g key={item.id + String(item.t)}>
         <circle cx={x} cy={y} r="8" className={item.fatal ? 'replay-error fatal' : 'replay-error'} />
         <circle cx={x} cy={y} r="3" className="replay-error-core" />
       </g>
     })}
+
+    <g className="replay-orientation" transform="translate(18 18)">
+      <rect x="0" y="0" width="100" height="45" rx="9" />
+      <text x="10" y="18">↑ 初始车头</text>
+      <text x="10" y="35">左 ←　→ 右</text>
+    </g>
   </svg>
+}
+
+function ReplayLegend() {
+  return <div className="replay-legend" aria-label="轨迹图例">
+    <span><i className="replay-legend-dot start" />起点</span>
+    <span><i className="replay-legend-dot end" />终点</span>
+    <span><i className="replay-legend-dot error" />扣分位置</span>
+    <span><i className="replay-legend-dot fatal" />不合格位置</span>
+  </div>
 }
 
 export function ExamReplay({
@@ -107,7 +250,7 @@ export function ExamReplay({
         <div className="eyebrow">DRIVING REPLAY</div>
         <h3>驾驶轨迹复盘</h3>
       </div>
-      <span>● 起点　● 终点　● 扣分位置</span>
+      <ReplayLegend />
     </div>
 
     <div className="replay-projects">
@@ -125,7 +268,7 @@ export function ExamReplay({
               <span>{Math.round(stats.duration)} s</span>
             </div>
           </div>
-          <PathMap samples={projectSamples} infractions={projectInfractions} />
+          <PathMap project={project} samples={projectSamples} infractions={projectInfractions} />
         </article>
       })}
     </div>

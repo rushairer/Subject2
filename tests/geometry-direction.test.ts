@@ -4,9 +4,11 @@ import {
   forwardFromHeading,
   leftFromHeading,
   rightFromHeading,
+  sceneYawFromHeading,
   turnDirection,
   worldPointFromVehicle,
 } from '../src/sim/vehicleFrame'
+import { toReplayLocal } from '../src/replay/replayGeometry'
 import {
   SUBJECT3_EVENTS,
   SUBJECT3_SEGMENTS,
@@ -81,4 +83,25 @@ test('subject3 U-turn geometry turns left throughout the maneuver', () => {
     .filter(boundary => boundary.distance >= event.start && boundary.distance <= event.end)
   assert.ok(boundaries.length >= 2)
   for (const boundary of boundaries) assert.equal(turnDirection(boundary.from, boundary.to), 'left')
+})
+
+
+test('Three.js scene yaw is the inverse of simulator heading', () => {
+  assert.equal(sceneYawFromHeading(0), 0)
+  assert.equal(sceneYawFromHeading(Math.PI / 2), -Math.PI / 2)
+  assert.equal(sceneYawFromHeading(-Math.PI / 2), Math.PI / 2)
+})
+
+test('replay frame always maps initial vehicle right to screen-right', () => {
+  const frame = { originX: 0, originZ: 0, heading: 0 }
+  const local = toReplayLocal({ x: 1, z: 0 }, frame)
+  near(local.x, 1)
+  near(local.z, 0)
+})
+
+test('reverse-parking replay maps world +X to vehicle-left when heading is pi', () => {
+  const frame = { originX: 0, originZ: 0, heading: Math.PI }
+  const local = toReplayLocal({ x: 1, z: 0 }, frame)
+  near(local.x, -1)
+  near(local.z, 0)
 })

@@ -21,6 +21,17 @@ Use `src/sim/vehicleFrame.ts` helpers instead of duplicating trigonometric frame
 
 `src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
 
+## User-facing replay coordinate convention
+
+Driving replay must never expose raw world X/Z as if screen-left/screen-right were vehicle-left/vehicle-right. Replay maps must transform every trajectory, infraction, and field reference into the vehicle's initial local frame:
+
+- screen top = initial vehicle forward
+- screen right = initial vehicle right
+- screen left = initial vehicle left
+- screen bottom = initial vehicle rear
+
+Use `src/replay/replayGeometry.ts` for the transform. Keep start/end/error legend markers visually identical to the markers used on the SVG map.
+
 ## Mirror system: locked known-good baseline
 
 The three-mirror reflection system has a verified known-good baseline at commit:
