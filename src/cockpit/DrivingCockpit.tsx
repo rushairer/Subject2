@@ -26,8 +26,9 @@ export interface CockpitVehicleState {
 interface MirrorRig {
   camera: THREE.PerspectiveCamera
   target: THREE.WebGLRenderTarget
-  anchor: React.RefObject<THREE.Object3D | null>
   surface: React.RefObject<THREE.Mesh | null>
+  localPosition: [number, number, number]
+  localTarget: [number, number, number]
 }
 
 function createMirrorTarget(width: number, height: number) {
@@ -113,7 +114,7 @@ function WheelButtonCluster({ side }: { side: 'left' | 'right' }) {
 }
 
 function SteeringColumn() {
-  return <group position={[-0.43, 1.10, -0.57]} rotation-x={1.02}>
+  return <group position={[-0.43, 1.17, -0.61]} rotation-x={0.48}>
     <mesh position={[0, 0, -0.12]}>
       <cylinderGeometry args={[0.055, 0.072, 0.26, 20]} />
       <meshStandardMaterial color="#15191c" metalness={0.26} roughness={0.48} />
@@ -282,9 +283,6 @@ export function DrivingCockpit({
   const rightMirrorShape = useMemo(() => roundedMirrorShape(0.53, 0.225, 0.065), [])
   const centerMirrorShape = useMemo(() => roundedMirrorShape(0.69, 0.18, 0.035), [])
 
-  const centerAnchor = useRef<THREE.Object3D>(null)
-  const leftAnchor = useRef<THREE.Object3D>(null)
-  const rightAnchor = useRef<THREE.Object3D>(null)
   const centerSurface = useRef<THREE.Mesh>(null)
   const leftSurface = useRef<THREE.Mesh>(null)
   const rightSurface = useRef<THREE.Mesh>(null)
@@ -299,9 +297,9 @@ export function DrivingCockpit({
       centerTarget,
       leftTarget,
       rightTarget,
-      centerCamera: new THREE.PerspectiveCamera(42, 512 / 190, 0.08, 260),
-      leftCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
-      rightCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
+      centerCamera: new THREE.PerspectiveCamera(44, 512 / 190, 0.12, 260),
+      leftCamera: new THREE.PerspectiveCamera(62, 384 / 192, 0.12, 220),
+      rightCamera: new THREE.PerspectiveCamera(62, 384 / 192, 0.12, 220),
     }
   }, [])
 
@@ -430,28 +428,61 @@ export function DrivingCockpit({
     mirrorAccumulator.current += delta
     if (mirrorAccumulator.current < 1 / 30) return
     mirrorAccumulator.current = 0
+
+    const cockpitRoot = root.current
+    if (!cockpitRoot) return
+
     const rigs: MirrorRig[] = [
-      { camera: mirrors.centerCamera, target: mirrors.centerTarget, anchor: centerAnchor, surface: centerSurface },
-      { camera: mirrors.leftCamera, target: mirrors.leftTarget, anchor: leftAnchor, surface: leftSurface },
-      { camera: mirrors.rightCamera, target: mirrors.rightTarget, anchor: rightAnchor, surface: rightSurface },
+      {
+        camera: mirrors.centerCamera,
+        target: mirrors.centerTarget,
+        surface: centerSurface,
+        localPosition: [0, 1.62, -0.49],
+        localTarget: [0, 1.34, 8.5],
+      },
+      {
+        camera: mirrors.leftCamera,
+        target: mirrors.leftTarget,
+        surface: leftSurface,
+        localPosition: [-1.02, 1.34, -0.39],
+        localTarget: [-2.6, 1.12, 8.2],
+      },
+      {
+        camera: mirrors.rightCamera,
+        target: mirrors.rightTarget,
+        surface: rightSurface,
+        localPosition: [1.02, 1.34, -0.39],
+        localTarget: [2.6, 1.12, 8.2],
+      },
     ]
 
-    const surfaces = [centerSurface.current, leftSurface.current, rightSurface.current]
-    surfaces.forEach(surface => { if (surface) surface.visible = false })
-
     const previousTarget = gl.getRenderTarget()
-    for (const rig of rigs) {
-      const anchor = rig.anchor.current
-      if (!anchor) continue
-      anchor.getWorldPosition(rig.camera.position)
-      anchor.getWorldQuaternion(rig.camera.quaternion)
-      rig.camera.updateMatrixWorld()
-      gl.setRenderTarget(rig.target)
-      gl.clear()
-      gl.render(scene, rig.camera)
+    const previousAutoClear = gl.autoClear
+    const wasVisible = cockpitRoot.visible
+
+    // Mirror cameras should see the road and traffic behind the car, not get
+    // occluded by the cockpit shell they are mounted on.
+    cockpitRoot.visible = false
+    gl.autoClear = true
+
+    try {
+      for (const rig of rigs) {
+        const worldPosition = cockpitRoot.localToWorld(new THREE.Vector3(...rig.localPosition))
+        const worldTarget = cockpitRoot.localToWorld(new THREE.Vector3(...rig.localTarget))
+        rig.camera.position.copy(worldPosition)
+        rig.camera.up.set(0, 1, 0)
+        rig.camera.lookAt(worldTarget)
+        rig.camera.updateMatrixWorld(true)
+
+        gl.setRenderTarget(rig.target)
+        gl.clear(true, true, true)
+        gl.render(scene, rig.camera)
+      }
+    } finally {
+      cockpitRoot.visible = wasVisible
+      gl.setRenderTarget(previousTarget)
+      gl.autoClear = previousAutoClear
     }
-    gl.setRenderTarget(previousTarget)
-    surfaces.forEach(surface => { if (surface) surface.visible = true })
   }, -1)
 
   const v = vehicle.current
@@ -568,7 +599,8 @@ export function DrivingCockpit({
     </mesh>
 
     <SteeringColumn />
-    <group ref={steeringWheel} position={[-0.43, 1.17, -0.455]} rotation-x={1.03}>
+    <group position={[-0.43, 1.32, -0.5]} rotation-x={0.48}>
+      <group ref={steeringWheel}>
       <mesh>
         <torusGeometry args={[0.305, 0.043, 20, 72]} />
         <meshStandardMaterial color="#111416" metalness={0.08} roughness={0.5} />
@@ -611,6 +643,7 @@ export function DrivingCockpit({
         <boxGeometry args={[0.018, 0.07, 0.016]} />
         <meshStandardMaterial color="#33383c" roughness={0.32} />
       </mesh>
+      </group>
     </group>
 
     <group ref={gearLever} position={[0.33, 0.64, -0.12]}>
@@ -632,10 +665,6 @@ export function DrivingCockpit({
     <Pedal x={-0.39} active={v.brake} wide />
     <Pedal x={-0.2} active={v.throttle} />
 
-    <object3D ref={centerAnchor} position={[0, 1.61, -0.545]} rotation={[0, Math.PI, 0]} />
-    <object3D ref={leftAnchor} position={[-1.08, 1.34, -0.415]} rotation={[0, Math.PI - 0.2, 0]} />
-    <object3D ref={rightAnchor} position={[1.08, 1.34, -0.415]} rotation={[0, Math.PI + 0.2, 0]} />
-
     <group position={[0, 1.625, -0.625]}>
       <mesh position={[0, 0.145, -0.018]}>
         <boxGeometry args={[0.065, 0.17, 0.05]} />
@@ -645,9 +674,9 @@ export function DrivingCockpit({
         <extrudeGeometry args={[centerMirrorShape, { depth: 0.055, bevelEnabled: true, bevelSize: 0.018, bevelThickness: 0.014, bevelSegments: 2 }]} />
         <meshStandardMaterial color="#111518" roughness={0.34} />
       </mesh>
-      <mesh ref={centerSurface} position={[0, 0, 0.054]}>
+      <mesh ref={centerSurface} position={[0, 0, 0.082]}>
         <shapeGeometry args={[centerMirrorShape]} />
-        <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} />
+        <meshBasicMaterial map={mirrors.centerTarget.texture} color="#eef7ff" toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
 
@@ -660,9 +689,9 @@ export function DrivingCockpit({
         <extrudeGeometry args={[leftMirrorShape, { depth: 0.075, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.018, bevelSegments: 3 }]} />
         <meshStandardMaterial color="#101519" metalness={0.24} roughness={0.32} />
       </mesh>
-      <mesh ref={leftSurface} position={[0, 0, 0.074]}>
+      <mesh ref={leftSurface} position={[0, 0, 0.104]}>
         <shapeGeometry args={[leftMirrorShape]} />
-        <meshBasicMaterial map={mirrors.leftTarget.texture} toneMapped={false} />
+        <meshBasicMaterial map={mirrors.leftTarget.texture} color="#eef7ff" toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
 
@@ -675,9 +704,9 @@ export function DrivingCockpit({
         <extrudeGeometry args={[rightMirrorShape, { depth: 0.075, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.018, bevelSegments: 3 }]} />
         <meshStandardMaterial color="#101519" metalness={0.24} roughness={0.32} />
       </mesh>
-      <mesh ref={rightSurface} position={[0, 0, 0.074]}>
+      <mesh ref={rightSurface} position={[0, 0, 0.104]}>
         <shapeGeometry args={[rightMirrorShape]} />
-        <meshBasicMaterial map={mirrors.rightTarget.texture} toneMapped={false} />
+        <meshBasicMaterial map={mirrors.rightTarget.texture} color="#eef7ff" toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
     </group>
 
