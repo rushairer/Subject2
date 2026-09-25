@@ -483,18 +483,27 @@ export function DrivingCockpit({
     <RoadWheel x={-0.78} z={1.42} spinRef={rearLeftSpin} />
     <RoadWheel x={0.78} z={1.42} spinRef={rearRightSpin} />
 
-    {/* Door / belt-line body section. */}
-    <mesh position={[0, 0.94, 0.15]}>
-      <boxGeometry args={[1.68, 0.34, 2.08]} />
-      <meshStandardMaterial color="#303940" metalness={0.22} roughness={0.47} />
-    </mesh>
-    <mesh position={[-0.865, 0.83, 0.12]}>
-      <boxGeometry args={[0.055, 0.50, 2.12]} />
+    {/* Hollow passenger compartment: side skins and sills only.
+        Never span a solid mesh across the cabin volume. */}
+    <mesh position={[-0.855, 0.86, 0.12]}>
+      <boxGeometry args={[0.075, 0.48, 2.12]} />
       <meshStandardMaterial color="#2b343a" metalness={0.17} roughness={0.5} />
     </mesh>
-    <mesh position={[0.865, 0.83, 0.12]}>
-      <boxGeometry args={[0.055, 0.50, 2.12]} />
+    <mesh position={[0.855, 0.86, 0.12]}>
+      <boxGeometry args={[0.075, 0.48, 2.12]} />
       <meshStandardMaterial color="#2b343a" metalness={0.17} roughness={0.5} />
+    </mesh>
+    <mesh position={[-0.77, 0.66, 0.12]}>
+      <boxGeometry args={[0.13, 0.12, 2.18]} />
+      <meshStandardMaterial color="#252d32" metalness={0.12} roughness={0.55} />
+    </mesh>
+    <mesh position={[0.77, 0.66, 0.12]}>
+      <boxGeometry args={[0.13, 0.12, 2.18]} />
+      <meshStandardMaterial color="#252d32" metalness={0.12} roughness={0.55} />
+    </mesh>
+    <mesh position={[0, 0.62, 0.12]}>
+      <boxGeometry args={[1.38, 0.08, 2.04]} />
+      <meshStandardMaterial color="#1b2125" metalness={0.08} roughness={0.72} />
     </mesh>
 
     {/* Windshield and A-pillars: top edge is rearward (+Z), so the pillars
@@ -692,24 +701,33 @@ export function DrivingCockpit({
     <object3D ref={rightAnchor} position={[1.02, 1.24, -0.34]} rotation={[0, Math.PI - 0.15, 0]} />
 
     <group position={[0, 1.53, -0.44]}>
-      <mesh><boxGeometry args={[0.68, 0.21, 0.045]} /><meshStandardMaterial color="#111417" roughness={0.4} /></mesh>
-      <mesh ref={centerSurface} position={[0, 0, 0.025]}>
+      <mesh position={[0, 0, -0.004]}>
+        <boxGeometry args={[0.638, 0.178, 0.032]} />
+        <meshStandardMaterial color="#111417" metalness={0.12} roughness={0.34} />
+      </mesh>
+      <mesh ref={centerSurface} position={[0, 0, 0.017]}>
         <planeGeometry args={[0.61, 0.15]} />
         <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
     <group position={[-1.02, 1.24, -0.34]} rotation-y={0.22}>
-      <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
-      <mesh ref={leftSurface} position={[0, 0, 0.031]}>
+      <mesh position={[0, 0, -0.004]}>
+        <boxGeometry args={[0.388, 0.198, 0.036]} />
+        <meshStandardMaterial color="#101418" metalness={0.14} roughness={0.32} />
+      </mesh>
+      <mesh ref={leftSurface} position={[0, 0, 0.019]}>
         <planeGeometry args={[0.36, 0.17]} />
         <meshBasicMaterial map={mirrors.leftTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
     <group position={[1.02, 1.24, -0.34]} rotation-y={-0.22}>
-      <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
-      <mesh ref={rightSurface} position={[0, 0, 0.031]}>
+      <mesh position={[0, 0, -0.004]}>
+        <boxGeometry args={[0.388, 0.198, 0.036]} />
+        <meshStandardMaterial color="#101418" metalness={0.14} roughness={0.32} />
+      </mesh>
+      <mesh ref={rightSurface} position={[0, 0, 0.019]}>
         <planeGeometry args={[0.36, 0.17]} />
         <meshBasicMaterial map={mirrors.rightTarget.texture} toneMapped={false} />
       </mesh>
