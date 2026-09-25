@@ -567,7 +567,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
-          <div className="steering-hud-rotor" style={{ transform: `rotate(${-display.steeringWheelAngle}rad)` }}>
+          <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
             <span className="steering-hud-center" />
             <span className="steering-hud-spoke s1" />
             <span className="steering-hud-spoke s2" />

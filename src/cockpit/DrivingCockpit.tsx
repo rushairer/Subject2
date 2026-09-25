@@ -26,6 +26,7 @@ export interface CockpitVehicleState {
 interface MirrorRig {
   camera: THREE.PerspectiveCamera
   target: THREE.WebGLRenderTarget
+  anchor: React.RefObject<THREE.Object3D | null>
   surface: React.RefObject<THREE.Mesh | null>
 }
 
@@ -35,8 +36,9 @@ function createMirrorTarget(width: number, height: number) {
     stencilBuffer: false,
   })
   target.texture.colorSpace = THREE.SRGBColorSpace
-  // A reflected virtual camera already produces the left-right reversal of a
-  // physical mirror. Do not flip the render target a second time.
+  target.texture.wrapS = THREE.RepeatWrapping
+  target.texture.repeat.x = -1
+  target.texture.offset.x = 1
   target.texture.generateMipmaps = false
   target.texture.minFilter = THREE.LinearFilter
   target.texture.magFilter = THREE.LinearFilter
@@ -254,7 +256,7 @@ export function DrivingCockpit({
   showClutch: boolean
   automatic: boolean
 }): ReactElement {
-  const { gl, scene, camera: driverCamera } = useThree()
+  const { gl, scene } = useThree()
   const root = useRef<THREE.Group>(null)
   const steeringWheel = useRef<THREE.Group>(null)
   const gearLever = useRef<THREE.Group>(null)
@@ -280,6 +282,9 @@ export function DrivingCockpit({
   const rightMirrorShape = useMemo(() => roundedMirrorShape(0.53, 0.225, 0.065), [])
   const centerMirrorShape = useMemo(() => roundedMirrorShape(0.69, 0.18, 0.035), [])
 
+  const centerAnchor = useRef<THREE.Object3D>(null)
+  const leftAnchor = useRef<THREE.Object3D>(null)
+  const rightAnchor = useRef<THREE.Object3D>(null)
   const centerSurface = useRef<THREE.Mesh>(null)
   const leftSurface = useRef<THREE.Mesh>(null)
   const rightSurface = useRef<THREE.Mesh>(null)
@@ -294,9 +299,9 @@ export function DrivingCockpit({
       centerTarget,
       leftTarget,
       rightTarget,
-      centerCamera: new THREE.PerspectiveCamera(44, 512 / 190, 0.12, 260),
-      leftCamera: new THREE.PerspectiveCamera(62, 384 / 192, 0.12, 220),
-      rightCamera: new THREE.PerspectiveCamera(62, 384 / 192, 0.12, 220),
+      centerCamera: new THREE.PerspectiveCamera(42, 512 / 190, 0.08, 260),
+      leftCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
+      rightCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
     }
   }, [])
 
@@ -426,57 +431,27 @@ export function DrivingCockpit({
     if (mirrorAccumulator.current < 1 / 30) return
     mirrorAccumulator.current = 0
 
-    const cockpitRoot = root.current
-    if (!cockpitRoot) return
-
-    const rigs = [
-      { camera: mirrors.centerCamera, target: mirrors.centerTarget, surface: centerSurface },
-      { camera: mirrors.leftCamera, target: mirrors.leftTarget, surface: leftSurface },
-      { camera: mirrors.rightCamera, target: mirrors.rightTarget, surface: rightSurface },
+    const rigs: MirrorRig[] = [
+      { camera: mirrors.centerCamera, target: mirrors.centerTarget, anchor: centerAnchor, surface: centerSurface },
+      { camera: mirrors.leftCamera, target: mirrors.leftTarget, anchor: leftAnchor, surface: leftSurface },
+      { camera: mirrors.rightCamera, target: mirrors.rightTarget, anchor: rightAnchor, surface: rightSurface },
     ]
 
-    const driverPosition = new THREE.Vector3()
-    const driverDirection = new THREE.Vector3()
-    const driverUp = new THREE.Vector3(0, 1, 0)
-    driverCamera.getWorldPosition(driverPosition)
-    driverCamera.getWorldDirection(driverDirection)
-    driverUp.applyQuaternion(driverCamera.quaternion).normalize()
+    const surfaces = [centerSurface.current, leftSurface.current, rightSurface.current]
+    surfaces.forEach(surface => {
+      if (surface) surface.visible = false
+    })
 
     const previousTarget = gl.getRenderTarget()
     const previousAutoClear = gl.autoClear
-    const wasVisible = cockpitRoot.visible
-
-    cockpitRoot.visible = false
     gl.autoClear = true
 
     try {
       for (const rig of rigs) {
-        const surface = rig.surface.current
-        if (!surface) continue
-
-        const mirrorPosition = new THREE.Vector3()
-        const mirrorQuaternion = new THREE.Quaternion()
-        surface.getWorldPosition(mirrorPosition)
-        surface.getWorldQuaternion(mirrorQuaternion)
-
-        const mirrorNormal = new THREE.Vector3(0, 0, 1)
-          .applyQuaternion(mirrorQuaternion)
-          .normalize()
-
-        const eyeToPlane = driverPosition.clone().sub(mirrorPosition)
-        const reflectedPosition = driverPosition.clone().sub(
-          mirrorNormal.clone().multiplyScalar(2 * eyeToPlane.dot(mirrorNormal)),
-        )
-        const reflectedDirection = driverDirection.clone().sub(
-          mirrorNormal.clone().multiplyScalar(2 * driverDirection.dot(mirrorNormal)),
-        ).normalize()
-        const reflectedUp = driverUp.clone().sub(
-          mirrorNormal.clone().multiplyScalar(2 * driverUp.dot(mirrorNormal)),
-        ).normalize()
-
-        rig.camera.position.copy(reflectedPosition)
-        rig.camera.up.copy(reflectedUp)
-        rig.camera.lookAt(reflectedPosition.clone().add(reflectedDirection))
+        const anchor = rig.anchor.current
+        if (!anchor) continue
+        anchor.getWorldPosition(rig.camera.position)
+        anchor.getWorldQuaternion(rig.camera.quaternion)
         rig.camera.updateMatrixWorld(true)
 
         gl.setRenderTarget(rig.target)
@@ -484,9 +459,11 @@ export function DrivingCockpit({
         gl.render(scene, rig.camera)
       }
     } finally {
-      cockpitRoot.visible = wasVisible
       gl.setRenderTarget(previousTarget)
       gl.autoClear = previousAutoClear
+      surfaces.forEach(surface => {
+        if (surface) surface.visible = true
+      })
     }
   }, -1)
 
@@ -670,6 +647,10 @@ export function DrivingCockpit({
     <Pedal x={-0.39} active={v.brake} wide />
     <Pedal x={-0.2} active={v.throttle} />
 
+    <object3D ref={centerAnchor} position={[0, 1.61, -0.545]} rotation={[0, Math.PI, 0]} />
+    <object3D ref={leftAnchor} position={[-1.08, 1.34, -0.415]} rotation={[0, Math.PI - 0.2, 0]} />
+    <object3D ref={rightAnchor} position={[1.08, 1.34, -0.415]} rotation={[0, Math.PI + 0.2, 0]} />
+
     <group position={[0, 1.625, -0.625]}>
       <mesh position={[0, 0.145, -0.018]}>
         <boxGeometry args={[0.065, 0.17, 0.05]} />
@@ -685,7 +666,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[-1.085, 1.335, -0.47]} rotation-y={-0.14}>
+    <group position={[-1.075, 1.33, -0.48]} rotation-y={0.035}>
       <mesh position={[0.19, -0.035, -0.015]} rotation-z={-0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
@@ -700,7 +681,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[1.085, 1.335, -0.47]} rotation-y={0.14}>
+    <group position={[1.075, 1.33, -0.48]} rotation-y={-0.035}>
       <mesh position={[-0.19, -0.035, -0.015]} rotation-z={0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
