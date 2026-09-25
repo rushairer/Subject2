@@ -70,9 +70,10 @@ export function stepVehiclePhysics(
       const freeRpm = DRIVING_RULES.manualTransmission.idleRpm + input.throttle * 3200
       const wheelCoupledRpm = Math.abs(vehicle.speed) * (coupledRpmPerMps[absGear] ?? 205)
       const coupling = vehicle.gear === 0 ? 0 : clutchEngagement * 0.92
+      const torqueSupportRpm = input.throttle * 1200 * coupling
       const targetRpm = Math.max(
         320,
-        freeRpm * (1 - coupling) + wheelCoupledRpm * coupling,
+        freeRpm * (1 - coupling) + wheelCoupledRpm * coupling + torqueSupportRpm,
       )
       vehicle.engineRpm += (targetRpm - vehicle.engineRpm) * Math.min(1, dt * 8)
 
@@ -82,7 +83,13 @@ export function stepVehiclePhysics(
         Math.abs(vehicle.speed) < DRIVING_RULES.manualTransmission.stallSpeedThreshold &&
         input.throttle < DRIVING_RULES.manualTransmission.stallThrottleThreshold
 
-      if (stallRisk || vehicle.engineRpm < DRIVING_RULES.manualTransmission.stallRpm) {
+      const loadedLowRpm =
+        vehicle.gear !== 0 &&
+        clutchEngagement > 0.72 &&
+        vehicle.engineRpm < DRIVING_RULES.manualTransmission.stallRpm &&
+        input.throttle < 0.35
+
+      if (stallRisk || loadedLowRpm) {
         vehicle.stallTimer += dt
       } else {
         vehicle.stallTimer = Math.max(0, vehicle.stallTimer - dt * 2.5)
