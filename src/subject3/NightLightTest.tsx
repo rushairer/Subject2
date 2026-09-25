@@ -64,7 +64,11 @@ export function NightLightTest({
   const [index, setIndex] = useState(0)
   const [remaining, setRemaining] = useState(5)
   const actionCount = useRef(0)
+  const onPassRef = useRef(onPass)
+  const onFailRef = useRef(onFail)
   const prompt = prompts[index]
+  onPassRef.current = onPass
+  onFailRef.current = onFail
 
   useEffect(() => {
     let resolved = false
@@ -95,7 +99,7 @@ export function NightLightTest({
         window.clearTimeout(timeout)
         if (index >= prompts.length - 1) {
           speak('模拟夜间灯光考试完成。请关闭不需要的灯光，准备起步。')
-          onPass()
+          onPassRef.current()
         } else {
           setIndex(value => value + 1)
         }
@@ -106,7 +110,7 @@ export function NightLightTest({
       if (resolved) return
       resolved = true
       window.clearInterval(interval)
-      onFail(prompt.text)
+      onFailRef.current(prompt.text)
     }, 5000)
 
     return () => {
@@ -115,7 +119,7 @@ export function NightLightTest({
       window.clearTimeout(timeout)
       window.removeEventListener('keydown', keyDown)
     }
-  }, [index, onFail, onPass, prompt, prompts.length, vehicle])
+  }, [index, prompt, prompts.length, vehicle])
 
   return <div className="light-test">
     <div className="eyebrow">科目三 · 模拟夜间灯光考试</div>
