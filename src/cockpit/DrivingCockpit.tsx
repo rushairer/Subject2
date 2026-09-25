@@ -112,7 +112,7 @@ function WheelButtonCluster({ side }: { side: 'left' | 'right' }) {
 }
 
 function SteeringColumn() {
-  return <group position={[-0.43, 1.04, -0.53]} rotation-x={1.06}>
+  return <group position={[-0.43, 1.10, -0.57]} rotation-x={1.02}>
     <mesh position={[0, 0, -0.12]}>
       <cylinderGeometry args={[0.055, 0.072, 0.26, 20]} />
       <meshStandardMaterial color="#15191c" metalness={0.26} roughness={0.48} />
@@ -146,6 +146,37 @@ function SteeringColumn() {
   </group>
 }
 
+
+function ackermannFrontAngles(virtualAngle: number) {
+  if (Math.abs(virtualAngle) < 0.0001) return { left: 0, right: 0 }
+
+  const wheelbase = 2.82
+  const halfTrack = 1.56 / 2
+  const sign = Math.sign(virtualAngle)
+  const radius = wheelbase / Math.tan(Math.abs(virtualAngle))
+  const inner = Math.atan(wheelbase / Math.max(0.15, radius - halfTrack))
+  const outer = Math.atan(wheelbase / (radius + halfTrack))
+
+  return sign > 0
+    ? { left: outer, right: inner }
+    : { left: -inner, right: -outer }
+}
+
+function roundedMirrorShape(width: number, height: number, radius: number) {
+  const shape = new THREE.Shape()
+  const x = -width / 2
+  const y = -height / 2
+  shape.moveTo(x + radius, y)
+  shape.lineTo(x + width - radius, y)
+  shape.quadraticCurveTo(x + width, y, x + width, y + radius)
+  shape.lineTo(x + width, y + height - radius)
+  shape.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+  shape.lineTo(x + radius, y + height)
+  shape.quadraticCurveTo(x, y + height, x, y + height - radius)
+  shape.lineTo(x, y + radius)
+  shape.quadraticCurveTo(x, y, x + radius, y)
+  return shape
+}
 
 function RoadWheel({
   x,
@@ -246,6 +277,9 @@ export function DrivingCockpit({
   const frontRightSpin = useRef<THREE.Group>(null)
   const rearLeftSpin = useRef<THREE.Group>(null)
   const rearRightSpin = useRef<THREE.Group>(null)
+  const leftMirrorShape = useMemo(() => roundedMirrorShape(0.53, 0.225, 0.065), [])
+  const rightMirrorShape = useMemo(() => roundedMirrorShape(0.53, 0.225, 0.065), [])
+  const centerMirrorShape = useMemo(() => roundedMirrorShape(0.69, 0.18, 0.035), [])
 
   const centerAnchor = useRef<THREE.Object3D>(null)
   const leftAnchor = useRef<THREE.Object3D>(null)
@@ -291,8 +325,9 @@ export function DrivingCockpit({
     displayAccumulator.current += delta
     wheelSpin.current += (v.speed * delta) / 0.31
     if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steeringWheelAngle
-    if (frontLeftSteer.current) frontLeftSteer.current.rotation.y = -v.steering
-    if (frontRightSteer.current) frontRightSteer.current.rotation.y = -v.steering
+    const frontAngles = ackermannFrontAngles(v.steering)
+    if (frontLeftSteer.current) frontLeftSteer.current.rotation.y = -frontAngles.left
+    if (frontRightSteer.current) frontRightSteer.current.rotation.y = -frontAngles.right
     for (const spin of [frontLeftSpin.current, frontRightSpin.current, rearLeftSpin.current, rearRightSpin.current]) {
       if (spin) spin.rotation.y = wheelSpin.current
     }
@@ -444,17 +479,25 @@ export function DrivingCockpit({
       <meshStandardMaterial color="#1a2026" roughness={0.52} />
     </mesh>
 
-    <VehicleGlass position={[0, 1.44, -0.69]} rotation={[-0.16, 0, 0]} size={[1.58, 0.66]} />
-    <VehicleGlass position={[-0.865, 1.42, 0.16]} rotation={[0, Math.PI / 2, 0]} size={[1.35, 0.57]} />
-    <VehicleGlass position={[0.865, 1.42, 0.16]} rotation={[0, Math.PI / 2, 0]} size={[1.35, 0.57]} />
+    <VehicleGlass position={[0, 1.415, -0.735]} rotation={[-0.145, 0, 0]} size={[1.66, 0.72]} />
+    <VehicleGlass position={[-0.862, 1.42, 0.14]} rotation={[0, Math.PI / 2, 0]} size={[1.34, 0.58]} />
+    <VehicleGlass position={[0.862, 1.42, 0.14]} rotation={[0, Math.PI / 2, 0]} size={[1.34, 0.58]} />
 
-    <mesh position={[-0.82, 1.4, -0.47]} rotation-x={-0.17}>
-      <boxGeometry args={[0.075, 0.76, 0.09]} />
+    <mesh position={[-0.842, 1.415, -0.685]} rotation-x={-0.145}>
+      <boxGeometry args={[0.082, 0.79, 0.095]} />
       <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
     </mesh>
-    <mesh position={[0.82, 1.4, -0.47]} rotation-x={-0.17}>
-      <boxGeometry args={[0.075, 0.76, 0.09]} />
+    <mesh position={[0.842, 1.415, -0.685]} rotation-x={-0.145}>
+      <boxGeometry args={[0.082, 0.79, 0.095]} />
       <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
+    </mesh>
+    <mesh position={[0, 1.765, -0.665]} rotation-x={-0.145}>
+      <boxGeometry args={[1.74, 0.085, 0.105]} />
+      <meshStandardMaterial color="#151b20" roughness={0.46} />
+    </mesh>
+    <mesh position={[0, 1.07, -0.785]} rotation-x={-0.145}>
+      <boxGeometry args={[1.72, 0.08, 0.105]} />
+      <meshStandardMaterial color="#171d22" roughness={0.48} />
     </mesh>
     <mesh position={[-0.855, 1.4, 0.67]}>
       <boxGeometry args={[0.075, 0.72, 0.1]} />
@@ -472,10 +515,7 @@ export function DrivingCockpit({
       <boxGeometry args={[0.075, 0.08, 1.58]} />
       <meshStandardMaterial color="#161c21" roughness={0.46} />
     </mesh>
-    <mesh position={[0, 1.75, -0.57]}>
-      <boxGeometry args={[1.75, 0.09, 0.1]} />
-      <meshStandardMaterial color="#151b20" roughness={0.46} />
-    </mesh>
+
     <mesh position={[0, 1.74, 0.83]}>
       <boxGeometry args={[1.75, 0.09, 0.1]} />
       <meshStandardMaterial color="#151b20" roughness={0.46} />
@@ -527,7 +567,7 @@ export function DrivingCockpit({
     </mesh>
 
     <SteeringColumn />
-    <group ref={steeringWheel} position={[-0.43, 1.075, -0.405]} rotation-x={1.08}>
+    <group ref={steeringWheel} position={[-0.43, 1.17, -0.455]} rotation-x={1.03}>
       <mesh>
         <torusGeometry args={[0.305, 0.043, 20, 72]} />
         <meshStandardMaterial color="#111416" metalness={0.08} roughness={0.5} />
@@ -595,47 +635,47 @@ export function DrivingCockpit({
     <object3D ref={leftAnchor} position={[-1.08, 1.34, -0.415]} rotation={[0, Math.PI - 0.2, 0]} />
     <object3D ref={rightAnchor} position={[1.08, 1.34, -0.415]} rotation={[0, Math.PI + 0.2, 0]} />
 
-    <group position={[0, 1.62, -0.61]}>
-      <mesh position={[0, 0.16, -0.015]}>
-        <boxGeometry args={[0.07, 0.19, 0.055]} />
+    <group position={[0, 1.625, -0.625]}>
+      <mesh position={[0, 0.145, -0.018]}>
+        <boxGeometry args={[0.065, 0.17, 0.05]} />
         <meshStandardMaterial color="#242a2e" roughness={0.42} />
       </mesh>
-      <mesh>
-        <boxGeometry args={[0.75, 0.235, 0.065]} />
+      <mesh position={[0, 0, -0.012]}>
+        <extrudeGeometry args={[centerMirrorShape, { depth: 0.055, bevelEnabled: true, bevelSize: 0.018, bevelThickness: 0.014, bevelSegments: 2 }]} />
         <meshStandardMaterial color="#111518" roughness={0.34} />
       </mesh>
-      <mesh ref={centerSurface} position={[0, 0, 0.036]}>
-        <planeGeometry args={[0.675, 0.17]} />
+      <mesh ref={centerSurface} position={[0, 0, 0.054]}>
+        <shapeGeometry args={[centerMirrorShape]} />
         <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
-    <group position={[-1.075, 1.33, -0.48]} rotation-y={0.035}>
-      <mesh position={[0.155, -0.04, 0.005]} rotation-z={-0.16}>
-        <boxGeometry args={[0.31, 0.055, 0.07]} />
+    <group position={[-1.085, 1.335, -0.47]} rotation-y={0.055}>
+      <mesh position={[0.19, -0.035, -0.015]} rotation-z={-0.14}>
+        <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
       </mesh>
-      <mesh scale={[0.32, 0.16, 0.065]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial color="#12171b" metalness={0.28} roughness={0.34} />
+      <mesh position={[0, 0, -0.018]}>
+        <extrudeGeometry args={[leftMirrorShape, { depth: 0.075, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.018, bevelSegments: 3 }]} />
+        <meshStandardMaterial color="#101519" metalness={0.24} roughness={0.32} />
       </mesh>
-      <mesh ref={leftSurface} position={[0, 0, 0.067]}>
-        <planeGeometry args={[0.49, 0.205]} />
+      <mesh ref={leftSurface} position={[0, 0, 0.074]}>
+        <shapeGeometry args={[leftMirrorShape]} />
         <meshBasicMaterial map={mirrors.leftTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
-    <group position={[1.075, 1.33, -0.48]} rotation-y={-0.035}>
-      <mesh position={[-0.155, -0.04, 0.005]} rotation-z={0.16}>
-        <boxGeometry args={[0.31, 0.055, 0.07]} />
+    <group position={[1.085, 1.335, -0.47]} rotation-y={-0.055}>
+      <mesh position={[-0.19, -0.035, -0.015]} rotation-z={0.14}>
+        <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
       </mesh>
-      <mesh scale={[0.32, 0.16, 0.065]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial color="#12171b" metalness={0.28} roughness={0.34} />
+      <mesh position={[0, 0, -0.018]}>
+        <extrudeGeometry args={[rightMirrorShape, { depth: 0.075, bevelEnabled: true, bevelSize: 0.025, bevelThickness: 0.018, bevelSegments: 3 }]} />
+        <meshStandardMaterial color="#101519" metalness={0.24} roughness={0.32} />
       </mesh>
-      <mesh ref={rightSurface} position={[0, 0, 0.067]}>
-        <planeGeometry args={[0.49, 0.205]} />
+      <mesh ref={rightSurface} position={[0, 0, 0.074]}>
+        <shapeGeometry args={[rightMirrorShape]} />
         <meshBasicMaterial map={mirrors.rightTarget.texture} toneMapped={false} />
       </mesh>
     </group>

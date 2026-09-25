@@ -381,13 +381,13 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       carGroup.current.rotation.set(roadPose.pitch, -v.heading, 0)
     }
     const driverOffsetX = -0.4
-    const driverForward = 0.1
+    const driverForward = 0.03
     camera.position.set(
       v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
-      roadPose.y + 1.49,
+      roadPose.y + 1.445,
       v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
     )
-    camera.rotation.set(roadPose.pitch, -v.heading + cameraYaw.current, 0)
+    camera.rotation.set(roadPose.pitch - 0.055, -v.heading + cameraYaw.current, 0)
 
     const limit = session.examId === 'subject3' ? 50 : 12
     if (Math.abs(v.speed) * 3.6 > limit) {

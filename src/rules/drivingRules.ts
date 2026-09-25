@@ -3,6 +3,9 @@ export const DRIVING_RULES = {
     wheelTurnsLockToLock: 2.7,
     wheelTurnsPerSecond: 1.0,
     roadWheelMaxAngleRadians: 0.58,
+    wheelbaseMeters: 2.82,
+    trackWidthMeters: 1.56,
+    rearAxleFromCenterMeters: 1.41,
   },
   manualTransmission: {
     idleRpm: 820,
