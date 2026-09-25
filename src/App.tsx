@@ -381,7 +381,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course /> : <Road />}
+    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>

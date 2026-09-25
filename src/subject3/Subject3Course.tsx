@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type ReactElement } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 
 type Point = { x: number; z: number }
@@ -443,7 +444,205 @@ function Pedestrian({ distance, lateral, color }: { distance: number; lateral: n
   </group>
 }
 
-export function Subject3Course(): ReactElement {
+
+function CarBody({ color = '#c7cbd0' }: { color?: string }) {
+  return <group>
+    <mesh position={[0, 0.38, 0]}><boxGeometry args={[1.78, 0.62, 4.25]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.46} /></mesh>
+    <mesh position={[0, 0.82, -0.2]}><boxGeometry args={[1.48, 0.55, 1.9]} /><meshStandardMaterial color="#526775" metalness={0.48} roughness={0.25} /></mesh>
+    <mesh position={[-0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
+    <mesh position={[0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
+  </group>
+}
+
+function actorWorldPosition(progress: number, lateral: number) {
+  const pose = poseAtRouteDistance(progress)
+  return {
+    pose,
+    x: pose.x + pose.rightX * lateral,
+    z: pose.z + pose.rightZ * lateral,
+  }
+}
+
+function checkVehicleCollision(
+  player: MutableRefObject<Subject3Vehicle>,
+  x: number,
+  z: number,
+  id: string,
+  onInfraction: (item: Subject3Infraction) => void,
+  radius = 2.6,
+) {
+  const distance = Math.hypot(player.current.x - x, player.current.z - z)
+  if (distance < radius) {
+    onInfraction({
+      id,
+      title: '道路驾驶过程中与其他交通参与者发生碰撞',
+      points: 100,
+      fatal: true,
+    })
+  }
+}
+
+function MovingTrafficCar({
+  player,
+  onInfraction,
+  id,
+  startProgress,
+  speed,
+  lateral,
+  opposite = false,
+  color,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+  id: string
+  startProgress: number
+  speed: number
+  lateral: number
+  opposite?: boolean
+  color: string
+}) {
+  const group = useRef<THREE.Group>(null)
+  const progress = useRef(startProgress)
+
+  useFrame((_, delta) => {
+    progress.current += (opposite ? -1 : 1) * speed * delta
+    if (progress.current > SUBJECT3_ROUTE_LENGTH - 40) progress.current = 120
+    if (progress.current < 60) progress.current = SUBJECT3_ROUTE_LENGTH - 80
+    const world = actorWorldPosition(progress.current, lateral)
+    if (group.current) {
+      group.current.position.set(world.x, 0.04, world.z)
+      group.current.rotation.y = world.pose.heading + (opposite ? Math.PI : 0)
+    }
+    checkVehicleCollision(player, world.x, world.z, `subject3-collision-${id}`, onInfraction)
+  })
+
+  return <group ref={group}><CarBody color={color} /></group>
+}
+
+function SuddenBrakeCar({
+  player,
+  onInfraction,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+}) {
+  const group = useRef<THREE.Group>(null)
+  const progress = useRef(2760)
+  const speed = useRef(8.5)
+
+  useFrame((_, delta) => {
+    const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
+    if (playerProgress > 2660 && playerProgress < 2920) {
+      if (playerProgress > 2725) speed.current = Math.max(0, speed.current - 7.5 * delta)
+      progress.current += speed.current * delta
+    }
+    const world = actorWorldPosition(progress.current, 0)
+    if (group.current) {
+      group.current.position.set(world.x, 0.04, world.z)
+      group.current.rotation.y = world.pose.heading
+    }
+    checkVehicleCollision(player, world.x, world.z, 'subject3-collision-sudden-brake', onInfraction)
+  })
+
+  return <group ref={group}><CarBody color="#d8d4c9" /></group>
+}
+
+function CrossingPedestrian({
+  player,
+  onInfraction,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+}) {
+  const group = useRef<THREE.Group>(null)
+  const elapsed = useRef(0)
+  const triggered = useRef(false)
+  const progress = 2532
+
+  useFrame((_, delta) => {
+    const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
+    if (!triggered.current && playerProgress > 2440) triggered.current = true
+    if (triggered.current) elapsed.current = Math.min(6, elapsed.current + delta)
+    const t = Math.min(1, elapsed.current / 4.8)
+    const lateral = 3.4 - t * 9.1
+    const world = actorWorldPosition(progress, lateral)
+    if (group.current) group.current.position.set(world.x, 0, world.z)
+    if (triggered.current) {
+      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45)
+    }
+  })
+
+  return <group ref={group}>
+    <mesh position={[0, 1.03, 0]}><cylinderGeometry args={[0.18, 0.23, 1.25, 12]} /><meshStandardMaterial color="#3f75a2" /></mesh>
+    <mesh position={[0, 1.85, 0]}><sphereGeometry args={[0.24, 14, 10]} /><meshStandardMaterial color="#d8aa80" /></mesh>
+  </group>
+}
+
+function CutInScooter({
+  player,
+  onInfraction,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+}) {
+  const group = useRef<THREE.Group>(null)
+  const elapsed = useRef(0)
+  const triggered = useRef(false)
+  const progress = useRef(1385)
+
+  useFrame((_, delta) => {
+    const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
+    if (!triggered.current && playerProgress > 1290) triggered.current = true
+    if (triggered.current) {
+      elapsed.current = Math.min(5, elapsed.current + delta)
+      progress.current += 3.2 * delta
+    }
+    const t = Math.min(1, elapsed.current / 3.4)
+    const lateral = 3.2 - t * 3.3
+    const world = actorWorldPosition(progress.current, lateral)
+    if (group.current) {
+      group.current.position.set(world.x, 0.18, world.z)
+      group.current.rotation.y = world.pose.heading
+    }
+    if (triggered.current) {
+      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-scooter', onInfraction, 1.55)
+    }
+  })
+
+  return <group ref={group}>
+    <mesh position={[0, 0.38, 0]}><boxGeometry args={[0.48, 0.42, 1.45]} /><meshStandardMaterial color="#343b40" /></mesh>
+    <mesh position={[0, 0.92, 0.08]}><cylinderGeometry args={[0.15, 0.19, 0.9, 12]} /><meshStandardMaterial color="#bf584b" /></mesh>
+    <mesh position={[0, 1.54, 0.08]}><sphereGeometry args={[0.2, 12, 9]} /><meshStandardMaterial color="#d6a67e" /></mesh>
+    <mesh position={[-0.27, 0.18, -0.48]} rotation-z={Math.PI / 2}><torusGeometry args={[0.23, 0.045, 10, 18]} /><meshStandardMaterial color="#111" /></mesh>
+    <mesh position={[-0.27, 0.18, 0.48]} rotation-z={Math.PI / 2}><torusGeometry args={[0.23, 0.045, 10, 18]} /><meshStandardMaterial color="#111" /></mesh>
+  </group>
+}
+
+function DynamicTraffic({
+  player,
+  onInfraction,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+}) {
+  return <>
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-a" startProgress={620} speed={9.2} lateral={-3.5} color="#40698e" />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-b" startProgress={1540} speed={7.5} lateral={0} color="#b5b8b3" />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-a" startProgress={1900} speed={10.5} lateral={-8.75} opposite color="#a84742" />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-b" startProgress={3650} speed={8.6} lateral={-8.75} opposite color="#4f6e51" />
+    <SuddenBrakeCar player={player} onInfraction={onInfraction} />
+    <CrossingPedestrian player={player} onInfraction={onInfraction} />
+    <CutInScooter player={player} onInfraction={onInfraction} />
+  </>
+}
+
+export function Subject3Course({
+  player,
+  onInfraction,
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+}): ReactElement {
   return <group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.09, -1200]}>
       <planeGeometry args={[1400, 5400]} />
@@ -478,6 +677,8 @@ export function Subject3Course(): ReactElement {
     <Pedestrian distance={1205} lateral={3.2} color="#e2a544" />
     <Pedestrian distance={2530} lateral={1.1} color="#4e79aa" />
     <Pedestrian distance={2540} lateral={-0.4} color="#8c5d92" />
+
+    <DynamicTraffic player={player} onInfraction={onInfraction} />
 
     {SUBJECT3_EVENTS.filter((_, index) => index % 2 === 0).map((event, index) => {
       const pose = poseAtRouteDistance((event.start + event.end) / 2)
