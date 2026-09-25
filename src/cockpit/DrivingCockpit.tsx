@@ -163,6 +163,24 @@ function ackermannFrontAngles(virtualAngle: number) {
     : { left: -inner, right: -outer }
 }
 
+const MIRROR_SURFACE_POSE = {
+  // Derived from the current left-hand-drive eye point, each physical mirror
+  // position, and the known-good rear camera directions from 0c206fff.
+  // The surface normal bisects the eye ray and the desired reflected scene ray.
+  center: {
+    pitch: THREE.MathUtils.degToRad(6),
+    yaw: THREE.MathUtils.degToRad(-16.5),
+  },
+  left: {
+    pitch: THREE.MathUtils.degToRad(-6),
+    yaw: THREE.MathUtils.degToRad(22),
+  },
+  right: {
+    pitch: THREE.MathUtils.degToRad(-3.5),
+    yaw: THREE.MathUtils.degToRad(-31),
+  },
+} as const
+
 function roundedMirrorShape(width: number, height: number, radius: number) {
   const shape = new THREE.Shape()
   const x = -width / 2
@@ -651,7 +669,7 @@ export function DrivingCockpit({
     <object3D ref={leftAnchor} position={[-1.08, 1.34, -0.415]} rotation={[0, Math.PI - 0.2, 0]} />
     <object3D ref={rightAnchor} position={[1.08, 1.34, -0.415]} rotation={[0, Math.PI + 0.2, 0]} />
 
-    <group position={[0, 1.625, -0.625]}>
+    <group position={[0, 1.625, -0.625]} rotation={[MIRROR_SURFACE_POSE.center.pitch, MIRROR_SURFACE_POSE.center.yaw, 0]}>
       <mesh position={[0, 0.145, -0.018]}>
         <boxGeometry args={[0.065, 0.17, 0.05]} />
         <meshStandardMaterial color="#242a2e" roughness={0.42} />
@@ -666,7 +684,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[-1.075, 1.33, -0.48]} rotation-y={0.035}>
+    <group position={[-1.075, 1.33, -0.48]} rotation={[MIRROR_SURFACE_POSE.left.pitch, MIRROR_SURFACE_POSE.left.yaw, 0]}>
       <mesh position={[0.19, -0.035, -0.015]} rotation-z={-0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
@@ -681,7 +699,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[1.075, 1.33, -0.48]} rotation-y={-0.035}>
+    <group position={[1.075, 1.33, -0.48]} rotation={[MIRROR_SURFACE_POSE.right.pitch, MIRROR_SURFACE_POSE.right.yaw, 0]}>
       <mesh position={[-0.19, -0.035, -0.015]} rotation-z={0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
