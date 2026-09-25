@@ -109,14 +109,20 @@ export function detectMovedAxis(
 
 function normalizeSteering(raw: number, calibration: CenteredAxisCalibration) {
   const { left, center, right } = calibration
-  if (raw <= center) {
-    const denominator = center - left
-    if (Math.abs(denominator) < 0.001) return 0
-    return clamp(-((center - raw) / denominator), -1, 0)
+  const fromCenter = raw - center
+  const leftVector = left - center
+  const rightVector = right - center
+
+  if (Math.abs(fromCenter) < 0.002) return 0
+
+  const isLeftSide = fromCenter * leftVector > 0
+  if (isLeftSide) {
+    if (Math.abs(leftVector) < 0.001) return 0
+    return -clamp(Math.abs(fromCenter / leftVector), 0, 1)
   }
-  const denominator = right - center
-  if (Math.abs(denominator) < 0.001) return 0
-  return clamp((raw - center) / denominator, 0, 1)
+
+  if (Math.abs(rightVector) < 0.001) return 0
+  return clamp(Math.abs(fromCenter / rightVector), 0, 1)
 }
 
 function normalizePedal(raw: number, calibration: PedalAxisCalibration) {
@@ -131,7 +137,7 @@ export function readRacingWheelControls(): RacingWheelControls {
 
   const mapping = loadRacingWheelMapping(gamepad.id)
   if (!mapping) {
-    return { connected: true, deviceId: gamepad.id, steering: 0, throttle: 0, brake: 0 }
+    return { connected: true, steering: 0, throttle: 0, brake: 0 }
   }
 
   return {
