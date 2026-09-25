@@ -27,8 +27,6 @@ interface MirrorRig {
   camera: THREE.PerspectiveCamera
   target: THREE.WebGLRenderTarget
   surface: React.RefObject<THREE.Mesh | null>
-  localPosition: [number, number, number]
-  localTarget: [number, number, number]
 }
 
 function createMirrorTarget(width: number, height: number) {
@@ -37,9 +35,8 @@ function createMirrorTarget(width: number, height: number) {
     stencilBuffer: false,
   })
   target.texture.colorSpace = THREE.SRGBColorSpace
-  target.texture.wrapS = THREE.RepeatWrapping
-  target.texture.repeat.x = -1
-  target.texture.offset.x = 1
+  // A reflected virtual camera already produces the left-right reversal of a
+  // physical mirror. Do not flip the render target a second time.
   target.texture.generateMipmaps = false
   target.texture.minFilter = THREE.LinearFilter
   target.texture.magFilter = THREE.LinearFilter
@@ -114,7 +111,7 @@ function WheelButtonCluster({ side }: { side: 'left' | 'right' }) {
 }
 
 function SteeringColumn() {
-  return <group position={[-0.43, 1.17, -0.61]} rotation-x={0.48}>
+  return <group position={[-0.43, 1.08, -0.57]} rotation-x={-0.38}>
     <mesh position={[0, 0, -0.12]}>
       <cylinderGeometry args={[0.055, 0.072, 0.26, 20]} />
       <meshStandardMaterial color="#15191c" metalness={0.26} roughness={0.48} />
@@ -257,7 +254,7 @@ export function DrivingCockpit({
   showClutch: boolean
   automatic: boolean
 }): ReactElement {
-  const { gl, scene } = useThree()
+  const { gl, scene, camera: driverCamera } = useThree()
   const root = useRef<THREE.Group>(null)
   const steeringWheel = useRef<THREE.Group>(null)
   const gearLever = useRef<THREE.Group>(null)
@@ -432,46 +429,54 @@ export function DrivingCockpit({
     const cockpitRoot = root.current
     if (!cockpitRoot) return
 
-    const rigs: MirrorRig[] = [
-      {
-        camera: mirrors.centerCamera,
-        target: mirrors.centerTarget,
-        surface: centerSurface,
-        localPosition: [0, 1.62, -0.49],
-        localTarget: [0, 1.34, 8.5],
-      },
-      {
-        camera: mirrors.leftCamera,
-        target: mirrors.leftTarget,
-        surface: leftSurface,
-        localPosition: [-1.02, 1.34, -0.39],
-        localTarget: [-2.6, 1.12, 8.2],
-      },
-      {
-        camera: mirrors.rightCamera,
-        target: mirrors.rightTarget,
-        surface: rightSurface,
-        localPosition: [1.02, 1.34, -0.39],
-        localTarget: [2.6, 1.12, 8.2],
-      },
+    const rigs = [
+      { camera: mirrors.centerCamera, target: mirrors.centerTarget, surface: centerSurface },
+      { camera: mirrors.leftCamera, target: mirrors.leftTarget, surface: leftSurface },
+      { camera: mirrors.rightCamera, target: mirrors.rightTarget, surface: rightSurface },
     ]
+
+    const driverPosition = new THREE.Vector3()
+    const driverDirection = new THREE.Vector3()
+    const driverUp = new THREE.Vector3(0, 1, 0)
+    driverCamera.getWorldPosition(driverPosition)
+    driverCamera.getWorldDirection(driverDirection)
+    driverUp.applyQuaternion(driverCamera.quaternion).normalize()
 
     const previousTarget = gl.getRenderTarget()
     const previousAutoClear = gl.autoClear
     const wasVisible = cockpitRoot.visible
 
-    // Mirror cameras should see the road and traffic behind the car, not get
-    // occluded by the cockpit shell they are mounted on.
     cockpitRoot.visible = false
     gl.autoClear = true
 
     try {
       for (const rig of rigs) {
-        const worldPosition = cockpitRoot.localToWorld(new THREE.Vector3(...rig.localPosition))
-        const worldTarget = cockpitRoot.localToWorld(new THREE.Vector3(...rig.localTarget))
-        rig.camera.position.copy(worldPosition)
-        rig.camera.up.set(0, 1, 0)
-        rig.camera.lookAt(worldTarget)
+        const surface = rig.surface.current
+        if (!surface) continue
+
+        const mirrorPosition = new THREE.Vector3()
+        const mirrorQuaternion = new THREE.Quaternion()
+        surface.getWorldPosition(mirrorPosition)
+        surface.getWorldQuaternion(mirrorQuaternion)
+
+        const mirrorNormal = new THREE.Vector3(0, 0, 1)
+          .applyQuaternion(mirrorQuaternion)
+          .normalize()
+
+        const eyeToPlane = driverPosition.clone().sub(mirrorPosition)
+        const reflectedPosition = driverPosition.clone().sub(
+          mirrorNormal.clone().multiplyScalar(2 * eyeToPlane.dot(mirrorNormal)),
+        )
+        const reflectedDirection = driverDirection.clone().sub(
+          mirrorNormal.clone().multiplyScalar(2 * driverDirection.dot(mirrorNormal)),
+        ).normalize()
+        const reflectedUp = driverUp.clone().sub(
+          mirrorNormal.clone().multiplyScalar(2 * driverUp.dot(mirrorNormal)),
+        ).normalize()
+
+        rig.camera.position.copy(reflectedPosition)
+        rig.camera.up.copy(reflectedUp)
+        rig.camera.lookAt(reflectedPosition.clone().add(reflectedDirection))
         rig.camera.updateMatrixWorld(true)
 
         gl.setRenderTarget(rig.target)
@@ -599,7 +604,7 @@ export function DrivingCockpit({
     </mesh>
 
     <SteeringColumn />
-    <group position={[-0.43, 1.32, -0.5]} rotation-x={0.48}>
+    <group position={[-0.43, 1.16, -0.43]} rotation-x={-0.38} scale={[0.55, 0.55, 0.55]}>
       <group ref={steeringWheel}>
       <mesh>
         <torusGeometry args={[0.305, 0.043, 20, 72]} />
@@ -680,7 +685,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[-1.085, 1.335, -0.47]} rotation-y={0.055}>
+    <group position={[-1.085, 1.335, -0.47]} rotation-y={-0.14}>
       <mesh position={[0.19, -0.035, -0.015]} rotation-z={-0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
@@ -695,7 +700,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[1.085, 1.335, -0.47]} rotation-y={-0.055}>
+    <group position={[1.085, 1.335, -0.47]} rotation-y={0.14}>
       <mesh position={[-0.19, -0.035, -0.015]} rotation-z={0.14}>
         <boxGeometry args={[0.36, 0.06, 0.085]} />
         <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
