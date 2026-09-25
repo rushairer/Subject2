@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking } from './subject2/ReverseParkingCourse'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -50,11 +51,24 @@ const projects = [
   ['right-angle', '直角转弯', '观察、打灯、转向', '训练车身边距、观察、转向灯和转向时机。'],
 ] as const
 
-const initialVehicle = (): Vehicle => ({
-  x: 0, z: 8, heading: 0, speed: 0, steering: 0, gear: 0,
-  engineOn: false, handbrake: true, leftIndicator: false, rightIndicator: false,
-  hazard: false, lowBeam: false, highBeam: false,
-})
+const initialVehicle = (examId?: ExamId): Vehicle => {
+  const reverseParking = examId === 'reverse-parking'
+  return {
+    x: 0,
+    z: reverseParking ? 5.7 : 8,
+    heading: reverseParking ? Math.PI : 0,
+    speed: 0,
+    steering: 0,
+    gear: 0,
+    engineOn: false,
+    handbrake: true,
+    leftIndicator: false,
+    rightIndicator: false,
+    hazard: false,
+    lowBeam: false,
+    highBeam: false,
+  }
+}
 
 function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
   const [name, setName] = useState('')
@@ -139,14 +153,17 @@ function CarVisual() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, onInfraction, onTick }: {
+function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session,
-  onInfraction: (i: Infraction) => void, onTick: () => void
+  onInfraction: (i: Infraction) => void, onTick: () => void,
+  onProjectStatus: (status: string) => void
 }) {
   const keys = useRef<Record<string, boolean>>({})
   const cameraYaw = useRef(0)
   const { camera } = useThree()
   const speedTimer = useRef(0)
+  const reverseParkingRuntime = useRef(createReverseParkingRuntime())
+  const lastProjectStatus = useRef('')
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -207,7 +224,18 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick }: {
       if (speedTimer.current > 1.2) onInfraction({ id: 'speed-control', title: '训练区域速度控制不当', points: 10 })
     } else speedTimer.current = 0
     if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
-    if (Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
+    if (session.examId !== 'reverse-parking' && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
+
+    if (session.examId === 'reverse-parking') {
+      const update = updateReverseParking(v, reverseParkingRuntime.current, dt)
+      reverseParkingRuntime.current = update.runtime
+      update.infractions.forEach(onInfraction)
+      if (update.status !== lastProjectStatus.current) {
+        lastProjectStatus.current = update.status
+        onProjectStatus(update.status)
+      }
+    }
+
     onTick()
   })
 
@@ -218,16 +246,17 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick }: {
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    <Road />
+    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : <Road />}
     <group position={[vehicle.current.x, 0, vehicle.current.z]} rotation-y={vehicle.current.heading}><CarVisual /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
 
 function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[]) => void }) {
-  const vehicle = useRef(initialVehicle())
-  const [display, setDisplay] = useState(initialVehicle())
+  const vehicle = useRef(initialVehicle(session.examId))
+  const [display, setDisplay] = useState(initialVehicle(session.examId))
   const [infractions, setInfractions] = useState<Infraction[]>([])
+  const [projectStatus, setProjectStatus] = useState(session.examId === 'reverse-parking' ? '驶过右侧控制线后停车，挂 R 挡开始第一次倒库' : '')
   const lastUi = useRef(0)
   const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
   const tick = () => {
@@ -236,9 +265,10 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={session} onInfraction={addInfraction} onTick={tick} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={session} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} /></Canvas>
     <div className="hud">
       <div className="hud-top"><div className="status-chip">{candidate.name} · {session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
+      {projectStatus && <div className="project-status">{projectStatus}</div>}
       <div className="mirror mirror-left"><span>左后视镜</span></div><div className="mirror mirror-center"><span>内后视镜</span></div><div className="mirror mirror-right"><span>右后视镜</span></div>
       <div className="instruction-card"><b>键盘驾驶</b><span>W 油门 · S 刹车 · A/D 方向 · C 离合</span><span>1–5 / N / R 挡位 · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光</span><span>Z/X 左右观察 · F 回头观察</span></div>
       <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
