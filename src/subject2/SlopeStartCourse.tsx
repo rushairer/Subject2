@@ -1,9 +1,11 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const SLOPE_START = {
-  carLength: 4.4,
-  carWidth: 1.8,
+  carLength: TRAINING_CAR.lengthMeters,
+  carWidth: TRAINING_CAR.widthMeters,
   roadWidth: 3.2,
   rampLength: 20,
   minVerticalRadius: 20,
@@ -79,27 +81,25 @@ export function createSlopeRuntime(): SlopeRuntime {
 }
 
 function wheelPoints(vehicle: SlopeVehicle) {
-  const axle = 1.42
-  const halfTrack = 0.75
-  const fx = Math.sin(vehicle.heading)
-  const fz = -Math.cos(vehicle.heading)
-  const rx = Math.cos(vehicle.heading)
-  const rz = Math.sin(vehicle.heading)
+  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
+  const front = TRAINING_CAR.frontAxleFromCenterMeters
+  const rear = TRAINING_CAR.rearAxleFromCenterMeters
   return [
-    [vehicle.x + fx * axle + rx * halfTrack, vehicle.z + fz * axle + rz * halfTrack],
-    [vehicle.x + fx * axle - rx * halfTrack, vehicle.z + fz * axle - rz * halfTrack],
-    [vehicle.x - fx * axle + rx * halfTrack, vehicle.z - fz * axle + rz * halfTrack],
-    [vehicle.x - fx * axle - rx * halfTrack, vehicle.z - fz * axle - rz * halfTrack],
-  ] as const
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
+  ].map(point => [point.x, point.z] as const)
+
 }
 
 function frontBumperZ(vehicle: SlopeVehicle) {
-  return vehicle.z - Math.cos(vehicle.heading) * (SLOPE_START.carLength / 2)
+  return worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, TRAINING_CAR.lengthMeters / 2, 0).z
 }
 
 function rightBodyGap(vehicle: SlopeVehicle) {
-  const rightX = vehicle.x + Math.cos(vehicle.heading) * (SLOPE_START.carWidth / 2)
-  return SLOPE_GEOMETRY.roadHalf - rightX
+  const rightSide = worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, 0, TRAINING_CAR.widthMeters / 2)
+  return SLOPE_GEOMETRY.roadHalf - rightSide.x
 }
 
 function status(runtime: SlopeRuntime) {

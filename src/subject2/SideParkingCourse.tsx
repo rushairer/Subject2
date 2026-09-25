@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const SIDE_PARKING = {
   carLength: TRAINING_CAR.lengthMeters,
@@ -77,16 +78,13 @@ export function createSideParkingRuntime(): SideParkingRuntime {
 function corners(vehicle: SideParkingVehicle) {
   const halfLength = SIDE_PARKING.carLength / 2
   const halfWidth = SIDE_PARKING.carWidth / 2
-  const fx = Math.sin(vehicle.heading)
-  const fz = -Math.cos(vehicle.heading)
-  const rx = Math.cos(vehicle.heading)
-  const rz = Math.sin(vehicle.heading)
   return [
-    [vehicle.x + fx * halfLength + rx * halfWidth, vehicle.z + fz * halfLength + rz * halfWidth],
-    [vehicle.x + fx * halfLength - rx * halfWidth, vehicle.z + fz * halfLength - rz * halfWidth],
-    [vehicle.x - fx * halfLength + rx * halfWidth, vehicle.z - fz * halfLength + rz * halfWidth],
-    [vehicle.x - fx * halfLength - rx * halfWidth, vehicle.z - fz * halfLength - rz * halfWidth],
-  ] as const
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, -halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, -halfWidth),
+  ].map(point => [point.x, point.z] as const)
+
 }
 
 function pointAllowed(x: number, z: number) {

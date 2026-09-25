@@ -1,5 +1,26 @@
 # Subject2 Development Guardrails
 
+## Canonical coordinate and direction convention
+
+All driving, exam, camera, and route code must use the same vehicle-local frame:
+
+- `heading = 0`: vehicle faces world `-Z`
+- vehicle forward: `(sin(heading), -cos(heading))`
+- vehicle right: `(cos(heading), sin(heading))`
+- vehicle left: negative of vehicle right
+- positive steering / positive heading delta = **right turn**
+- negative steering / negative heading delta = **left turn**
+- positive route lateral offset = **right**
+- negative route lateral offset = **left**
+- Three.js visual body rotation remains `rotation.y = -heading`; do not infer driving turn sign from renderer rotation
+- first-person look yaw uses camera rotation semantics; use named left/right actions rather than guessing from a raw angle
+
+Use `src/sim/vehicleFrame.ts` helpers instead of duplicating trigonometric frame formulas in exam logic. Every named left/right route event needs a regression test proving the actual geometry turns the same way.
+
+## Single source of truth for training-car geometry
+
+`src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
+
 ## Mirror system: locked known-good baseline
 
 The three-mirror reflection system has a verified known-good baseline at commit:

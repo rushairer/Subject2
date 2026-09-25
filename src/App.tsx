@@ -11,6 +11,7 @@ import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 }
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
+import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 import { RacingWheelSetup } from './input/RacingWheelSetup'
@@ -93,7 +94,7 @@ const examTitle = (examId: ExamId) => ({
 }[examId])
 
 const initialProjectStatus = (examId: ExamId) => {
-  if (examId === 'reverse-parking') return '驶过右侧控制线后停车，挂 R 挡开始第一次倒库'
+  if (examId === 'reverse-parking') return '驶过起始端控制线后停车，挂 R 挡开始第一次倒库'
   if (examId === 'side-parking') return '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
   if (examId === 'right-angle') return '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
   if (examId === 'curve-driving') return '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
@@ -394,17 +395,20 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
       carGroup.current.rotation.set(roadPose.pitch, -v.heading, 0)
     }
     const perspectiveCamera = camera as THREE.PerspectiveCamera
-    const forward = new THREE.Vector3(Math.sin(v.heading), 0, -Math.cos(v.heading))
-    const right = new THREE.Vector3(Math.cos(v.heading), 0, Math.sin(v.heading))
+    const forwardFrame = forwardFromHeading(v.heading)
+    const rightFrame = rightFromHeading(v.heading)
+    const forward = new THREE.Vector3(forwardFrame.x, 0, forwardFrame.z)
+    const right = new THREE.Vector3(rightFrame.x, 0, rightFrame.z)
     const vehicleCenter = new THREE.Vector3(v.x, roadPose.y + 0.9, v.z)
 
     if (cameraMode === 'first') {
-      const driverOffsetX = -0.43
-      const driverForward = -0.18
+      const driverRightOffset = -0.43
+      const driverForwardOffset = -0.18
+      const driver = worldPointFromVehicle(v.x, v.z, v.heading, driverForwardOffset, driverRightOffset)
       camera.position.set(
-        v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
+        driver.x,
         roadPose.y + 1.36,
-        v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
+        driver.z,
       )
       camera.rotation.set(roadPose.pitch - 0.015, -v.heading + cameraYaw.current, 0)
       if (perspectiveCamera.fov !== 68) {

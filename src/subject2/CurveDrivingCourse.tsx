@@ -1,14 +1,15 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const CURVE_DRIVING = {
   radius: 7.5,
   roadWidth: 3.5,
   arcDegrees: 135,
   stopLimitSeconds: 2,
-  carLength: 4.4,
-  trackWidth: 1.5,
-  axleOffset: 1.42,
+  carLength: TRAINING_CAR.lengthMeters,
+  trackWidth: TRAINING_CAR.trackWidthMeters,
 } as const
 
 type Point = { x: number; z: number }
@@ -100,18 +101,16 @@ function nearestProgress(x: number, z: number) {
 }
 
 function wheelPoints(vehicle: CurveVehicle) {
-  const fx = Math.sin(vehicle.heading)
-  const fz = -Math.cos(vehicle.heading)
-  const rx = Math.cos(vehicle.heading)
-  const rz = Math.sin(vehicle.heading)
-  const axle = CURVE_DRIVING.axleOffset
-  const halfTrack = CURVE_DRIVING.trackWidth / 2
+  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
+  const front = TRAINING_CAR.frontAxleFromCenterMeters
+  const rear = TRAINING_CAR.rearAxleFromCenterMeters
   return [
-    [vehicle.x + fx * axle + rx * halfTrack, vehicle.z + fz * axle + rz * halfTrack],
-    [vehicle.x + fx * axle - rx * halfTrack, vehicle.z + fz * axle - rz * halfTrack],
-    [vehicle.x - fx * axle + rx * halfTrack, vehicle.z - fz * axle + rz * halfTrack],
-    [vehicle.x - fx * axle - rx * halfTrack, vehicle.z - fz * axle - rz * halfTrack],
-  ] as const
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
+  ].map(point => [point.x, point.z] as const)
+
 }
 
 function status(runtime: CurveRuntime) {

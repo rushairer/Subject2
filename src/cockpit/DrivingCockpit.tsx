@@ -478,10 +478,10 @@ export function DrivingCockpit({
       <meshStandardMaterial color="#252d33" metalness={0.18} roughness={0.48} />
     </mesh>
 
-    <RoadWheel x={-0.78} z={-1.4} steerRef={frontLeftSteer} spinRef={frontLeftSpin} />
-    <RoadWheel x={0.78} z={-1.4} steerRef={frontRightSteer} spinRef={frontRightSpin} />
-    <RoadWheel x={-0.78} z={1.42} spinRef={rearLeftSpin} />
-    <RoadWheel x={0.78} z={1.42} spinRef={rearRightSpin} />
+    <RoadWheel x={-TRAINING_CAR.trackWidthMeters / 2} z={-TRAINING_CAR.frontAxleFromCenterMeters} steerRef={frontLeftSteer} spinRef={frontLeftSpin} />
+    <RoadWheel x={TRAINING_CAR.trackWidthMeters / 2} z={-TRAINING_CAR.frontAxleFromCenterMeters} steerRef={frontRightSteer} spinRef={frontRightSpin} />
+    <RoadWheel x={-TRAINING_CAR.trackWidthMeters / 2} z={TRAINING_CAR.rearAxleFromCenterMeters} spinRef={rearLeftSpin} />
+    <RoadWheel x={TRAINING_CAR.trackWidthMeters / 2} z={TRAINING_CAR.rearAxleFromCenterMeters} spinRef={rearRightSpin} />
 
     {/* Hollow passenger compartment: side skins and sills only.
         Never span a solid mesh across the cabin volume. */}

@@ -1,4 +1,5 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
+import { forwardFromHeading } from './vehicleFrame'
 
 export interface PhysicsVehicle {
   x: number
@@ -165,14 +166,13 @@ export function stepVehiclePhysics(
   const wheelbase = DRIVING_RULES.steering.wheelbaseMeters
   const rearAxleFromCenter = DRIVING_RULES.steering.rearAxleFromCenterMeters
   const headingBefore = vehicle.heading
-  const forwardXBefore = Math.sin(headingBefore)
-  const forwardZBefore = -Math.cos(headingBefore)
+  const forwardBefore = forwardFromHeading(headingBefore)
 
   // Kinematic bicycle model: the rear axle is the constrained axle, while
   // the front axle steers. Vehicle x/z remains the body center so existing
   // exam geometry and collision checks continue to use the same reference.
-  let rearAxleX = vehicle.x - forwardXBefore * rearAxleFromCenter
-  let rearAxleZ = vehicle.z - forwardZBefore * rearAxleFromCenter
+  let rearAxleX = vehicle.x - forwardBefore.x * rearAxleFromCenter
+  let rearAxleZ = vehicle.z - forwardBefore.z * rearAxleFromCenter
 
   const yawRate =
     Math.abs(vehicle.steering) < 0.0001
@@ -185,10 +185,9 @@ export function stepVehiclePhysics(
   rearAxleZ -= Math.cos(headingMid) * vehicle.speed * dt
   vehicle.heading = headingBefore + headingDelta
 
-  const forwardXAfter = Math.sin(vehicle.heading)
-  const forwardZAfter = -Math.cos(vehicle.heading)
-  vehicle.x = rearAxleX + forwardXAfter * rearAxleFromCenter
-  vehicle.z = rearAxleZ + forwardZAfter * rearAxleFromCenter
+  const forwardAfter = forwardFromHeading(vehicle.heading)
+  vehicle.x = rearAxleX + forwardAfter.x * rearAxleFromCenter
+  vehicle.z = rearAxleZ + forwardAfter.z * rearAxleFromCenter
 
   return { stalled }
 }

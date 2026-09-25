@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const REVERSE_PARKING = {
   carLength: TRAINING_CAR.lengthMeters,
@@ -97,31 +98,22 @@ function pointInAllowedArea(x: number, z: number) {
 function carCorners(vehicle: ReverseParkingVehicle) {
   const halfLength = REVERSE_PARKING.carLength / 2
   const halfWidth = REVERSE_PARKING.carWidth / 2
-  const forwardX = Math.sin(vehicle.heading)
-  const forwardZ = -Math.cos(vehicle.heading)
-  const rightX = Math.cos(vehicle.heading)
-  const rightZ = Math.sin(vehicle.heading)
   return [
-    [vehicle.x + forwardX * halfLength + rightX * halfWidth, vehicle.z + forwardZ * halfLength + rightZ * halfWidth],
-    [vehicle.x + forwardX * halfLength - rightX * halfWidth, vehicle.z + forwardZ * halfLength - rightZ * halfWidth],
-    [vehicle.x - forwardX * halfLength + rightX * halfWidth, vehicle.z - forwardZ * halfLength + rightZ * halfWidth],
-    [vehicle.x - forwardX * halfLength - rightX * halfWidth, vehicle.z - forwardZ * halfLength - rightZ * halfWidth],
-  ] as const
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, -halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, halfWidth),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, -halfWidth),
+  ].map(point => [point.x, point.z] as const)
+
 }
 
 function frontWheelZs(vehicle: ReverseParkingVehicle) {
-  const axleFromCenter = TRAINING_CAR.frontAxleFromCenterMeters
+  const axle = TRAINING_CAR.frontAxleFromCenterMeters
   const halfTrack = TRAINING_CAR.trackWidthMeters / 2
-  const forwardX = Math.sin(vehicle.heading)
-  const forwardZ = -Math.cos(vehicle.heading)
-  const rightX = Math.cos(vehicle.heading)
-  const rightZ = Math.sin(vehicle.heading)
-  const axleX = vehicle.x + forwardX * axleFromCenter
-  const axleZ = vehicle.z + forwardZ * axleFromCenter
-  return [
-    axleZ + rightZ * halfTrack,
-    axleZ - rightZ * halfTrack,
-  ]
+  const right = worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, axle, halfTrack)
+  const left = worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, axle, -halfTrack)
+  return [right.z, left.z]
+
 }
 
 function fullyInsideBay(vehicle: ReverseParkingVehicle) {
@@ -141,8 +133,8 @@ function bodyOutsideProject(vehicle: ReverseParkingVehicle) {
 function statusFor(runtime: ReverseParkingRuntime) {
   const seconds = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${REVERSE_PARKING.timeLimitSeconds}s` : ''
   switch (runtime.phase) {
-    case 'approach': return '驶过右侧控制线后停车，挂 R 挡开始第一次倒库'
-    case 'first-reverse': return '第一次倒车入库：观察右后视镜与库角，车身完全入库后停车' + seconds
+    case 'approach': return '驶过起始端控制线后停车，挂 R 挡开始第一次倒库'
+    case 'first-reverse': return '第一次倒车入库：观察左后视镜与库角，车身完全入库后停车' + seconds
     case 'first-parked': return '第一次入库完成：挂前进挡驶出，前往另一端控制线' + seconds
     case 'cross-to-opposite': return '驶向另一端控制线，确保两个前轮触地点均越过控制线' + seconds
     case 'second-reverse': return '第二次倒车入库：车身完全入库并停稳' + seconds

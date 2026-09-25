@@ -1,8 +1,10 @@
 import type { ReactElement } from 'react'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const RIGHT_ANGLE = {
-  carLength: 4.4,
-  carWidth: 1.8,
+  carLength: TRAINING_CAR.lengthMeters,
+  carWidth: TRAINING_CAR.widthMeters,
   roadWidth: 3.6,
   legLength: 6.8,
   stopLimitSeconds: 2,
@@ -57,18 +59,16 @@ export function createRightAngleRuntime(): RightAngleRuntime {
 }
 
 function wheelPoints(vehicle: RightAngleVehicle) {
-  const axle = 1.42
-  const halfTrack = 0.75
-  const fx = Math.sin(vehicle.heading)
-  const fz = -Math.cos(vehicle.heading)
-  const rx = Math.cos(vehicle.heading)
-  const rz = Math.sin(vehicle.heading)
+  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
+  const front = TRAINING_CAR.frontAxleFromCenterMeters
+  const rear = TRAINING_CAR.rearAxleFromCenterMeters
   return [
-    [vehicle.x + fx * axle + rx * halfTrack, vehicle.z + fz * axle + rz * halfTrack],
-    [vehicle.x + fx * axle - rx * halfTrack, vehicle.z + fz * axle - rz * halfTrack],
-    [vehicle.x - fx * axle + rx * halfTrack, vehicle.z - fz * axle + rz * halfTrack],
-    [vehicle.x - fx * axle - rx * halfTrack, vehicle.z - fz * axle - rz * halfTrack],
-  ] as const
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
+    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
+  ].map(point => [point.x, point.z] as const)
+
 }
 
 function pointAllowed(x: number, z: number) {
