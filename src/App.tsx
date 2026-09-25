@@ -2,6 +2,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking } from './subject2/ReverseParkingCourse'
+import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from './subject2/SideParkingCourse'
+import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -53,9 +55,11 @@ const projects = [
 
 const initialVehicle = (examId?: ExamId): Vehicle => {
   const reverseParking = examId === 'reverse-parking'
+  const sideParking = examId === 'side-parking'
+  const rightAngle = examId === 'right-angle'
   return {
     x: 0,
-    z: reverseParking ? 5.7 : 8,
+    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : 8,
     heading: reverseParking ? Math.PI : 0,
     speed: 0,
     steering: 0,
@@ -145,7 +149,7 @@ function Road() {
 
 function CarVisual() {
   return <group>
-    <mesh position={[0, .62, .45]}><boxGeometry args={[1.78, .42, 2.25]} /><meshStandardMaterial color="#111922" metalness={.35} roughness={.4} /></mesh>
+    <mesh position={[0, .62, 0]}><boxGeometry args={[1.8, .42, 4.4]} /><meshStandardMaterial color="#111922" metalness={.35} roughness={.4} /></mesh>
     <mesh position={[0, 1.02, -.48]}><boxGeometry args={[1.65, .16, .2]} /><meshStandardMaterial color="#232b31" /></mesh>
     <mesh position={[-.56, 1.02, -.6]} rotation-x={Math.PI / 2.3}><torusGeometry args={[.27, .035, 12, 32]} /><meshStandardMaterial color="#111" /></mesh>
     <mesh position={[-.96, 1.1, -.48]}><boxGeometry args={[.34, .15, .07]} /><meshStandardMaterial color="#7895a6" metalness={.7} /></mesh>
@@ -163,6 +167,8 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
   const { camera } = useThree()
   const speedTimer = useRef(0)
   const reverseParkingRuntime = useRef(createReverseParkingRuntime())
+  const sideParkingRuntime = useRef(createSideParkingRuntime())
+  const rightAngleRuntime = useRef(createRightAngleRuntime())
   const lastProjectStatus = useRef('')
 
   useEffect(() => {
@@ -226,13 +232,25 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
     if (session.examId !== 'reverse-parking' && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
+    let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     if (session.examId === 'reverse-parking') {
       const update = updateReverseParking(v, reverseParkingRuntime.current, dt)
       reverseParkingRuntime.current = update.runtime
-      update.infractions.forEach(onInfraction)
-      if (update.status !== lastProjectStatus.current) {
-        lastProjectStatus.current = update.status
-        onProjectStatus(update.status)
+      projectUpdate = update
+    } else if (session.examId === 'side-parking') {
+      const update = updateSideParking(v, sideParkingRuntime.current, dt)
+      sideParkingRuntime.current = update.runtime
+      projectUpdate = update
+    } else if (session.examId === 'right-angle') {
+      const update = updateRightAngle(v, rightAngleRuntime.current, dt)
+      rightAngleRuntime.current = update.runtime
+      projectUpdate = update
+    }
+    if (projectUpdate) {
+      projectUpdate.infractions.forEach(onInfraction)
+      if (projectUpdate.status !== lastProjectStatus.current) {
+        lastProjectStatus.current = projectUpdate.status
+        onProjectStatus(projectUpdate.status)
       }
     }
 
@@ -246,7 +264,7 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : <Road />}
+    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : <Road />}
     <group position={[vehicle.current.x, 0, vehicle.current.z]} rotation-y={vehicle.current.heading}><CarVisual /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
@@ -256,7 +274,15 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const vehicle = useRef(initialVehicle(session.examId))
   const [display, setDisplay] = useState(initialVehicle(session.examId))
   const [infractions, setInfractions] = useState<Infraction[]>([])
-  const [projectStatus, setProjectStatus] = useState(session.examId === 'reverse-parking' ? '驶过右侧控制线后停车，挂 R 挡开始第一次倒库' : '')
+  const [projectStatus, setProjectStatus] = useState(
+    session.examId === 'reverse-parking'
+      ? '驶过右侧控制线后停车，挂 R 挡开始第一次倒库'
+      : session.examId === 'side-parking'
+        ? '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
+        : session.examId === 'right-angle'
+          ? '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
+          : '',
+  )
   const lastUi = useRef(0)
   const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
   const tick = () => {
