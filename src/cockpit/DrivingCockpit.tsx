@@ -5,6 +5,7 @@ import * as THREE from 'three'
 export interface CockpitVehicleState {
   speed: number
   steering: number
+  steeringWheelAngle: number
   throttle: number
   brake: number
   clutch: number
@@ -148,7 +149,7 @@ export function DrivingCockpit({
   useFrame(({ clock }, delta) => {
     const v = vehicle.current
     displayAccumulator.current += delta
-    if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steering * 3.8
+    if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steeringWheelAngle
 
     if (gearLever.current) {
       const [gx, gz] = automatic
@@ -216,6 +217,16 @@ export function DrivingCockpit({
         ctx.fillText(v.engineOn ? `RPM ${Math.round(v.engineRpm)}` : 'ENGINE', 465, 56)
         ctx.fillStyle = v.handbrake ? '#ff7368' : '#53636d'
         ctx.fillText('P BRAKE', 465, 91)
+        const wheelTurns = Math.abs(v.steeringWheelAngle) / (Math.PI * 2)
+        ctx.font = '700 20px system-ui, sans-serif'
+        ctx.fillStyle = Math.abs(v.steeringWheelAngle) < 0.03 ? '#7f929e' : '#f0c86d'
+        ctx.fillText(
+          Math.abs(v.steeringWheelAngle) < 0.03
+            ? 'STEER 0'
+            : `STEER ${v.steeringWheelAngle < 0 ? 'L' : 'R'} ${wheelTurns.toFixed(2)}T`,
+          465,
+          196,
+        )
         ctx.fillStyle = v.seatbelt ? '#70dfa0' : '#ff7368'
         ctx.fillText(v.seatbelt ? 'BELT OK' : 'BELT', 465, 126)
         ctx.fillStyle = v.highBeam ? '#70b7ff' : v.lowBeam ? '#72d7ff' : '#53636d'

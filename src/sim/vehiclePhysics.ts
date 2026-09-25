@@ -6,6 +6,7 @@ export interface PhysicsVehicle {
   heading: number
   speed: number
   steering: number
+  steeringWheelAngle: number
   throttle: number
   brake: number
   clutch: number
@@ -54,7 +55,19 @@ export function stepVehiclePhysics(
   vehicle.throttle = input.throttle
   vehicle.brake = input.brake
   vehicle.clutch = automatic ? 0 : input.clutch
-  vehicle.steering += (input.steer * 0.58 - vehicle.steering) * Math.min(1, dt * 7)
+
+  const maxSteeringWheelAngle = DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
+  const steeringWheelRate = DRIVING_RULES.steering.wheelTurnsPerSecond * Math.PI * 2
+  vehicle.steeringWheelAngle = Math.max(
+    -maxSteeringWheelAngle,
+    Math.min(
+      maxSteeringWheelAngle,
+      vehicle.steeringWheelAngle + input.steer * steeringWheelRate * dt,
+    ),
+  )
+  vehicle.steering =
+    (vehicle.steeringWheelAngle / maxSteeringWheelAngle) *
+    DRIVING_RULES.steering.roadWheelMaxAngleRadians
 
   const direction = vehicle.gear < 0 ? -1 : 1
   const absGear = Math.max(1, Math.abs(vehicle.gear))

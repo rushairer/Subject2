@@ -1,4 +1,9 @@
 export const DRIVING_RULES = {
+  steering: {
+    wheelTurnsLockToLock: 2.7,
+    wheelTurnsPerSecond: 1.0,
+    roadWheelMaxAngleRadians: 0.58,
+  },
   manualTransmission: {
     idleRpm: 820,
     stallRpm: 560,
