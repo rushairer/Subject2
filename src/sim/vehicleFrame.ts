@@ -53,7 +53,7 @@ export function normalizeHeadingDelta(delta: number) {
  * Always use this helper for route/vehicle visual orientation.
  */
 export function sceneYawFromHeading(heading: number) {
-  return -heading
+  return heading === 0 ? 0 : -heading
 }
 
 export type TurnDirection = 'left' | 'right' | 'straight'
