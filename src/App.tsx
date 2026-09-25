@@ -12,6 +12,7 @@ import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
+import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -134,17 +135,22 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
 }
 
 function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
-  const [name, setName] = useState('')
-  const [gender, setGender] = useState<Gender>('男')
-  const [age, setAge] = useState(18)
-  const [licenseType, setLicenseType] = useState<LicenseType>('C1')
+  const savedCandidate = useMemo(() => loadCandidate(), [])
+  const [name, setName] = useState(savedCandidate?.name ?? '')
+  const [gender, setGender] = useState<Gender>(savedCandidate?.gender ?? '男')
+  const [age, setAge] = useState(savedCandidate?.age ?? 18)
+  const [licenseType, setLicenseType] = useState<LicenseType>(savedCandidate?.licenseType ?? 'C1')
   return <main className="shell centered"><section className="hero-card">
     <div className="eyebrow">SUBJECT2 · 中国大陆驾考 3D 模拟训练</div>
     <h1>建立考生档案</h1>
     <p className="lead">档案用于当前浏览器内的训练与模拟考试成绩单。</p>
     <form className="profile-form" onSubmit={e => {
       e.preventDefault()
-      if (name.trim()) onSubmit({ name: name.trim(), gender, age, licenseType })
+      if (name.trim()) {
+        const candidate = { name: name.trim(), gender, age, licenseType }
+        saveCandidate(candidate)
+        onSubmit(candidate)
+      }
     }}>
       <label>姓名<input required maxLength={20} placeholder="请输入姓名" value={name} onChange={e => setName(e.target.value)} /></label>
       <div className="form-row">
@@ -157,16 +163,29 @@ function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
   </section></main>
 }
 
-function Menu({ candidate, onStart }: { candidate: Candidate, onStart: (s: Session) => void }) {
+function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate, onStart: (s: Session) => void, onSwitchCandidate: () => void }) {
   const [mode, setMode] = useState<Mode>('practice')
   const [time, setTime] = useState<TimeOfDay>('day')
   const visible = projects.filter(p => !(candidate.licenseType === 'C2' && p[0] === 'slope-start'))
+  const recentHistory = useMemo(
+    () => loadExamHistory().filter(item => item.candidateName === candidate.name).slice(0, 4),
+    [candidate.name],
+  )
   return <main className="shell menu-shell">
-    <header className="topbar"><div><div className="eyebrow">SUBJECT2 DRIVING LAB</div><h1>{candidate.name}，选择训练任务</h1></div><div className="candidate-pill">{candidate.licenseType} · {candidate.gender} · {candidate.age} 岁</div></header>
+    <header className="topbar"><div><div className="eyebrow">SUBJECT2 DRIVING LAB</div><h1>{candidate.name}，选择训练任务</h1></div><div className="candidate-actions"><div className="candidate-pill">{candidate.licenseType} · {candidate.gender} · {candidate.age} 岁</div><button className="ghost-btn" onClick={onSwitchCandidate}>切换考生</button></div></header>
     <section className="toolbar">
       <div className="segmented"><button className={mode === 'practice' ? 'active' : ''} onClick={() => setMode('practice')}>训练模式</button><button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}>考试模式</button></div>
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
     </section>
+    {recentHistory.length > 0 && <section className="recent-results">
+      <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
+      <div className="recent-results-grid">
+        {recentHistory.map(item => <div className="recent-result" key={item.id}>
+          <div><strong>{examTitle(item.examId as ExamId)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}</span></div>
+          <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
+        </div>)}
+      </div>
+    </section>}
     <section>
       <div className="section-heading"><div><span className="chapter">第一章</span><h2>科目二 · 场地驾驶技能</h2></div><p>每个项目可单独训练，并提供组合模拟考试入口。</p></div>
       <div className="card-grid">
@@ -549,8 +568,23 @@ export default function App() {
 
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
-  if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory) => { setResult({ score, infractions, trajectory: [...trajectory] }); setPhase('result') }} />
+  if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} onSwitchCandidate={() => setPhase('profile')} />
+  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory) => {
+    const passLine = session.examId === 'subject3' ? 90 : 80
+    appendExamHistory({
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+      createdAt: Date.now(),
+      candidateName: candidate.name,
+      licenseType: candidate.licenseType,
+      examId: session.examId,
+      mode: session.mode,
+      score,
+      passed: score >= passLine && !infractions.some(item => item.fatal),
+      infractionCount: infractions.length,
+    })
+    setResult({ score, infractions, trajectory: [...trajectory] })
+    setPhase('result')
+  }} />
   if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} trajectory={result.trajectory} onBack={() => setPhase('menu')} />
   return null
 }
