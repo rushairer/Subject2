@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking } from './subject2/ReverseParkingCourse'
 import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from './subject2/SideParkingCourse'
 import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
+import { CurveDrivingCourse, CURVE_START, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
+import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -57,9 +59,11 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
   const reverseParking = examId === 'reverse-parking'
   const sideParking = examId === 'side-parking'
   const rightAngle = examId === 'right-angle'
+  const curveDriving = examId === 'curve-driving'
+  const slopeStart = examId === 'slope-start'
   return {
-    x: 0,
-    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : 8,
+    x: curveDriving ? CURVE_START.x : slopeStart ? 0.4 : 0,
+    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : curveDriving ? CURVE_START.z : slopeStart ? 11 : 8,
     heading: reverseParking ? Math.PI : 0,
     speed: 0,
     steering: 0,
@@ -169,6 +173,9 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
   const reverseParkingRuntime = useRef(createReverseParkingRuntime())
   const sideParkingRuntime = useRef(createSideParkingRuntime())
   const rightAngleRuntime = useRef(createRightAngleRuntime())
+  const curveRuntime = useRef(createCurveRuntime())
+  const slopeRuntime = useRef(createSlopeRuntime())
+  const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
 
   useEffect(() => {
@@ -215,14 +222,23 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     }
     const braking = brake * 9 + (v.handbrake ? 12 : 0)
     if (Math.abs(v.speed) > .001) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), braking * dt)
+    if (session.examId === 'slope-start' && !v.handbrake && !brake) {
+      const slope = getSlopePose(v.z)
+      if (slope.grade > 0) v.speed -= Math.sin(slope.pitch) * 9.81 * dt
+    }
     v.speed *= Math.pow(.987, dt * 60)
     v.speed = Math.max(-5.5, Math.min(16, v.speed))
     v.heading += v.steering * v.speed * dt * .055
     v.x += Math.sin(v.heading) * v.speed * dt
     v.z -= Math.cos(v.heading) * v.speed * dt
 
-    camera.position.set(v.x + Math.sin(v.heading) * .12, 1.47, v.z - Math.cos(v.heading) * .15)
-    camera.rotation.set(0, v.heading + cameraYaw.current, 0)
+    const roadPose = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
+    if (carGroup.current) {
+      carGroup.current.position.set(v.x, roadPose.y, v.z)
+      carGroup.current.rotation.set(roadPose.pitch, v.heading, 0)
+    }
+    camera.position.set(v.x + Math.sin(v.heading) * .12, roadPose.y + 1.47, v.z - Math.cos(v.heading) * .15)
+    camera.rotation.set(roadPose.pitch, v.heading + cameraYaw.current, 0)
 
     const limit = session.examId === 'subject3' ? 50 : 12
     if (Math.abs(v.speed) * 3.6 > limit) {
@@ -230,7 +246,7 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
       if (speedTimer.current > 1.2) onInfraction({ id: 'speed-control', title: '训练区域速度控制不当', points: 10 })
     } else speedTimer.current = 0
     if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
-    if (session.examId !== 'reverse-parking' && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
+    if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     if (session.examId === 'reverse-parking') {
@@ -244,6 +260,14 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     } else if (session.examId === 'right-angle') {
       const update = updateRightAngle(v, rightAngleRuntime.current, dt)
       rightAngleRuntime.current = update.runtime
+      projectUpdate = update
+    } else if (session.examId === 'curve-driving') {
+      const update = updateCurveDriving(v, curveRuntime.current, dt)
+      curveRuntime.current = update.runtime
+      projectUpdate = update
+    } else if (session.examId === 'slope-start') {
+      const update = updateSlopeStart(v, slopeRuntime.current, dt)
+      slopeRuntime.current = update.runtime
       projectUpdate = update
     }
     if (projectUpdate) {
@@ -264,8 +288,8 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : <Road />}
-    <group position={[vehicle.current.x, 0, vehicle.current.z]} rotation-y={vehicle.current.heading}><CarVisual /></group>
+    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : <Road />}
+    <group ref={carGroup}><CarVisual /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
@@ -281,7 +305,11 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
         ? '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
         : session.examId === 'right-angle'
           ? '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
-          : '',
+          : session.examId === 'curve-driving'
+            ? '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
+            : session.examId === 'slope-start'
+              ? '坡道定点停车：保持右侧车身距边线 30cm 内，将前保险杠停在桩杆线上'
+              : '',
   )
   const lastUi = useRef(0)
   const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
