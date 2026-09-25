@@ -1,6 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
 
 export interface CockpitVehicleState {
   speed: number
@@ -150,8 +151,8 @@ function SteeringColumn() {
 function ackermannFrontAngles(virtualAngle: number) {
   if (Math.abs(virtualAngle) < 0.0001) return { left: 0, right: 0 }
 
-  const wheelbase = 2.82
-  const halfTrack = 1.56 / 2
+  const wheelbase = TRAINING_CAR.wheelbaseMeters
+  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
   const sign = Math.sign(virtualAngle)
   const radius = wheelbase / Math.tan(Math.abs(virtualAngle))
   const inner = Math.atan(wheelbase / Math.max(0.15, radius - halfTrack))
@@ -193,7 +194,7 @@ function RoadWheel({
     <group rotation-z={Math.PI / 2}>
       <group ref={spinRef}>
         <mesh>
-          <cylinderGeometry args={[0.31, 0.31, 0.19, 28]} />
+          <cylinderGeometry args={[TRAINING_CAR.wheelRadiusMeters, TRAINING_CAR.wheelRadiusMeters, 0.19, 28]} />
           <meshStandardMaterial color="#111315" roughness={0.86} />
         </mesh>
         <mesh position={[0, 0.101, 0]}>
@@ -323,7 +324,7 @@ export function DrivingCockpit({
   useFrame(({ clock }, delta) => {
     const v = vehicle.current
     displayAccumulator.current += delta
-    wheelSpin.current += (v.speed * delta) / 0.31
+    wheelSpin.current += (v.speed * delta) / TRAINING_CAR.wheelRadiusMeters
     if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steeringWheelAngle
     const frontAngles = ackermannFrontAngles(v.steering)
     if (frontLeftSteer.current) frontLeftSteer.current.rotation.y = -frontAngles.left

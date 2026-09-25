@@ -1,11 +1,13 @@
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
+
 export const DRIVING_RULES = {
   steering: {
     wheelTurnsLockToLock: 2.7,
     wheelTurnsPerSecond: 1.0,
     roadWheelMaxAngleRadians: 0.58,
-    wheelbaseMeters: 2.82,
-    trackWidthMeters: 1.56,
-    rearAxleFromCenterMeters: 1.41,
+    wheelbaseMeters: TRAINING_CAR.wheelbaseMeters,
+    trackWidthMeters: TRAINING_CAR.trackWidthMeters,
+    rearAxleFromCenterMeters: TRAINING_CAR.rearAxleFromCenterMeters,
   },
   manualTransmission: {
     idleRpm: 820,

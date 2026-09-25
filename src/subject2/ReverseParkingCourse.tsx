@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
 
 export const REVERSE_PARKING = {
-  carLength: 4.4,
-  carWidth: 1.8,
+  carLength: TRAINING_CAR.lengthMeters,
+  carWidth: TRAINING_CAR.widthMeters,
   bayWidth: 2.3,
   bayLength: 5.1,
   laneWidth: 6.7,
@@ -109,8 +110,8 @@ function carCorners(vehicle: ReverseParkingVehicle) {
 }
 
 function frontWheelZs(vehicle: ReverseParkingVehicle) {
-  const axleFromCenter = 1.42
-  const halfTrack = 0.75
+  const axleFromCenter = TRAINING_CAR.frontAxleFromCenterMeters
+  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
   const forwardX = Math.sin(vehicle.heading)
   const forwardZ = -Math.cos(vehicle.heading)
   const rightX = Math.cos(vehicle.heading)

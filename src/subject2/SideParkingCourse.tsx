@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
 
 export const SIDE_PARKING = {
-  carLength: 4.4,
-  carWidth: 1.8,
+  carLength: TRAINING_CAR.lengthMeters,
+  carWidth: TRAINING_CAR.widthMeters,
   bayLength: 7.6,
   bayWidth: 2.5,
   laneWidth: 3.4,
