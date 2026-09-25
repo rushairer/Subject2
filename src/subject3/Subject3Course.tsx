@@ -615,7 +615,7 @@ function StaticCar({ distance, lateral, opposite = false, color = '#d7d9dd' }: {
   const pose = poseAtRouteDistance(distance)
   return <group
     position={[pose.x + pose.rightX * lateral, 0.45, pose.z + pose.rightZ * lateral]}
-    rotation-y={pose.heading + (opposite ? Math.PI : 0)}
+    rotation-y={-pose.heading + (opposite ? Math.PI : 0)}
   >
     <mesh><boxGeometry args={[1.75, 0.65, 4.2]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
     <mesh position={[0, 0.45, -0.15]}><boxGeometry args={[1.5, 0.55, 1.9]} /><meshStandardMaterial color="#60707a" metalness={0.5} roughness={0.28} /></mesh>
@@ -697,7 +697,7 @@ function MovingTrafficCar({
     const world = actorWorldPosition(progress.current, lateral)
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = world.pose.heading + (opposite ? Math.PI : 0)
+      group.current.rotation.y = -world.pose.heading + (opposite ? Math.PI : 0)
     }
     checkVehicleCollision(player, world.x, world.z, `subject3-collision-${id}`, onInfraction)
   })
@@ -725,7 +725,7 @@ function SuddenBrakeCar({
     const world = actorWorldPosition(progress.current, 0)
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = world.pose.heading
+      group.current.rotation.y = -world.pose.heading
     }
     checkVehicleCollision(player, world.x, world.z, 'subject3-collision-sudden-brake', onInfraction)
   })
@@ -788,7 +788,7 @@ function CutInScooter({
     const world = actorWorldPosition(progress.current, lateral)
     if (group.current) {
       group.current.position.set(world.x, 0.18, world.z)
-      group.current.rotation.y = world.pose.heading
+      group.current.rotation.y = -world.pose.heading
     }
     if (triggered.current) {
       checkVehicleCollision(player, world.x, world.z, 'subject3-collision-scooter', onInfraction, 1.55)

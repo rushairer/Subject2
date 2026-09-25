@@ -300,8 +300,8 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
       if (k === 'b') { v.horn = true; startHorn() }
       if (k === 't') v.seatbelt = !v.seatbelt
-      if (k === 'z') { cameraYaw.current = -.62; v.lookLeft = true }
-      if (k === 'x') { cameraYaw.current = .62; v.lookRight = true }
+      if (k === 'z') { cameraYaw.current = .62; v.lookLeft = true }
+      if (k === 'x') { cameraYaw.current = -.62; v.lookRight = true }
       if (k === 'f') { cameraYaw.current = Math.PI; v.lookBack = true }
     }
     const up = (e: KeyboardEvent) => {
@@ -355,7 +355,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
     const roadPose = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
     if (carGroup.current) {
       carGroup.current.position.set(v.x, roadPose.y, v.z)
-      carGroup.current.rotation.set(roadPose.pitch, v.heading, 0)
+      carGroup.current.rotation.set(roadPose.pitch, -v.heading, 0)
     }
     const driverOffsetX = -0.4
     const driverForward = 0.1
@@ -364,7 +364,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       roadPose.y + 1.49,
       v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
     )
-    camera.rotation.set(roadPose.pitch, v.heading + cameraYaw.current, 0)
+    camera.rotation.set(roadPose.pitch, -v.heading + cameraYaw.current, 0)
 
     const limit = session.examId === 'subject3' ? 50 : 12
     if (Math.abs(v.speed) * 3.6 > limit) {
