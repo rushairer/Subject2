@@ -38,6 +38,7 @@ interface Vehicle {
   hazard: boolean
   lowBeam: boolean
   highBeam: boolean
+  horn: boolean
 }
 interface Infraction {
   id: string
@@ -101,6 +102,7 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
     hazard: false,
     lowBeam: false,
     highBeam: false,
+    horn: false,
   }
 }
 
@@ -177,8 +179,8 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
-  vehicle: React.MutableRefObject<Vehicle>, session: Session,
+function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean,
   onInfraction: (i: Infraction) => void, onTick: () => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
@@ -195,6 +197,38 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
   const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
   const completionLatched = useRef(false)
+  const audioContext = useRef<AudioContext | null>(null)
+  const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
+
+  const startHorn = () => {
+    if (hornNodes.current) return
+    const context = audioContext.current ?? new AudioContext()
+    audioContext.current = context
+    if (context.state === 'suspended') void context.resume()
+    const gain = context.createGain()
+    gain.gain.setValueAtTime(0.035, context.currentTime)
+    gain.connect(context.destination)
+    const oscillators = [415, 520].map(frequency => {
+      const oscillator = context.createOscillator()
+      oscillator.type = 'square'
+      oscillator.frequency.setValueAtTime(frequency, context.currentTime)
+      oscillator.connect(gain)
+      oscillator.start()
+      return oscillator
+    })
+    hornNodes.current = { oscillators, gain }
+  }
+
+  const stopHorn = () => {
+    const active = hornNodes.current
+    if (!active) return
+    active.oscillators.forEach(oscillator => {
+      try { oscillator.stop() } catch { /* already stopped */ }
+      oscillator.disconnect()
+    })
+    active.gain.disconnect()
+    hornNodes.current = null
+  }
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -210,7 +244,9 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
       if (k === 'k') { v.highBeam = !v.highBeam; if (v.highBeam) v.lowBeam = true }
       if (k === 'n') v.gear = 0
       if (k === 'r') v.gear = -1
-      if (/^[1-5]$/.test(k)) v.gear = Number(k)
+      if (automatic && k === 'g') v.gear = 1
+      if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
+      if (k === 'b') { v.horn = true; startHorn() }
       if (k === 'z') cameraYaw.current = -.62
       if (k === 'x') cameraYaw.current = .62
       if (k === 'f') cameraYaw.current = Math.PI
@@ -219,17 +255,24 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
       const k = e.key.toLowerCase()
       keys.current[k] = false
       if (['z','x','f'].includes(k)) cameraYaw.current = 0
+      if (k === 'b') { vehicle.current.horn = false; stopHorn() }
     }
     addEventListener('keydown', down); addEventListener('keyup', up)
-    return () => { removeEventListener('keydown', down); removeEventListener('keyup', up) }
-  }, [vehicle])
+    return () => {
+      removeEventListener('keydown', down)
+      removeEventListener('keyup', up)
+      stopHorn()
+      void audioContext.current?.close()
+      audioContext.current = null
+    }
+  }, [automatic, vehicle])
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
     const throttle = keys.current['w'] || keys.current['arrowup'] ? 1 : 0
     const brake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
-    const clutch = keys.current['c'] ? 1 : 0
+    const clutch = automatic ? 0 : (keys.current['c'] ? 1 : 0)
     const steer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
     v.throttle = throttle
     v.brake = brake
@@ -326,13 +369,14 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus,
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
     {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : <Road />}
-    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={true} /></group>
+    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
 
 function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[]) => void }) {
   const combinedExam = session.examId === 'subject2-exam'
+  const automatic = candidate.licenseType === 'C2'
   const examSequence: ExamId[] = candidate.licenseType === 'C1'
     ? ['reverse-parking', 'slope-start', 'side-parking', 'curve-driving', 'right-angle']
     : ['reverse-parking', 'side-parking', 'curve-driving', 'right-angle']
@@ -380,13 +424,13 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
       <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="instruction-card"><b>键盘驾驶</b><span>W 油门 · S 刹车 · A/D 方向 · C 离合</span><span>1–5 / N / R 挡位 · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光</span><span>Z/X 左右观察 · F 回头观察</span></div>
-      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭</span><span>Z/X 左右观察 · F 回头观察</span></div>
+      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : automatic ? 'D' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>HORN</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>

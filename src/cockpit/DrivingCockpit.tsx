@@ -16,6 +16,7 @@ export interface CockpitVehicleState {
   hazard: boolean
   lowBeam: boolean
   highBeam: boolean
+  horn: boolean
 }
 
 interface MirrorRig {
@@ -69,9 +70,11 @@ function Pedal({ x, active, wide = false }: { x: number; active: number; wide?: 
 export function DrivingCockpit({
   vehicle,
   showClutch,
+  automatic,
 }: {
   vehicle: MutableRefObject<CockpitVehicleState>
   showClutch: boolean
+  automatic: boolean
 }): ReactElement {
   const { gl, scene } = useThree()
   const root = useRef<THREE.Group>(null)
@@ -80,6 +83,13 @@ export function DrivingCockpit({
   const speedNeedle = useRef<THREE.Group>(null)
   const leftSignal = useRef<THREE.Mesh>(null)
   const rightSignal = useRef<THREE.Mesh>(null)
+  const lowBeamLamp = useRef<THREE.Mesh>(null)
+  const highBeamLamp = useRef<THREE.Mesh>(null)
+  const hornPad = useRef<THREE.Mesh>(null)
+  const leftHeadlight = useRef<THREE.SpotLight>(null)
+  const rightHeadlight = useRef<THREE.SpotLight>(null)
+  const headlightTarget = useRef<THREE.Object3D>(null)
+  const mirrorAccumulator = useRef(0)
 
   const centerAnchor = useRef<THREE.Object3D>(null)
   const leftAnchor = useRef<THREE.Object3D>(null)
@@ -115,7 +125,9 @@ export function DrivingCockpit({
     if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steering * 3.8
 
     if (gearLever.current) {
-      const [gx, gz] = gearPosition(v.gear)
+      const [gx, gz] = automatic
+        ? (v.gear === -1 ? [-0.08, -0.05] : v.gear === 0 ? [0, 0] : [0.08, 0.05])
+        : gearPosition(v.gear)
       gearLever.current.rotation.x = -0.08 + gz * 3.2
       gearLever.current.rotation.z = -gx * 3.2
     }
@@ -134,9 +146,32 @@ export function DrivingCockpit({
       const material = rightSignal.current.material as THREE.MeshBasicMaterial
       material.color.set((v.rightIndicator || v.hazard) && blink ? '#53f28b' : '#284637')
     }
+    if (lowBeamLamp.current) {
+      const material = lowBeamLamp.current.material as THREE.MeshBasicMaterial
+      material.color.set(v.lowBeam ? '#79d7ff' : '#233745')
+    }
+    if (highBeamLamp.current) {
+      const material = highBeamLamp.current.material as THREE.MeshBasicMaterial
+      material.color.set(v.highBeam ? '#6fb8ff' : '#233745')
+    }
+    if (hornPad.current) {
+      const material = hornPad.current.material as THREE.MeshStandardMaterial
+      material.emissive.set(v.horn ? '#7b1e16' : '#000000')
+      material.emissiveIntensity = v.horn ? 1.2 : 0
+    }
+    const lightIntensity = v.highBeam ? 220 : v.lowBeam ? 95 : 0
+    for (const light of [leftHeadlight.current, rightHeadlight.current]) {
+      if (!light) continue
+      light.intensity = lightIntensity
+      light.distance = v.highBeam ? 110 : 62
+      light.angle = v.highBeam ? 0.17 : 0.28
+    }
   })
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    mirrorAccumulator.current += delta
+    if (mirrorAccumulator.current < 1 / 30) return
+    mirrorAccumulator.current = 0
     const rigs: MirrorRig[] = [
       { camera: mirrors.centerCamera, target: mirrors.centerTarget, anchor: centerAnchor, surface: centerSurface },
       { camera: mirrors.leftCamera, target: mirrors.leftTarget, anchor: leftAnchor, surface: leftSurface },
@@ -197,12 +232,20 @@ export function DrivingCockpit({
       <circleGeometry args={[0.025, 16]} />
       <meshBasicMaterial color="#284637" />
     </mesh>
+    <mesh ref={lowBeamLamp} position={[-0.34, 1.145, -0.82]}>
+      <circleGeometry args={[0.018, 16]} />
+      <meshBasicMaterial color="#233745" />
+    </mesh>
+    <mesh ref={highBeamLamp} position={[-0.29, 1.145, -0.82]}>
+      <circleGeometry args={[0.018, 16]} />
+      <meshBasicMaterial color="#233745" />
+    </mesh>
 
     <group ref={steeringWheel} position={[-0.43, 1.08, -0.46]} rotation-x={1.13}>
       <mesh><torusGeometry args={[0.29, 0.036, 14, 42]} /><meshStandardMaterial color="#101214" roughness={0.42} /></mesh>
       <mesh><boxGeometry args={[0.48, 0.032, 0.045]} /><meshStandardMaterial color="#171b1e" /></mesh>
       <mesh><boxGeometry args={[0.035, 0.43, 0.045]} /><meshStandardMaterial color="#171b1e" /></mesh>
-      <mesh><cylinderGeometry args={[0.09, 0.09, 0.055, 24]} /><meshStandardMaterial color="#252b30" metalness={0.2} /></mesh>
+      <mesh ref={hornPad}><cylinderGeometry args={[0.09, 0.09, 0.055, 24]} /><meshStandardMaterial color="#252b30" metalness={0.2} emissive="#000000" /></mesh>
     </group>
 
     <group ref={gearLever} position={[0.33, 0.64, -0.12]}>
@@ -269,5 +312,11 @@ export function DrivingCockpit({
       <boxGeometry args={[0.52, 0.76, 0.82]} />
       <meshStandardMaterial color="#20262b" roughness={0.82} />
     </mesh>
+
+    <object3D ref={headlightTarget} position={[0, 0.45, -40]} />
+    <spotLight ref={leftHeadlight} position={[-0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} target={headlightTarget.current ?? undefined} />
+    <spotLight ref={rightHeadlight} position={[0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} target={headlightTarget.current ?? undefined} />
+    <mesh position={[-0.55, 0.64, 2.17]}><boxGeometry args={[0.42, 0.12, 0.03]} /><meshStandardMaterial color="#7a1616" emissive={v.lowBeam || v.highBeam ? '#6a0d0d' : '#160000'} emissiveIntensity={1.1} /></mesh>
+    <mesh position={[0.55, 0.64, 2.17]}><boxGeometry args={[0.42, 0.12, 0.03]} /><meshStandardMaterial color="#7a1616" emissive={v.lowBeam || v.highBeam ? '#6a0d0d' : '#160000'} emissiveIntensity={1.1} /></mesh>
   </group>
 }
