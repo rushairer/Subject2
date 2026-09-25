@@ -625,7 +625,9 @@ export function DrivingCockpit({
         <planeGeometry args={[0.61, 0.15]} />
         <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} />
       </mesh>
-    </group>    <group position={[-1.0, 1.26, -0.48]} rotation-y={0.22}>
+    </group>
+
+    <group position={[-1.0, 1.26, -0.48]} rotation-y={0.22}>
       <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
       <mesh ref={leftSurface} position={[0, 0, 0.031]}>
         <planeGeometry args={[0.36, 0.17]} />
