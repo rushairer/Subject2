@@ -69,6 +69,83 @@ function createInstrumentDisplay() {
   return { canvas, texture }
 }
 
+
+function SteeringSpoke({
+  angle,
+  length,
+  width,
+  offset = 0.13,
+}: {
+  angle: number
+  length: number
+  width: number
+  offset?: number
+}) {
+  const x = Math.sin(angle) * (offset + length / 2)
+  const y = Math.cos(angle) * (offset + length / 2)
+  return <group position={[x, y, 0]} rotation-z={-angle}>
+    <mesh>
+      <boxGeometry args={[width, length, 0.045]} />
+      <meshStandardMaterial color="#25292d" metalness={0.18} roughness={0.42} />
+    </mesh>
+    <mesh position={[0, 0, 0.026]}>
+      <boxGeometry args={[Math.max(0.018, width - 0.035), Math.max(0.05, length - 0.035), 0.012]} />
+      <meshStandardMaterial color="#33383d" metalness={0.32} roughness={0.3} />
+    </mesh>
+  </group>
+}
+
+function WheelButtonCluster({ side }: { side: 'left' | 'right' }) {
+  const x = side === 'left' ? -0.14 : 0.14
+  return <group position={[x, 0.015, 0.042]}>
+    <mesh>
+      <boxGeometry args={[0.105, 0.067, 0.028]} />
+      <meshStandardMaterial color="#111416" metalness={0.2} roughness={0.36} />
+    </mesh>
+    {[-0.026, 0.026].map((dx, index) => (
+      <mesh key={index} position={[dx, 0, 0.018]}>
+        <boxGeometry args={[0.029, 0.028, 0.009]} />
+        <meshStandardMaterial color="#3e464d" metalness={0.24} roughness={0.33} />
+      </mesh>
+    ))}
+  </group>
+}
+
+function SteeringColumn() {
+  return <group position={[-0.43, 1.04, -0.53]} rotation-x={1.06}>
+    <mesh position={[0, 0, -0.12]}>
+      <cylinderGeometry args={[0.055, 0.072, 0.26, 20]} />
+      <meshStandardMaterial color="#15191c" metalness={0.26} roughness={0.48} />
+    </mesh>
+    <mesh position={[0, 0, -0.27]}>
+      <cylinderGeometry args={[0.08, 0.1, 0.12, 20]} />
+      <meshStandardMaterial color="#22282d" metalness={0.18} roughness={0.5} />
+    </mesh>
+
+    <group position={[-0.14, 0.015, -0.16]} rotation-z={0.2}>
+      <mesh rotation-z={Math.PI / 2}>
+        <cylinderGeometry args={[0.014, 0.018, 0.22, 12]} />
+        <meshStandardMaterial color="#252b30" metalness={0.35} roughness={0.38} />
+      </mesh>
+      <mesh position={[-0.12, 0, 0]}>
+        <boxGeometry args={[0.075, 0.028, 0.03]} />
+        <meshStandardMaterial color="#1a1f23" roughness={0.42} />
+      </mesh>
+    </group>
+
+    <group position={[0.14, 0.015, -0.16]} rotation-z={-0.2}>
+      <mesh rotation-z={Math.PI / 2}>
+        <cylinderGeometry args={[0.014, 0.018, 0.22, 12]} />
+        <meshStandardMaterial color="#252b30" metalness={0.35} roughness={0.38} />
+      </mesh>
+      <mesh position={[0.12, 0, 0]}>
+        <boxGeometry args={[0.075, 0.028, 0.03]} />
+        <meshStandardMaterial color="#1a1f23" roughness={0.42} />
+      </mesh>
+    </group>
+  </group>
+}
+
 function Pedal({ x, active, wide = false }: { x: number; active: number; wide?: boolean }) {
   return <group position={[x, 0.38, -0.72]} rotation-x={-0.42 - active * 0.28}>
     <mesh>
@@ -321,11 +398,50 @@ export function DrivingCockpit({
       <meshBasicMaterial color="#233745" />
     </mesh>
 
-    <group ref={steeringWheel} position={[-0.43, 1.08, -0.46]} rotation-x={1.13}>
-      <mesh><torusGeometry args={[0.29, 0.036, 14, 42]} /><meshStandardMaterial color="#101214" roughness={0.42} /></mesh>
-      <mesh><boxGeometry args={[0.48, 0.032, 0.045]} /><meshStandardMaterial color="#171b1e" /></mesh>
-      <mesh><boxGeometry args={[0.035, 0.43, 0.045]} /><meshStandardMaterial color="#171b1e" /></mesh>
-      <mesh ref={hornPad}><cylinderGeometry args={[0.09, 0.09, 0.055, 24]} /><meshStandardMaterial color="#252b30" metalness={0.2} emissive="#000000" /></mesh>
+    <SteeringColumn />
+    <group ref={steeringWheel} position={[-0.43, 1.075, -0.405]} rotation-x={1.08}>
+      <mesh>
+        <torusGeometry args={[0.305, 0.043, 20, 72]} />
+        <meshStandardMaterial color="#111416" metalness={0.08} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0, 0.008]}>
+        <torusGeometry args={[0.305, 0.032, 16, 72]} />
+        <meshStandardMaterial color="#202428" metalness={0.1} roughness={0.38} />
+      </mesh>
+
+      <mesh position={[0, 0.303, 0.041]}>
+        <boxGeometry args={[0.048, 0.035, 0.024]} />
+        <meshStandardMaterial color="#c59a3e" metalness={0.35} roughness={0.28} />
+      </mesh>
+
+      <SteeringSpoke angle={Math.PI * 0.61} length={0.165} width={0.105} />
+      <SteeringSpoke angle={-Math.PI * 0.61} length={0.165} width={0.105} />
+      <SteeringSpoke angle={Math.PI} length={0.178} width={0.11} offset={0.095} />
+
+      <mesh position={[0, -0.005, 0.01]}>
+        <cylinderGeometry args={[0.128, 0.145, 0.07, 32]} />
+        <meshStandardMaterial color="#1d2226" metalness={0.2} roughness={0.36} />
+      </mesh>
+      <mesh ref={hornPad} position={[0, -0.003, 0.052]}>
+        <cylinderGeometry args={[0.103, 0.112, 0.032, 32]} />
+        <meshStandardMaterial color="#2c3237" metalness={0.16} roughness={0.3} emissive="#000000" />
+      </mesh>
+      <mesh position={[0, -0.003, 0.071]}>
+        <circleGeometry args={[0.032, 24]} />
+        <meshStandardMaterial color="#4f565c" metalness={0.5} roughness={0.24} />
+      </mesh>
+
+      <WheelButtonCluster side="left" />
+      <WheelButtonCluster side="right" />
+
+      <mesh position={[-0.285, 0.105, 0.01]} rotation-z={-0.34}>
+        <boxGeometry args={[0.018, 0.07, 0.016]} />
+        <meshStandardMaterial color="#33383c" roughness={0.32} />
+      </mesh>
+      <mesh position={[0.285, 0.105, 0.01]} rotation-z={0.34}>
+        <boxGeometry args={[0.018, 0.07, 0.016]} />
+        <meshStandardMaterial color="#33383c" roughness={0.32} />
+      </mesh>
     </group>
 
     <group ref={gearLever} position={[0.33, 0.64, -0.12]}>
