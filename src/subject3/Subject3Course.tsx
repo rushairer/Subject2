@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { DRIVING_RULES } from '../rules/drivingRules'
 
 type Point = { x: number; z: number }
 
@@ -163,6 +164,12 @@ export interface Subject3Vehicle {
   seatbelt: boolean
   lowBeam: boolean
   highBeam: boolean
+  handbrake: boolean
+  leftSignalAge: number
+  rightSignalAge: number
+  lookLeft: boolean
+  lookRight: boolean
+  lookBack: boolean
 }
 
 export interface Subject3Infraction {
@@ -183,8 +190,18 @@ export interface Subject3Runtime {
   maxLateral: number
   leftSignalSeen: boolean
   rightSignalSeen: boolean
+  leftSignalLeadAtManeuver: number
+  rightSignalLeadAtManeuver: number
+  maneuverStarted: boolean
+  returnManeuverStarted: boolean
+  eventStartLateral: number
+  leftObservedBeforeManeuver: boolean
+  rightObservedBeforeManeuver: boolean
+  backObservedBeforeManeuver: boolean
   hornSeen: boolean
   stopSeen: boolean
+  pullOverStopSeconds: number
+  pullOverStopGap: number | null
   completed: boolean
   progress: number
 }
@@ -198,8 +215,18 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.maxLateral = 0
   runtime.leftSignalSeen = false
   runtime.rightSignalSeen = false
+  runtime.leftSignalLeadAtManeuver = 0
+  runtime.rightSignalLeadAtManeuver = 0
+  runtime.maneuverStarted = false
+  runtime.returnManeuverStarted = false
+  runtime.eventStartLateral = 0
+  runtime.leftObservedBeforeManeuver = false
+  runtime.rightObservedBeforeManeuver = false
+  runtime.backObservedBeforeManeuver = false
   runtime.hornSeen = false
   runtime.stopSeen = false
+  runtime.pullOverStopSeconds = 0
+  runtime.pullOverStopGap = null
 }
 
 export function createSubject3Runtime(): Subject3Runtime {
@@ -214,10 +241,77 @@ export function createSubject3Runtime(): Subject3Runtime {
     maxLateral: 0,
     leftSignalSeen: false,
     rightSignalSeen: false,
+    leftSignalLeadAtManeuver: 0,
+    rightSignalLeadAtManeuver: 0,
+    maneuverStarted: false,
+    returnManeuverStarted: false,
+    eventStartLateral: 0,
+    leftObservedBeforeManeuver: false,
+    rightObservedBeforeManeuver: false,
+    backObservedBeforeManeuver: false,
     hornSeen: false,
     stopSeen: false,
+    pullOverStopSeconds: 0,
+    pullOverStopGap: null,
     completed: false,
     progress: 0,
+  }
+}
+
+function normalizeAngle(angle: number) {
+  let value = angle
+  while (value > Math.PI) value -= Math.PI * 2
+  while (value < -Math.PI) value += Math.PI * 2
+  return value
+}
+
+function vehicleRightEdgeGap(vehicle: Subject3Vehicle) {
+  const halfLength = 2.2
+  const halfWidth = 0.9
+  const fx = Math.sin(vehicle.heading)
+  const fz = -Math.cos(vehicle.heading)
+  const rx = Math.cos(vehicle.heading)
+  const rz = Math.sin(vehicle.heading)
+  const corners = [
+    [vehicle.x + fx * halfLength + rx * halfWidth, vehicle.z + fz * halfLength + rz * halfWidth],
+    [vehicle.x - fx * halfLength + rx * halfWidth, vehicle.z - fz * halfLength + rz * halfWidth],
+  ] as const
+  const rightMostLateral = Math.max(...corners.map(([x, z]) => projectToSubject3Route(x, z).lateral))
+  return RIGHT_EDGE_OFFSET - rightMostLateral
+}
+
+function requireSignalLead(
+  event: Subject3RouteEvent,
+  runtime: Subject3Runtime,
+  direction: 'left' | 'right',
+  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+) {
+  const age = direction === 'left' ? runtime.leftSignalLeadAtManeuver : runtime.rightSignalLeadAtManeuver
+  if (age < DRIVING_RULES.subject3.signalLeadSeconds) {
+    add(
+      `${direction}-signal-lead`,
+      `${event.title}前开启${direction === 'left' ? '左' : '右'}转向灯不足 ${DRIVING_RULES.subject3.signalLeadSeconds} 秒即开始转向`,
+      100,
+      true,
+    )
+  }
+}
+
+function requireObservation(
+  event: Subject3RouteEvent,
+  runtime: Subject3Runtime,
+  direction: 'left' | 'right',
+  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+) {
+  const observed = direction === 'left'
+    ? runtime.leftObservedBeforeManeuver || runtime.backObservedBeforeManeuver
+    : runtime.rightObservedBeforeManeuver || runtime.backObservedBeforeManeuver
+  if (!observed) {
+    add(
+      `${direction}-observation`,
+      `${event.title}前未完成${direction === 'left' ? '左侧/后方' : '右侧/后方'}观察`,
+      10,
+    )
   }
 }
 
@@ -227,7 +321,9 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     infractions.push({ id: `subject3-${event.id}-${suffix}`, title, points, fatal })
 
   if (event.kind === 'start') {
-    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 10)
+    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 100, true)
+    requireSignalLead(event, runtime, 'left', add)
+    requireObservation(event, runtime, 'left', add)
     if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 10)
   }
 
@@ -244,25 +340,52 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     add('speed', `${event.title}时未按道路情景合理减速`, 10)
   }
 
-  if (event.kind === 'left-turn' && !runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 10)
-  if (event.kind === 'right-turn' && !runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 10)
-  if (event.kind === 'uturn' && !runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 10)
+  if (event.kind === 'left-turn') {
+    if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 100, true)
+    requireSignalLead(event, runtime, 'left', add)
+    requireObservation(event, runtime, 'left', add)
+  }
+  if (event.kind === 'right-turn') {
+    if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 100, true)
+    requireSignalLead(event, runtime, 'right', add)
+    requireObservation(event, runtime, 'right', add)
+  }
+  if (event.kind === 'uturn') {
+    if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 100, true)
+    requireSignalLead(event, runtime, 'left', add)
+    requireObservation(event, runtime, 'left', add)
+  }
 
   if (event.kind === 'lane-change') {
-    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用转向灯', 10)
+    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 100, true)
+    requireSignalLead(event, runtime, 'left', add)
+    requireObservation(event, runtime, 'left', add)
     if (runtime.minLateral > -2.0) add('path', '未完成指令要求的变更车道动作', 100, true)
   }
 
   if (event.kind === 'overtake') {
-    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 10)
-    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 10)
+    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 100, true)
+    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 100, true)
+    requireSignalLead(event, runtime, 'left', add)
+    requireObservation(event, runtime, 'left', add)
+    if (runtime.rightSignalLeadAtManeuver < DRIVING_RULES.subject3.signalLeadSeconds) add('right-signal-lead', '超车返回原车道前右转向灯开启不足 3 秒', 100, true)
+    if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 10)
     if (runtime.minLateral > -2.0) add('path', '未完成有效的超车车道变化', 100, true)
   }
 
   if (event.kind === 'pull-over') {
-    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 10)
-    if (!runtime.stopSeen) add('stop', '未在靠边停车项目区域内完成停车', 100, true)
-    if (runtime.maxLateral < 0.55) add('distance', '靠边停车时未驶向道路右侧合理停车位置', 10)
+    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 100, true)
+    requireSignalLead(event, runtime, 'right', add)
+    requireObservation(event, runtime, 'right', add)
+    if (!runtime.stopSeen || runtime.pullOverStopGap == null) {
+      add('stop', '未在靠边停车项目区域内完成停车', 100, true)
+    } else if (runtime.pullOverStopGap < 0) {
+      add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 100, true)
+    } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.warningMaxGapMeters) {
+      add('distance-fail', '停车后车身距离道路右侧边缘线超过 50cm', 100, true)
+    } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.idealMaxGapMeters) {
+      add('distance-10', '停车后车身距离道路右侧边缘线超过 30cm 但未超过 50cm', 10)
+    }
   }
 
   return infractions
@@ -281,6 +404,7 @@ export function updateSubject3(
   previous: Subject3Runtime,
   automatic: boolean,
   night: boolean,
+  dt: number,
 ): { runtime: Subject3Runtime; infractions: Subject3Infraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: Subject3Infraction[] = []
@@ -311,7 +435,10 @@ export function updateSubject3(
 
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
   if (event && runtime.progress >= event.start) {
-    runtime.eventActive = true
+    if (!runtime.eventActive) {
+      runtime.eventActive = true
+      runtime.eventStartLateral = projection.lateral
+    }
     const kmh = Math.abs(vehicle.speed) * 3.6
     runtime.eventMaxSpeed = Math.max(runtime.eventMaxSpeed, kmh)
     runtime.eventMaxSteering = Math.max(runtime.eventMaxSteering, Math.abs(vehicle.steering))
@@ -321,7 +448,53 @@ export function updateSubject3(
     runtime.leftSignalSeen ||= vehicle.leftIndicator
     runtime.rightSignalSeen ||= vehicle.rightIndicator
     runtime.hornSeen ||= vehicle.horn
-    runtime.stopSeen ||= Math.abs(vehicle.speed) < 0.08
+
+    const relevantLeft = event.kind === 'start' || event.kind === 'left-turn' || event.kind === 'lane-change' || event.kind === 'overtake' || event.kind === 'uturn'
+    const relevantRight = event.kind === 'right-turn' || event.kind === 'pull-over'
+    const lateralDelta = projection.lateral - runtime.eventStartLateral
+    const steeringStarted = Math.abs(vehicle.steering) >= DRIVING_RULES.subject3.maneuverSteeringThreshold
+    const lateralStarted = Math.abs(lateralDelta) >= DRIVING_RULES.subject3.maneuverLateralThreshold
+    const startRolling = event.kind === 'start' && Math.abs(vehicle.speed) > 0.2
+
+    if (!runtime.maneuverStarted && (steeringStarted || lateralStarted || startRolling)) {
+      runtime.maneuverStarted = true
+      if (relevantLeft) runtime.leftSignalLeadAtManeuver = vehicle.leftSignalAge
+      if (relevantRight) runtime.rightSignalLeadAtManeuver = vehicle.rightSignalAge
+      runtime.leftObservedBeforeManeuver ||= vehicle.lookLeft
+      runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
+      runtime.backObservedBeforeManeuver ||= vehicle.lookBack
+    } else if (!runtime.maneuverStarted) {
+      runtime.leftObservedBeforeManeuver ||= vehicle.lookLeft
+      runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
+      runtime.backObservedBeforeManeuver ||= vehicle.lookBack
+    }
+
+    if (event.kind === 'overtake' && runtime.minLateral < -2 && !runtime.returnManeuverStarted && projection.lateral > -1.25) {
+      runtime.returnManeuverStarted = true
+      runtime.rightSignalLeadAtManeuver = vehicle.rightSignalAge
+      runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
+      runtime.backObservedBeforeManeuver ||= vehicle.lookBack
+    }
+
+    const stopped = Math.abs(vehicle.speed) < DRIVING_RULES.subject3.pullOver.stoppedSpeedMps
+    runtime.stopSeen ||= stopped
+    if (event.kind === 'pull-over' && stopped) {
+      runtime.pullOverStopSeconds += dt
+      runtime.pullOverStopGap = vehicleRightEdgeGap(vehicle)
+    } else if (event.kind === 'pull-over' && Math.abs(vehicle.speed) > 0.2) {
+      runtime.pullOverStopSeconds = 0
+    }
+
+    if (
+      event.kind === 'pull-over' &&
+      runtime.pullOverStopSeconds >= DRIVING_RULES.subject3.pullOver.stableStopSeconds &&
+      vehicle.handbrake &&
+      vehicle.gear === 0
+    ) {
+      infractions.push(...evaluateEvent(event, runtime, automatic, night))
+      runtime.completed = true
+      return { runtime, infractions, status: instructionFor(runtime) }
+    }
 
     if (runtime.progress > event.end) {
       infractions.push(...evaluateEvent(event, runtime, automatic, night))

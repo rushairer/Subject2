@@ -10,6 +10,7 @@ export interface CockpitVehicleState {
   clutch: number
   gear: number
   engineOn: boolean
+  engineRpm: number
   handbrake: boolean
   leftIndicator: boolean
   rightIndicator: boolean
@@ -212,7 +213,7 @@ export function DrivingCockpit({
         ctx.font = '700 23px system-ui, sans-serif'
         ctx.textAlign = 'left'
         ctx.fillStyle = v.engineOn ? '#70dfa0' : '#53636d'
-        ctx.fillText('ENGINE', 465, 56)
+        ctx.fillText(v.engineOn ? `RPM ${Math.round(v.engineRpm)}` : 'ENGINE', 465, 56)
         ctx.fillStyle = v.handbrake ? '#ff7368' : '#53636d'
         ctx.fillText('P BRAKE', 465, 91)
         ctx.fillStyle = v.seatbelt ? '#70dfa0' : '#ff7368'

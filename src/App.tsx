@@ -9,6 +9,8 @@ import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } 
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
 import { NightLightTest } from './subject3/NightLightTest'
+import { DRIVING_RULES } from './rules/drivingRules'
+import { stepVehiclePhysics } from './sim/vehiclePhysics'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -34,6 +36,8 @@ interface Vehicle {
   clutch: number
   gear: number
   engineOn: boolean
+  engineRpm: number
+  stallTimer: number
   handbrake: boolean
   leftIndicator: boolean
   rightIndicator: boolean
@@ -42,6 +46,11 @@ interface Vehicle {
   highBeam: boolean
   horn: boolean
   seatbelt: boolean
+  leftSignalAge: number
+  rightSignalAge: number
+  lookLeft: boolean
+  lookRight: boolean
+  lookBack: boolean
 }
 interface Infraction {
   id: string
@@ -101,6 +110,8 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
     clutch: 0,
     gear: 0,
     engineOn: false,
+    engineRpm: 0,
+    stallTimer: 0,
     handbrake: true,
     leftIndicator: false,
     rightIndicator: false,
@@ -109,6 +120,11 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
     highBeam: false,
     horn: false,
     seatbelt: false,
+    leftSignalAge: 0,
+    rightSignalAge: 0,
+    lookLeft: false,
+    lookRight: false,
+    lookBack: false,
   }
 }
 
@@ -206,6 +222,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
   const completionLatched = useRef(false)
   const audioContext = useRef<AudioContext | null>(null)
   const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
+  const stallCount = useRef(0)
 
   const startHorn = () => {
     if (hornNodes.current) return
@@ -243,7 +260,11 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       keys.current[k] = true
       const v = vehicle.current
       if (e.code === 'Space') { e.preventDefault(); v.handbrake = !v.handbrake }
-      if (k === 'i') v.engineOn = !v.engineOn
+      if (k === 'i') {
+        v.engineOn = !v.engineOn
+        v.engineRpm = v.engineOn ? DRIVING_RULES.manualTransmission.idleRpm : 0
+        v.stallTimer = 0
+      }
       if (k === 'q') { v.leftIndicator = !v.leftIndicator; v.rightIndicator = false }
       if (k === 'e') { v.rightIndicator = !v.rightIndicator; v.leftIndicator = false }
       if (k === 'v') v.hazard = !v.hazard
@@ -255,14 +276,17 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
       if (k === 'b') { v.horn = true; startHorn() }
       if (k === 't') v.seatbelt = !v.seatbelt
-      if (k === 'z') cameraYaw.current = -.62
-      if (k === 'x') cameraYaw.current = .62
-      if (k === 'f') cameraYaw.current = Math.PI
+      if (k === 'z') { cameraYaw.current = -.62; v.lookLeft = true }
+      if (k === 'x') { cameraYaw.current = .62; v.lookRight = true }
+      if (k === 'f') { cameraYaw.current = Math.PI; v.lookBack = true }
     }
     const up = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase()
       keys.current[k] = false
       if (['z','x','f'].includes(k)) cameraYaw.current = 0
+      if (k === 'z') vehicle.current.lookLeft = false
+      if (k === 'x') vehicle.current.lookRight = false
+      if (k === 'f') vehicle.current.lookBack = false
       if (k === 'b') { vehicle.current.horn = false; stopHorn() }
     }
     addEventListener('keydown', down); addEventListener('keyup', up)
@@ -280,29 +304,29 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
     const v = vehicle.current
     const throttle = controlsLocked ? 0 : (keys.current['w'] || keys.current['arrowup'] ? 1 : 0)
     const brake = controlsLocked ? 0 : (keys.current['s'] || keys.current['arrowdown'] ? 1 : 0)
-    const clutch = controlsLocked || automatic ? 0 : (keys.current['c'] ? 1 : 0)
+    const clutch = controlsLocked || automatic
+      ? 0
+      : keys.current['c']
+        ? 1
+        : keys.current['shift']
+          ? DRIVING_RULES.manualTransmission.biteClutchPosition
+          : 0
     const steer = controlsLocked ? 0 : ((keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0))
-    v.throttle = throttle
-    v.brake = brake
-    v.clutch = clutch
-    v.steering += (steer * .58 - v.steering) * Math.min(1, dt * 7)
-
-    if (v.engineOn && !v.handbrake && v.gear !== 0) {
-      const direction = v.gear < 0 ? -1 : 1
-      const gearFactor = v.gear < 0 ? .48 : Math.max(.36, 1 - (v.gear - 1) * .1)
-      v.speed += throttle * 5.2 * gearFactor * direction * (1 - clutch * .85) * dt
+    const slopeBeforeStep = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
+    const physics = stepVehiclePhysics(v, { throttle, brake, clutch, steer }, dt, {
+      automatic,
+      grade: slopeBeforeStep.grade,
+    })
+    if (physics.stalled) {
+      stallCount.current += 1
+      onInfraction({
+        id: `engine-stall-${stallCount.current}`,
+        title: '因操作不当造成发动机熄火',
+        points: 10,
+      })
     }
-    const braking = brake * 9 + (v.handbrake ? 12 : 0)
-    if (Math.abs(v.speed) > .001) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), braking * dt)
-    if (session.examId === 'slope-start' && !v.handbrake && !brake) {
-      const slope = getSlopePose(v.z)
-      if (slope.grade > 0) v.speed -= Math.sin(slope.pitch) * 9.81 * dt
-    }
-    v.speed *= Math.pow(.987, dt * 60)
-    v.speed = Math.max(-5.5, Math.min(16, v.speed))
-    v.heading += v.steering * v.speed * dt * .055
-    v.x += Math.sin(v.heading) * v.speed * dt
-    v.z -= Math.cos(v.heading) * v.speed * dt
+    v.leftSignalAge = v.leftIndicator ? v.leftSignalAge + dt : 0
+    v.rightSignalAge = v.rightIndicator ? v.rightSignalAge + dt : 0
 
     const roadPose = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
     if (carGroup.current) {
@@ -355,7 +379,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
       projectUpdate = update
       projectCompleted = update.runtime.completed
     } else if (session.examId === 'subject3') {
-      const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night')
+      const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night', dt)
       subject3Runtime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
@@ -464,7 +488,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
       <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : automatic ? 'D' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>HORN</span><span className={display.seatbelt ? 'on' : 'warn'}>BELT</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
