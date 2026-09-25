@@ -163,22 +163,6 @@ function ackermannFrontAngles(virtualAngle: number) {
     : { left: -inner, right: -outer }
 }
 
-function roundedMirrorShape(width: number, height: number, radius: number) {
-  const shape = new THREE.Shape()
-  const x = -width / 2
-  const y = -height / 2
-  shape.moveTo(x + radius, y)
-  shape.lineTo(x + width - radius, y)
-  shape.quadraticCurveTo(x + width, y, x + width, y + radius)
-  shape.lineTo(x + width, y + height - radius)
-  shape.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  shape.lineTo(x + radius, y + height)
-  shape.quadraticCurveTo(x, y + height, x, y + height - radius)
-  shape.lineTo(x, y + radius)
-  shape.quadraticCurveTo(x, y, x + radius, y)
-  return shape
-}
-
 function RoadWheel({
   x,
   z,
@@ -278,9 +262,6 @@ export function DrivingCockpit({
   const frontRightSpin = useRef<THREE.Group>(null)
   const rearLeftSpin = useRef<THREE.Group>(null)
   const rearRightSpin = useRef<THREE.Group>(null)
-  const leftMirrorShape = useMemo(() => roundedMirrorShape(0.49, 0.205, 0.07), [])
-  const rightMirrorShape = useMemo(() => roundedMirrorShape(0.49, 0.205, 0.07), [])
-  const centerMirrorShape = useMemo(() => roundedMirrorShape(0.675, 0.17, 0.035), [])
 
   const centerAnchor = useRef<THREE.Object3D>(null)
   const leftAnchor = useRef<THREE.Object3D>(null)
@@ -299,9 +280,9 @@ export function DrivingCockpit({
       centerTarget,
       leftTarget,
       rightTarget,
-      centerCamera: new THREE.PerspectiveCamera(42, 512 / 190, 0.08, 260),
-      leftCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
-      rightCamera: new THREE.PerspectiveCamera(56, 2.15, 0.08, 220),
+      centerCamera: new THREE.PerspectiveCamera(44, 512 / 190, 0.08, 260),
+      leftCamera: new THREE.PerspectiveCamera(48, 2, 0.08, 220),
+      rightCamera: new THREE.PerspectiveCamera(48, 2, 0.08, 220),
     }
   }, [])
 
@@ -634,52 +615,29 @@ export function DrivingCockpit({
     <Pedal x={-0.39} active={v.brake} wide />
     <Pedal x={-0.2} active={v.throttle} />
 
-    <object3D ref={centerAnchor} position={[0, 1.61, -0.545]} rotation={[0, Math.PI, 0]} />
-    <object3D ref={leftAnchor} position={[-1.08, 1.34, -0.415]} rotation={[0, Math.PI - 0.2, 0]} />
-    <object3D ref={rightAnchor} position={[1.08, 1.34, -0.415]} rotation={[0, Math.PI + 0.2, 0]} />
+    <object3D ref={centerAnchor} position={[0, 1.69, -0.62]} rotation={[0, Math.PI, 0]} />
+    <object3D ref={leftAnchor} position={[-1.01, 1.27, -0.54]} rotation={[0, Math.PI + 0.15, 0]} />
+    <object3D ref={rightAnchor} position={[1.01, 1.27, -0.54]} rotation={[0, Math.PI - 0.15, 0]} />
 
-    <group position={[0, 1.62, -0.61]}>
-      <mesh position={[0, 0.16, -0.015]}>
-        <boxGeometry args={[0.07, 0.19, 0.055]} />
-        <meshStandardMaterial color="#242a2e" roughness={0.42} />
+    <group position={[0, 1.66, -0.58]}>
+      <mesh><boxGeometry args={[0.68, 0.21, 0.045]} /><meshStandardMaterial color="#111417" roughness={0.4} /></mesh>
+      <mesh ref={centerSurface} position={[0, 0, 0.025]}>
+        <planeGeometry args={[0.61, 0.15]} />
+        <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} />
       </mesh>
-      <mesh>
-        <boxGeometry args={[0.75, 0.235, 0.065]} />
-        <meshStandardMaterial color="#111518" roughness={0.34} />
-      </mesh>
-      <mesh ref={centerSurface} position={[0, 0, 0.036]}>
-        <shapeGeometry args={[centerMirrorShape]} />
-        <meshBasicMaterial map={mirrors.centerTarget.texture} toneMapped={false} side={THREE.DoubleSide} />
+    </group>    <group position={[-1.0, 1.26, -0.48]} rotation-y={0.22}>
+      <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
+      <mesh ref={leftSurface} position={[0, 0, 0.031]}>
+        <planeGeometry args={[0.36, 0.17]} />
+        <meshBasicMaterial map={mirrors.leftTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
-    <group position={[-1.075, 1.33, -0.48]} rotation-y={0.035}>
-      <mesh position={[0.155, -0.04, 0.005]} rotation-z={-0.16}>
-        <boxGeometry args={[0.31, 0.055, 0.07]} />
-        <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
-      </mesh>
-      <mesh scale={[0.32, 0.16, 0.065]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial color="#12171b" metalness={0.28} roughness={0.34} />
-      </mesh>
-      <mesh ref={leftSurface} position={[0, 0, 0.067]}>
-        <shapeGeometry args={[leftMirrorShape]} />
-        <meshBasicMaterial map={mirrors.leftTarget.texture} toneMapped={false} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-
-    <group position={[1.075, 1.33, -0.48]} rotation-y={-0.035}>
-      <mesh position={[-0.155, -0.04, 0.005]} rotation-z={0.16}>
-        <boxGeometry args={[0.31, 0.055, 0.07]} />
-        <meshStandardMaterial color="#171d22" metalness={0.18} roughness={0.42} />
-      </mesh>
-      <mesh scale={[0.32, 0.16, 0.065]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial color="#12171b" metalness={0.28} roughness={0.34} />
-      </mesh>
-      <mesh ref={rightSurface} position={[0, 0, 0.067]}>
-        <shapeGeometry args={[rightMirrorShape]} />
-        <meshBasicMaterial map={mirrors.rightTarget.texture} toneMapped={false} side={THREE.DoubleSide} />
+    <group position={[1.0, 1.26, -0.48]} rotation-y={-0.22}>
+      <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
+      <mesh ref={rightSurface} position={[0, 0, 0.031]}>
+        <planeGeometry args={[0.36, 0.17]} />
+        <meshBasicMaterial map={mirrors.rightTarget.texture} toneMapped={false} />
       </mesh>
     </group>
 
