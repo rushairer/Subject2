@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking } from './subject2/ReverseParkingCourse'
 import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from './subject2/SideParkingCourse'
 import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
-import { CurveDrivingCourse, CURVE_START, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
+import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'\nimport { subject2StartPose } from './subject2/courseStartPoses'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
@@ -104,16 +104,12 @@ const initialProjectStatus = (examId: ExamId) => {
 }
 
 const initialVehicle = (examId?: ExamId): Vehicle => {
-  const reverseParking = examId === 'reverse-parking'
-  const sideParking = examId === 'side-parking'
-  const rightAngle = examId === 'right-angle'
-  const curveDriving = examId === 'curve-driving'
-  const slopeStart = examId === 'slope-start'
+  const subject2Start = subject2StartPose(examId)
   const subject3 = examId === 'subject3'
   return {
-    x: curveDriving ? CURVE_START.x : slopeStart ? 0.4 : subject3 ? SUBJECT3_START.x : 0,
-    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : curveDriving ? CURVE_START.z : slopeStart ? 11 : subject3 ? SUBJECT3_START.z : 8,
-    heading: reverseParking ? Math.PI : 0,
+    x: subject2Start?.x ?? (subject3 ? SUBJECT3_START.x : 0),
+    z: subject2Start?.z ?? (subject3 ? SUBJECT3_START.z : 8),
+    heading: subject2Start?.heading ?? 0,
     speed: 0,
     steering: 0,
     steeringWheelAngle: 0,
