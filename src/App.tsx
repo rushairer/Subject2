@@ -11,6 +11,7 @@ import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 }
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
+import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -57,6 +58,10 @@ interface Infraction {
   title: string
   points: number
   fatal?: boolean
+  t?: number
+  x?: number
+  z?: number
+  project?: string
 }
 interface Session {
   examId: ExamId
@@ -412,7 +417,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfractio
   </>
 }
 
-function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[]) => void }) {
+function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[]) => void }) {
   const combinedExam = session.examId === 'subject2-exam'
   const automatic = candidate.licenseType === 'C2'
   const examSequence: ExamId[] = candidate.licenseType === 'C1'
@@ -429,7 +434,20 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
   const finishLatched = useRef(false)
   const lastUi = useRef(0)
-  const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
+  const sessionStartedAt = useRef(performance.now())
+  const lastTrajectorySampleAt = useRef(0)
+  const trajectory = useRef<TrajectorySample[]>([])
+  const addInfraction = (item: Infraction) => setInfractions(prev => {
+    if (prev.some(x => x.id === item.id)) return prev
+    const now = performance.now()
+    return [...prev, {
+      ...item,
+      t: (now - sessionStartedAt.current) / 1000,
+      x: vehicle.current.x,
+      z: vehicle.current.z,
+      project: activeExamId,
+    }]
+  })
 
   useEffect(() => {
     vehicle.current = initialVehicle(activeExamId)
@@ -441,7 +459,23 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
 
   const tick = () => {
     const now = performance.now()
-    if (now - lastUi.current > 80) { lastUi.current = now; setDisplay({ ...vehicle.current }) }
+    if (now - lastUi.current > 80) {
+      lastUi.current = now
+      setDisplay({ ...vehicle.current })
+    }
+    if (now - lastTrajectorySampleAt.current > 180) {
+      lastTrajectorySampleAt.current = now
+      const v = vehicle.current
+      trajectory.current.push({
+        t: (now - sessionStartedAt.current) / 1000,
+        x: v.x,
+        z: v.z,
+        speed: v.speed,
+        gear: v.gear,
+        heading: v.heading,
+        project: activeExamId,
+      })
+    }
   }
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
 
@@ -450,7 +484,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     const passLine = activeExamId === 'subject3' ? 90 : 80
     if (infractions.some(i => i.fatal) || score < passLine) {
       finishLatched.current = true
-      onDone(score, infractions)
+      onDone(score, infractions, trajectory.current)
     }
   }, [activeExamId, infractions, onDone, score, session.mode])
 
@@ -468,14 +502,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   useEffect(() => {
     if (activeExamId !== 'subject3' || !projectComplete || finishLatched.current) return
     finishLatched.current = true
-    onDone(score, infractions)
+    onDone(score, infractions, trajectory.current)
   }, [activeExamId, infractions, onDone, projectComplete, score])
 
   const continueCombinedExam = () => {
     if (!combinedExam) return
     if (activeIndex >= examSequence.length - 1) {
       finishLatched.current = true
-      onDone(score, infractions)
+      onDone(score, infractions, trajectory.current)
       return
     }
     setActiveExamId(examSequence[activeIndex + 1])
@@ -484,7 +518,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   return <div className="driving-shell">
     <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} controlsLocked={!lightTestDone} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
-      <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
+      <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions, trajectory.current)}>结束并生成成绩</button></div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
@@ -495,13 +529,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   </div>
 }
 
-function Result({ candidate, session, score, infractions, onBack }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], onBack: () => void }) {
+function Result({ candidate, session, score, infractions, trajectory, onBack }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], trajectory: TrajectorySample[], onBack: () => void }) {
   const passLine = session.examId === 'subject3' ? 90 : 80
   const passed = score >= passLine && !infractions.some(i => i.fatal)
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">模拟考试成绩单</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{passed ? '合格' : '未合格'}</span></div>
     <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{session.examId}</span><span>合格线 {passLine}</span></div>
-    <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>-{i.points}</b></div>)}</div>
+    <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>{i.fatal ? '不合格' : `-${i.points}`}</b></div>)}</div>
+    <ExamReplay samples={trajectory} infractions={infractions} />
     <button className="primary" onClick={onBack}>返回训练中心</button><p className="disclaimer">成绩仅用于模拟训练，不具有真实机动车驾驶人考试效力。</p>
   </section></main>
 }
@@ -510,12 +545,12 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('profile')
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [result, setResult] = useState<{ score: number, infractions: Infraction[] } | null>(null)
+  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[] } | null>(null)
 
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
   if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions) => { setResult({ score, infractions }); setPhase('result') }} />
-  if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} onBack={() => setPhase('menu')} />
+  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory) => { setResult({ score, infractions, trajectory: [...trajectory] }); setPhase('result') }} />
+  if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} trajectory={result.trajectory} onBack={() => setPhase('menu')} />
   return null
 }
