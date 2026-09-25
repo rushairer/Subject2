@@ -300,6 +300,15 @@ export function updateSubject3(
 
   if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
 
+  if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
+    infractions.push({
+      id: 'subject3-night-lights-off',
+      title: '夜间道路驾驶时未开启前照灯',
+      points: 100,
+      fatal: true,
+    })
+  }
+
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
   if (event && runtime.progress >= event.start) {
     runtime.eventActive = true

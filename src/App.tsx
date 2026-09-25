@@ -8,6 +8,7 @@ import { CurveDrivingCourse, CURVE_START, createCurveRuntime, updateCurveDriving
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
+import { NightLightTest } from './subject3/NightLightTest'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -184,8 +185,8 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
-  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean,
+function DrivingWorld({ vehicle, session, automatic, controlsLocked, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, controlsLocked: boolean,
   onInfraction: (i: Infraction) => void, onTick: () => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
@@ -277,10 +278,10 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
-    const throttle = keys.current['w'] || keys.current['arrowup'] ? 1 : 0
-    const brake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
-    const clutch = automatic ? 0 : (keys.current['c'] ? 1 : 0)
-    const steer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
+    const throttle = controlsLocked ? 0 : (keys.current['w'] || keys.current['arrowup'] ? 1 : 0)
+    const brake = controlsLocked ? 0 : (keys.current['s'] || keys.current['arrowdown'] ? 1 : 0)
+    const clutch = controlsLocked || automatic ? 0 : (keys.current['c'] ? 1 : 0)
+    const steer = controlsLocked ? 0 : ((keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0))
     v.throttle = throttle
     v.brake = brake
     v.clutch = clutch
@@ -401,6 +402,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const [infractions, setInfractions] = useState<Infraction[]>([])
   const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
   const [projectComplete, setProjectComplete] = useState(false)
+  const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
   const finishLatched = useRef(false)
   const lastUi = useRef(0)
   const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
@@ -410,7 +412,8 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     setDisplay(initialVehicle(activeExamId))
     setProjectStatus(initialProjectStatus(activeExamId))
     setProjectComplete(false)
-  }, [activeExamId])
+    setLightTestDone(!(activeExamId === 'subject3' && session.time === 'day'))
+  }, [activeExamId, session.time])
 
   const tick = () => {
     const now = performance.now()
@@ -428,7 +431,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }, [activeExamId, infractions, onDone, score, session.mode])
 
   useEffect(() => {
-    if (activeExamId !== 'subject3' || !projectStatus || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    if (activeExamId !== 'subject3' || !lightTestDone || !projectStatus || typeof window === 'undefined' || !('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(projectStatus.replace(/ · /g, '。'))
     utterance.lang = 'zh-CN'
@@ -436,7 +439,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     utterance.volume = 0.85
     window.speechSynthesis.speak(utterance)
     return () => window.speechSynthesis.cancel()
-  }, [activeExamId, projectStatus])
+  }, [activeExamId, lightTestDone, projectStatus])
 
   useEffect(() => {
     if (activeExamId !== 'subject3' || !projectComplete || finishLatched.current) return
@@ -455,9 +458,10 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} controlsLocked={!lightTestDone} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
       <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
+      {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
       {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 方向{automatic ? '' : ' · C 离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察</span></div>
