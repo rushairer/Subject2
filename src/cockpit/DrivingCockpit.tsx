@@ -430,7 +430,6 @@ export function DrivingCockpit({
     mirrorAccumulator.current += delta
     if (mirrorAccumulator.current < 1 / 30) return
     mirrorAccumulator.current = 0
-
     const rigs: MirrorRig[] = [
       { camera: mirrors.centerCamera, target: mirrors.centerTarget, anchor: centerAnchor, surface: centerSurface },
       { camera: mirrors.leftCamera, target: mirrors.leftTarget, anchor: leftAnchor, surface: leftSurface },
@@ -438,33 +437,21 @@ export function DrivingCockpit({
     ]
 
     const surfaces = [centerSurface.current, leftSurface.current, rightSurface.current]
-    surfaces.forEach(surface => {
-      if (surface) surface.visible = false
-    })
+    surfaces.forEach(surface => { if (surface) surface.visible = false })
 
     const previousTarget = gl.getRenderTarget()
-    const previousAutoClear = gl.autoClear
-    gl.autoClear = true
-
-    try {
-      for (const rig of rigs) {
-        const anchor = rig.anchor.current
-        if (!anchor) continue
-        anchor.getWorldPosition(rig.camera.position)
-        anchor.getWorldQuaternion(rig.camera.quaternion)
-        rig.camera.updateMatrixWorld(true)
-
-        gl.setRenderTarget(rig.target)
-        gl.clear(true, true, true)
-        gl.render(scene, rig.camera)
-      }
-    } finally {
-      gl.setRenderTarget(previousTarget)
-      gl.autoClear = previousAutoClear
-      surfaces.forEach(surface => {
-        if (surface) surface.visible = true
-      })
+    for (const rig of rigs) {
+      const anchor = rig.anchor.current
+      if (!anchor) continue
+      anchor.getWorldPosition(rig.camera.position)
+      anchor.getWorldQuaternion(rig.camera.quaternion)
+      rig.camera.updateMatrixWorld()
+      gl.setRenderTarget(rig.target)
+      gl.clear()
+      gl.render(scene, rig.camera)
     }
+    gl.setRenderTarget(previousTarget)
+    surfaces.forEach(surface => { if (surface) surface.visible = true })
   }, -1)
 
   const v = vehicle.current
