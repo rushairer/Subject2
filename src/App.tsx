@@ -7,6 +7,7 @@ import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './s
 import { CurveDrivingCourse, CURVE_START, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
+import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -77,6 +78,7 @@ const initialProjectStatus = (examId: ExamId) => {
   if (examId === 'right-angle') return '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
   if (examId === 'curve-driving') return '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
   if (examId === 'slope-start') return '坡道定点停车：保持右侧车身距边线 30cm 内，将前保险杠停在桩杆线上'
+  if (examId === 'subject3') return '科目三道路驾驶 · 请完成上车准备，系好安全带，开启左转向灯后安全起步'
   return ''
 }
 
@@ -86,9 +88,10 @@ const initialVehicle = (examId?: ExamId): Vehicle => {
   const rightAngle = examId === 'right-angle'
   const curveDriving = examId === 'curve-driving'
   const slopeStart = examId === 'slope-start'
+  const subject3 = examId === 'subject3'
   return {
-    x: curveDriving ? CURVE_START.x : slopeStart ? 0.4 : 0,
-    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : curveDriving ? CURVE_START.z : slopeStart ? 11 : 8,
+    x: curveDriving ? CURVE_START.x : slopeStart ? 0.4 : subject3 ? SUBJECT3_START.x : 0,
+    z: reverseParking ? 5.7 : sideParking ? 8.2 : rightAngle ? 7.2 : curveDriving ? CURVE_START.z : slopeStart ? 11 : subject3 ? SUBJECT3_START.z : 8,
     heading: reverseParking ? Math.PI : 0,
     speed: 0,
     steering: 0,
@@ -196,6 +199,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
   const rightAngleRuntime = useRef(createRightAngleRuntime())
   const curveRuntime = useRef(createCurveRuntime())
   const slopeRuntime = useRef(createSlopeRuntime())
+  const subject3Runtime = useRef(createSubject3Runtime())
   const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
   const completionLatched = useRef(false)
@@ -320,7 +324,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
     } else speedTimer.current = 0
     if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
     if (Math.abs(v.speed) > .25 && !v.seatbelt) onInfraction({ id: 'seatbelt-not-fastened', title: '起步或行驶时未按规定使用安全带', points: 100, fatal: true })
-    if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
+    if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start', 'subject3'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     let projectCompleted = false
@@ -349,6 +353,11 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
       slopeRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
+    } else if (session.examId === 'subject3') {
+      const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night')
+      subject3Runtime.current = update.runtime
+      projectUpdate = update
+      projectCompleted = update.runtime.completed
     }
     if (projectUpdate) {
       projectUpdate.infractions.forEach(onInfraction)
@@ -372,7 +381,7 @@ function DrivingWorld({ vehicle, session, automatic, onInfraction, onTick, onPro
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : <Road />}
+    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
@@ -410,12 +419,30 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
 
   useEffect(() => {
-    if (!combinedExam || session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
-    if (infractions.some(i => i.fatal) || score < 80) {
+    if (session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
+    const passLine = activeExamId === 'subject3' ? 90 : 80
+    if (infractions.some(i => i.fatal) || score < passLine) {
       finishLatched.current = true
       onDone(score, infractions)
     }
-  }, [combinedExam, infractions, onDone, score, session.mode])
+  }, [activeExamId, infractions, onDone, score, session.mode])
+
+  useEffect(() => {
+    if (activeExamId !== 'subject3' || !projectStatus || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(projectStatus.replace(/ · /g, '。'))
+    utterance.lang = 'zh-CN'
+    utterance.rate = 1
+    utterance.volume = 0.85
+    window.speechSynthesis.speak(utterance)
+    return () => window.speechSynthesis.cancel()
+  }, [activeExamId, projectStatus])
+
+  useEffect(() => {
+    if (activeExamId !== 'subject3' || !projectComplete || finishLatched.current) return
+    finishLatched.current = true
+    onDone(score, infractions)
+  }, [activeExamId, infractions, onDone, projectComplete, score])
 
   const continueCombinedExam = () => {
     if (!combinedExam) return
