@@ -113,6 +113,13 @@ export function DrivingCockpit({
   }, [])
 
   useEffect(() => {
+    const target = headlightTarget.current
+    if (!target) return
+    if (leftHeadlight.current) leftHeadlight.current.target = target
+    if (rightHeadlight.current) rightHeadlight.current.target = target
+  }, [])
+
+  useEffect(() => {
     return () => {
       mirrors.centerTarget.dispose()
       mirrors.leftTarget.dispose()
@@ -314,8 +321,8 @@ export function DrivingCockpit({
     </mesh>
 
     <object3D ref={headlightTarget} position={[0, 0.45, -40]} />
-    <spotLight ref={leftHeadlight} position={[-0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} target={headlightTarget.current ?? undefined} />
-    <spotLight ref={rightHeadlight} position={[0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} target={headlightTarget.current ?? undefined} />
+    <spotLight ref={leftHeadlight} position={[-0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
+    <spotLight ref={rightHeadlight} position={[0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
     <mesh position={[-0.55, 0.64, 2.17]}><boxGeometry args={[0.42, 0.12, 0.03]} /><meshStandardMaterial color="#7a1616" emissive={v.lowBeam || v.highBeam ? '#6a0d0d' : '#160000'} emissiveIntensity={1.1} /></mesh>
     <mesh position={[0.55, 0.64, 2.17]}><boxGeometry args={[0.42, 0.12, 0.03]} /><meshStandardMaterial color="#7a1616" emissive={v.lowBeam || v.highBeam ? '#6a0d0d' : '#160000'} emissiveIntensity={1.1} /></mesh>
   </group>
