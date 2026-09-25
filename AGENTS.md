@@ -8,8 +8,9 @@ All driving, exam, camera, and route code must use the same vehicle-local frame:
 - vehicle forward: `(sin(heading), -cos(heading))`
 - vehicle right: `(cos(heading), sin(heading))`
 - vehicle left: negative of vehicle right
-- positive steering / positive heading delta = **right turn**
-- negative steering / negative heading delta = **left turn**
+- positive steering = road wheels point **right**; negative steering = road wheels point **left**
+- while moving forward, positive steering produces positive heading delta (**right turn**) and negative steering produces negative heading delta (**left turn**)
+- while reversing, heading delta changes sign: positive steering moves the rear axle **right** while the vehicle nose yaws left; negative steering moves the rear axle **left** while the nose yaws right
 - positive route lateral offset = **right**
 - negative route lateral offset = **left**
 - Three.js visual body rotation remains `rotation.y = -heading`; do not infer driving turn sign from renderer rotation
@@ -20,6 +21,10 @@ Use `src/sim/vehicleFrame.ts` helpers instead of duplicating trigonometric frame
 ## Single source of truth for training-car geometry
 
 `src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
+
+## Single source of truth for Subject 2 start poses
+
+`src/subject2/courseStartPoses.ts` owns the canonical spawn position and heading for every Subject 2 project. Do not duplicate start X/Z/heading values in `App.tsx`, replay code, tests, or future continuous-course routing.
 
 ## User-facing replay coordinate convention
 
