@@ -55,6 +55,25 @@ const projects = [
   ['right-angle', '直角转弯', '观察、打灯、转向', '训练车身边距、观察、转向灯和转向时机。'],
 ] as const
 
+const examTitle = (examId: ExamId) => ({
+  'reverse-parking': '倒车入库',
+  'side-parking': '侧方停车',
+  'slope-start': '坡道定点停车和起步',
+  'curve-driving': '曲线行驶',
+  'right-angle': '直角转弯',
+  'subject2-exam': '科目二模拟考试',
+  'subject3': '科目三道路驾驶',
+}[examId])
+
+const initialProjectStatus = (examId: ExamId) => {
+  if (examId === 'reverse-parking') return '驶过右侧控制线后停车，挂 R 挡开始第一次倒库'
+  if (examId === 'side-parking') return '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
+  if (examId === 'right-angle') return '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
+  if (examId === 'curve-driving') return '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
+  if (examId === 'slope-start') return '坡道定点停车：保持右侧车身距边线 30cm 内，将前保险杠停在桩杆线上'
+  return ''
+}
+
 const initialVehicle = (examId?: ExamId): Vehicle => {
   const reverseParking = examId === 'reverse-parking'
   const sideParking = examId === 'side-parking'
@@ -161,10 +180,11 @@ function CarVisual() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus }: {
+function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session,
   onInfraction: (i: Infraction) => void, onTick: () => void,
-  onProjectStatus: (status: string) => void
+  onProjectStatus: (status: string) => void,
+  onProjectComplete: () => void
 }) {
   const keys = useRef<Record<string, boolean>>({})
   const cameraYaw = useRef(0)
@@ -177,6 +197,7 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
   const slopeRuntime = useRef(createSlopeRuntime())
   const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
+  const completionLatched = useRef(false)
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -212,7 +233,7 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     const throttle = keys.current['w'] || keys.current['arrowup'] ? 1 : 0
     const brake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
     const clutch = keys.current['c'] ? 1 : 0
-    const steer = (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0) - (keys.current['d'] || keys.current['arrowright'] ? 1 : 0)
+    const steer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
     v.steering += (steer * .58 - v.steering) * Math.min(1, dt * 7)
 
     if (v.engineOn && !v.handbrake && v.gear !== 0) {
@@ -249,32 +270,42 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
     if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
+    let projectCompleted = false
     if (session.examId === 'reverse-parking') {
       const update = updateReverseParking(v, reverseParkingRuntime.current, dt)
       reverseParkingRuntime.current = update.runtime
       projectUpdate = update
+      projectCompleted = update.runtime.completed
     } else if (session.examId === 'side-parking') {
       const update = updateSideParking(v, sideParkingRuntime.current, dt)
       sideParkingRuntime.current = update.runtime
       projectUpdate = update
+      projectCompleted = update.runtime.completed
     } else if (session.examId === 'right-angle') {
       const update = updateRightAngle(v, rightAngleRuntime.current, dt)
       rightAngleRuntime.current = update.runtime
       projectUpdate = update
+      projectCompleted = update.runtime.completed
     } else if (session.examId === 'curve-driving') {
       const update = updateCurveDriving(v, curveRuntime.current, dt)
       curveRuntime.current = update.runtime
       projectUpdate = update
+      projectCompleted = update.runtime.completed
     } else if (session.examId === 'slope-start') {
       const update = updateSlopeStart(v, slopeRuntime.current, dt)
       slopeRuntime.current = update.runtime
       projectUpdate = update
+      projectCompleted = update.runtime.completed
     }
     if (projectUpdate) {
       projectUpdate.infractions.forEach(onInfraction)
       if (projectUpdate.status !== lastProjectStatus.current) {
         lastProjectStatus.current = projectUpdate.status
         onProjectStatus(projectUpdate.status)
+      }
+      if (projectCompleted && !completionLatched.current) {
+        completionLatched.current = true
+        onProjectComplete()
       }
     }
 
@@ -295,34 +326,59 @@ function DrivingWorld({ vehicle, session, onInfraction, onTick, onProjectStatus 
 }
 
 function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[]) => void }) {
-  const vehicle = useRef(initialVehicle(session.examId))
-  const [display, setDisplay] = useState(initialVehicle(session.examId))
+  const combinedExam = session.examId === 'subject2-exam'
+  const examSequence: ExamId[] = candidate.licenseType === 'C1'
+    ? ['reverse-parking', 'slope-start', 'side-parking', 'curve-driving', 'right-angle']
+    : ['reverse-parking', 'side-parking', 'curve-driving', 'right-angle']
+  const [activeExamId, setActiveExamId] = useState<ExamId>(combinedExam ? examSequence[0] : session.examId)
+  const activeIndex = combinedExam ? examSequence.indexOf(activeExamId) : 0
+  const effectiveSession: Session = { ...session, examId: activeExamId }
+  const vehicle = useRef(initialVehicle(activeExamId))
+  const [display, setDisplay] = useState(initialVehicle(activeExamId))
   const [infractions, setInfractions] = useState<Infraction[]>([])
-  const [projectStatus, setProjectStatus] = useState(
-    session.examId === 'reverse-parking'
-      ? '驶过右侧控制线后停车，挂 R 挡开始第一次倒库'
-      : session.examId === 'side-parking'
-        ? '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
-        : session.examId === 'right-angle'
-          ? '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
-          : session.examId === 'curve-driving'
-            ? '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
-            : session.examId === 'slope-start'
-              ? '坡道定点停车：保持右侧车身距边线 30cm 内，将前保险杠停在桩杆线上'
-              : '',
-  )
+  const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
+  const [projectComplete, setProjectComplete] = useState(false)
+  const finishLatched = useRef(false)
   const lastUi = useRef(0)
   const addInfraction = (item: Infraction) => setInfractions(prev => prev.some(x => x.id === item.id) ? prev : [...prev, item])
+
+  useEffect(() => {
+    vehicle.current = initialVehicle(activeExamId)
+    setDisplay(initialVehicle(activeExamId))
+    setProjectStatus(initialProjectStatus(activeExamId))
+    setProjectComplete(false)
+  }, [activeExamId])
+
   const tick = () => {
     const now = performance.now()
     if (now - lastUi.current > 80) { lastUi.current = now; setDisplay({ ...vehicle.current }) }
   }
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
+
+  useEffect(() => {
+    if (!combinedExam || session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
+    if (infractions.some(i => i.fatal) || score < 80) {
+      finishLatched.current = true
+      onDone(score, infractions)
+    }
+  }, [combinedExam, infractions, onDone, score, session.mode])
+
+  const continueCombinedExam = () => {
+    if (!combinedExam) return
+    if (activeIndex >= examSequence.length - 1) {
+      finishLatched.current = true
+      onDone(score, infractions)
+      return
+    }
+    setActiveExamId(examSequence[activeIndex + 1])
+  }
+
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={session} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
-      <div className="hud-top"><div className="status-chip">{candidate.name} · {session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
+      <div className="hud-top"><div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div><button className="finish-btn" onClick={() => onDone(score, infractions)}>结束并生成成绩</button></div>
       {projectStatus && <div className="project-status">{projectStatus}</div>}
+      {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
       <div className="mirror mirror-left"><span>左后视镜</span></div><div className="mirror mirror-center"><span>内后视镜</span></div><div className="mirror mirror-right"><span>右后视镜</span></div>
       <div className="instruction-card"><b>键盘驾驶</b><span>W 油门 · S 刹车 · A/D 方向 · C 离合</span><span>1–5 / N / R 挡位 · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光</span><span>Z/X 左右观察 · F 回头观察</span></div>
       <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
