@@ -438,17 +438,44 @@ export function DrivingCockpit({
   const v = vehicle.current
 
   return <group ref={root}>
-    <mesh position={[0, 0.52, 0]}>
-      <boxGeometry args={[1.82, 0.3, 3.8]} />
-      <meshStandardMaterial color="#151c22" metalness={0.28} roughness={0.48} />
+    {/* Classic three-box training sedan proportions, visually referenced from
+        late-1990s Chinese driving-school sedans such as the Santana 2000.
+        Keep this visual shell isolated from vehicle physics and mirror optics. */}
+    <mesh position={[0, 0.54, 0]}>
+      <boxGeometry args={[1.72, 0.42, 4.28]} />
+      <meshStandardMaterial color="#303940" metalness={0.24} roughness={0.46} />
     </mesh>
-    <mesh position={[0, 0.7, -1.35]} rotation-x={-0.035}>
-      <boxGeometry args={[1.7, 0.2, 1.32]} />
-      <meshStandardMaterial color="#1b252d" metalness={0.32} roughness={0.4} />
+
+    {/* Long, low engine bay and distinct front fascia. */}
+    <mesh position={[0, 0.78, -1.55]} rotation-x={0.018}>
+      <boxGeometry args={[1.64, 0.17, 1.28]} />
+      <meshStandardMaterial color="#364149" metalness={0.28} roughness={0.4} />
     </mesh>
-    <mesh position={[0, 0.68, 1.55]}>
-      <boxGeometry args={[1.72, 0.22, 0.9]} />
-      <meshStandardMaterial color="#182128" metalness={0.3} roughness={0.44} />
+    <mesh position={[0, 0.55, -2.16]}>
+      <boxGeometry args={[1.73, 0.32, 0.22]} />
+      <meshStandardMaterial color="#252d33" metalness={0.18} roughness={0.48} />
+    </mesh>
+    <mesh position={[0, 0.62, -2.285]}>
+      <boxGeometry args={[0.66, 0.17, 0.025]} />
+      <meshStandardMaterial color="#10161a" metalness={0.3} roughness={0.34} />
+    </mesh>
+    <mesh position={[-0.55, 0.67, -2.287]}>
+      <boxGeometry args={[0.43, 0.18, 0.028]} />
+      <meshStandardMaterial color="#c6d7df" emissive={v.lowBeam || v.highBeam ? '#fff4cf' : '#263137'} emissiveIntensity={v.lowBeam || v.highBeam ? 1.1 : 0.15} roughness={0.18} />
+    </mesh>
+    <mesh position={[0.55, 0.67, -2.287]}>
+      <boxGeometry args={[0.43, 0.18, 0.028]} />
+      <meshStandardMaterial color="#c6d7df" emissive={v.lowBeam || v.highBeam ? '#fff4cf' : '#263137'} emissiveIntensity={v.lowBeam || v.highBeam ? 1.1 : 0.15} roughness={0.18} />
+    </mesh>
+
+    {/* Separate trunk and rear fascia establish a real three-box silhouette. */}
+    <mesh position={[0, 0.79, 1.7]} rotation-x={-0.012}>
+      <boxGeometry args={[1.65, 0.22, 0.96]} />
+      <meshStandardMaterial color="#333d44" metalness={0.25} roughness={0.43} />
+    </mesh>
+    <mesh position={[0, 0.56, 2.15]}>
+      <boxGeometry args={[1.72, 0.30, 0.22]} />
+      <meshStandardMaterial color="#252d33" metalness={0.18} roughness={0.48} />
     </mesh>
 
     <RoadWheel x={-0.78} z={-1.4} steerRef={frontLeftSteer} spinRef={frontLeftSpin} />
@@ -456,61 +483,106 @@ export function DrivingCockpit({
     <RoadWheel x={-0.78} z={1.42} spinRef={rearLeftSpin} />
     <RoadWheel x={0.78} z={1.42} spinRef={rearRightSpin} />
 
-    <mesh position={[0, 1.02, -0.56]}>
-      <boxGeometry args={[1.72, 0.26, 0.36]} />
-      <meshStandardMaterial color="#1a2026" roughness={0.52} />
+    {/* Door / belt-line body section. */}
+    <mesh position={[0, 0.94, 0.15]}>
+      <boxGeometry args={[1.68, 0.34, 2.08]} />
+      <meshStandardMaterial color="#303940" metalness={0.22} roughness={0.47} />
+    </mesh>
+    <mesh position={[-0.865, 0.83, 0.12]}>
+      <boxGeometry args={[0.055, 0.50, 2.12]} />
+      <meshStandardMaterial color="#2b343a" metalness={0.17} roughness={0.5} />
+    </mesh>
+    <mesh position={[0.865, 0.83, 0.12]}>
+      <boxGeometry args={[0.055, 0.50, 2.12]} />
+      <meshStandardMaterial color="#2b343a" metalness={0.17} roughness={0.5} />
     </mesh>
 
-    <VehicleGlass position={[0, 1.415, -0.735]} rotation={[-0.145, 0, 0]} size={[1.66, 0.72]} />
-    <VehicleGlass position={[-0.862, 1.42, 0.14]} rotation={[0, Math.PI / 2, 0]} size={[1.34, 0.58]} />
-    <VehicleGlass position={[0.862, 1.42, 0.14]} rotation={[0, Math.PI / 2, 0]} size={[1.34, 0.58]} />
-
-    <mesh position={[-0.842, 1.415, -0.685]} rotation-x={-0.145}>
-      <boxGeometry args={[0.082, 0.79, 0.095]} />
-      <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
+    {/* Windshield and A-pillars: top edge is rearward (+Z), so the pillars
+        correctly lean backward from cowl to roof. */}
+    <VehicleGlass position={[0, 1.35, -0.66]} rotation={[0.40, 0, 0]} size={[1.56, 0.72]} />
+    <mesh position={[-0.80, 1.35, -0.66]} rotation-x={0.40}>
+      <boxGeometry args={[0.082, 0.77, 0.095]} />
+      <meshStandardMaterial color="#1d252a" metalness={0.13} roughness={0.5} />
     </mesh>
-    <mesh position={[0.842, 1.415, -0.685]} rotation-x={-0.145}>
-      <boxGeometry args={[0.082, 0.79, 0.095]} />
-      <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
+    <mesh position={[0.80, 1.35, -0.66]} rotation-x={0.40}>
+      <boxGeometry args={[0.082, 0.77, 0.095]} />
+      <meshStandardMaterial color="#1d252a" metalness={0.13} roughness={0.5} />
     </mesh>
-    <mesh position={[0, 1.765, -0.665]} rotation-x={-0.145}>
-      <boxGeometry args={[1.74, 0.085, 0.105]} />
-      <meshStandardMaterial color="#151b20" roughness={0.46} />
+    <mesh position={[0, 1.69, -0.51]}>
+      <boxGeometry args={[1.62, 0.085, 0.11]} />
+      <meshStandardMaterial color="#1c2429" roughness={0.47} />
     </mesh>
-    <mesh position={[0, 1.07, -0.785]} rotation-x={-0.145}>
-      <boxGeometry args={[1.72, 0.08, 0.105]} />
-      <meshStandardMaterial color="#171d22" roughness={0.48} />
-    </mesh>
-    <mesh position={[-0.855, 1.4, 0.67]}>
-      <boxGeometry args={[0.075, 0.72, 0.1]} />
-      <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
-    </mesh>
-    <mesh position={[0.855, 1.4, 0.67]}>
-      <boxGeometry args={[0.075, 0.72, 0.1]} />
-      <meshStandardMaterial color="#171d22" metalness={0.14} roughness={0.5} />
-    </mesh>
-    <mesh position={[-0.84, 1.73, 0.12]}>
-      <boxGeometry args={[0.075, 0.08, 1.58]} />
-      <meshStandardMaterial color="#161c21" roughness={0.46} />
-    </mesh>
-    <mesh position={[0.84, 1.73, 0.12]}>
-      <boxGeometry args={[0.075, 0.08, 1.58]} />
-      <meshStandardMaterial color="#161c21" roughness={0.46} />
+    <mesh position={[0, 1.015, -0.81]}>
+      <boxGeometry args={[1.67, 0.085, 0.12]} />
+      <meshStandardMaterial color="#20282d" roughness={0.5} />
     </mesh>
 
-    <mesh position={[0, 1.74, 0.83]}>
-      <boxGeometry args={[1.75, 0.09, 0.1]} />
-      <meshStandardMaterial color="#151b20" roughness={0.46} />
+    {/* Long, fairly flat roof like a classic driving-school sedan. */}
+    <mesh position={[0, 1.69, 0.26]}>
+      <boxGeometry args={[1.56, 0.095, 1.54]} />
+      <meshStandardMaterial color="#303940" metalness={0.2} roughness={0.45} />
+    </mesh>
+    <mesh position={[-0.80, 1.66, 0.25]}>
+      <boxGeometry args={[0.08, 0.09, 1.52]} />
+      <meshStandardMaterial color="#1d252a" roughness={0.48} />
+    </mesh>
+    <mesh position={[0.80, 1.66, 0.25]}>
+      <boxGeometry args={[0.08, 0.09, 1.52]} />
+      <meshStandardMaterial color="#1d252a" roughness={0.48} />
     </mesh>
 
-    <mesh position={[-0.88, 0.94, 0.12]}>
-      <boxGeometry args={[0.09, 0.48, 1.72]} />
-      <meshStandardMaterial color="#1a2228" metalness={0.18} roughness={0.48} />
+    {/* Side glazing split by a true B-pillar. */}
+    <VehicleGlass position={[-0.846, 1.38, -0.12]} rotation={[0, Math.PI / 2, 0]} size={[0.72, 0.50]} />
+    <VehicleGlass position={[0.846, 1.38, -0.12]} rotation={[0, Math.PI / 2, 0]} size={[0.72, 0.50]} />
+    <VehicleGlass position={[-0.846, 1.38, 0.59]} rotation={[0, Math.PI / 2, 0]} size={[0.62, 0.50]} />
+    <VehicleGlass position={[0.846, 1.38, 0.59]} rotation={[0, Math.PI / 2, 0]} size={[0.62, 0.50]} />
+
+    <mesh position={[-0.82, 1.38, 0.26]}>
+      <boxGeometry args={[0.09, 0.67, 0.105]} />
+      <meshStandardMaterial color="#1b2227" metalness={0.12} roughness={0.5} />
     </mesh>
-    <mesh position={[0.88, 0.94, 0.12]}>
-      <boxGeometry args={[0.09, 0.48, 1.72]} />
-      <meshStandardMaterial color="#1a2228" metalness={0.18} roughness={0.48} />
+    <mesh position={[0.82, 1.38, 0.26]}>
+      <boxGeometry args={[0.09, 0.67, 0.105]} />
+      <meshStandardMaterial color="#1b2227" metalness={0.12} roughness={0.5} />
     </mesh>
+
+    {/* Rear glass and C-pillars slope in the opposite direction to the A-pillars. */}
+    <VehicleGlass position={[0, 1.42, 0.98]} rotation={[-0.42, 0, 0]} size={[1.50, 0.58]} />
+    <mesh position={[-0.79, 1.42, 0.98]} rotation-x={-0.42}>
+      <boxGeometry args={[0.09, 0.62, 0.105]} />
+      <meshStandardMaterial color="#1c2429" metalness={0.13} roughness={0.5} />
+    </mesh>
+    <mesh position={[0.79, 1.42, 0.98]} rotation-x={-0.42}>
+      <boxGeometry args={[0.09, 0.62, 0.105]} />
+      <meshStandardMaterial color="#1c2429" metalness={0.13} roughness={0.5} />
+    </mesh>
+    <mesh position={[0, 1.68, 0.86]}>
+      <boxGeometry args={[1.58, 0.08, 0.10]} />
+      <meshStandardMaterial color="#1c2429" roughness={0.48} />
+    </mesh>
+    <mesh position={[0, 1.15, 1.10]}>
+      <boxGeometry args={[1.62, 0.08, 0.12]} />
+      <meshStandardMaterial color="#222a2f" roughness={0.5} />
+    </mesh>
+
+    {/* Simple classic side trim and door separation lines. */}
+    <mesh position={[-0.895, 0.78, 0.05]}>
+      <boxGeometry args={[0.018, 0.055, 2.34]} />
+      <meshStandardMaterial color="#151a1e" roughness={0.55} />
+    </mesh>
+    <mesh position={[0.895, 0.78, 0.05]}>
+      <boxGeometry args={[0.018, 0.055, 2.34]} />
+      <meshStandardMaterial color="#151a1e" roughness={0.55} />
+    </mesh>
+    <mesh position={[-0.896, 0.94, 0.25]}>
+      <boxGeometry args={[0.02, 0.42, 0.025]} />
+      <meshStandardMaterial color="#151a1e" roughness={0.55} />
+    </mesh>
+    <mesh position={[0.896, 0.94, 0.25]}>
+      <boxGeometry args={[0.02, 0.42, 0.025]} />
+      <meshStandardMaterial color="#151a1e" roughness={0.55} />
+    </mesh>
+
     <mesh position={[-0.43, 1.19, -0.76]} rotation-x={-0.18}>
       <boxGeometry args={[0.55, 0.18, 0.08]} />
       <meshStandardMaterial color="#080b0e" roughness={0.25} />
