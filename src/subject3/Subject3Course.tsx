@@ -164,7 +164,6 @@ export interface Subject3Vehicle {
   seatbelt: boolean
   lowBeam: boolean
   highBeam: boolean
-  handbrake: boolean
   leftSignalAge: number
   rightSignalAge: number
   lookLeft: boolean
@@ -465,6 +464,11 @@ export function updateSubject3(
       runtime.backObservedBeforeManeuver ||= vehicle.lookBack
     } else if (!runtime.maneuverStarted) {
       runtime.leftObservedBeforeManeuver ||= vehicle.lookLeft
+      runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
+      runtime.backObservedBeforeManeuver ||= vehicle.lookBack
+    }
+
+    if (event.kind === 'overtake' && runtime.maneuverStarted && !runtime.returnManeuverStarted) {
       runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
       runtime.backObservedBeforeManeuver ||= vehicle.lookBack
     }
