@@ -687,11 +687,11 @@ export function DrivingCockpit({
     <Pedal x={-0.39} active={v.brake} wide />
     <Pedal x={-0.2} active={v.throttle} />
 
-    <object3D ref={centerAnchor} position={[0, 1.69, -0.62]} rotation={[0, Math.PI, 0]} />
-    <object3D ref={leftAnchor} position={[-1.01, 1.27, -0.54]} rotation={[0, Math.PI + 0.15, 0]} />
-    <object3D ref={rightAnchor} position={[1.01, 1.27, -0.54]} rotation={[0, Math.PI - 0.15, 0]} />
+    <object3D ref={centerAnchor} position={[0, 1.53, -0.44]} rotation={[0, Math.PI, 0]} />
+    <object3D ref={leftAnchor} position={[-1.02, 1.24, -0.34]} rotation={[0, Math.PI + 0.15, 0]} />
+    <object3D ref={rightAnchor} position={[1.02, 1.24, -0.34]} rotation={[0, Math.PI - 0.15, 0]} />
 
-    <group position={[0, 1.66, -0.58]}>
+    <group position={[0, 1.53, -0.44]}>
       <mesh><boxGeometry args={[0.68, 0.21, 0.045]} /><meshStandardMaterial color="#111417" roughness={0.4} /></mesh>
       <mesh ref={centerSurface} position={[0, 0, 0.025]}>
         <planeGeometry args={[0.61, 0.15]} />
@@ -699,7 +699,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[-1.0, 1.26, -0.48]} rotation-y={0.22}>
+    <group position={[-1.02, 1.24, -0.34]} rotation-y={0.22}>
       <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
       <mesh ref={leftSurface} position={[0, 0, 0.031]}>
         <planeGeometry args={[0.36, 0.17]} />
@@ -707,7 +707,7 @@ export function DrivingCockpit({
       </mesh>
     </group>
 
-    <group position={[1.0, 1.26, -0.48]} rotation-y={-0.22}>
+    <group position={[1.02, 1.24, -0.34]} rotation-y={-0.22}>
       <mesh><boxGeometry args={[0.42, 0.23, 0.055]} /><meshStandardMaterial color="#101418" /></mesh>
       <mesh ref={rightSurface} position={[0, 0, 0.031]}>
         <planeGeometry args={[0.36, 0.17]} />

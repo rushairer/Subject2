@@ -395,14 +395,14 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
     const vehicleCenter = new THREE.Vector3(v.x, roadPose.y + 0.9, v.z)
 
     if (cameraMode === 'first') {
-      const driverOffsetX = -0.4
-      const driverForward = 0.03
+      const driverOffsetX = -0.43
+      const driverForward = -0.18
       camera.position.set(
         v.x + Math.cos(v.heading) * driverOffsetX + Math.sin(v.heading) * driverForward,
-        roadPose.y + 1.47,
+        roadPose.y + 1.36,
         v.z + Math.sin(v.heading) * driverOffsetX - Math.cos(v.heading) * driverForward,
       )
-      camera.rotation.set(roadPose.pitch - 0.035, -v.heading + cameraYaw.current, 0)
+      camera.rotation.set(roadPose.pitch - 0.015, -v.heading + cameraYaw.current, 0)
       if (perspectiveCamera.fov !== 68) {
         perspectiveCamera.fov = 68
         perspectiveCamera.updateProjectionMatrix()
