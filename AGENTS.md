@@ -93,6 +93,13 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 slow-zone judging
+
+- Straight-through intersections, pedestrian crossings, school zones, and bus-stop events must record both left- and right-side observation during the event.
+- For those slow-zone events, exceeding the configured event allowance represents failure to decelerate and is fatal; do not downgrade it to a 10-point warning.
+- Left/right intersection turns use the same fatal deceleration semantics.
+- Do not add an unconditional pedestrian-yield stop requirement unless the state machine is connected to the actual pedestrian conflict state. A rendered pedestrian existing somewhere in the scene is not enough to prove a live conflict.
+
 ## Subject 3 named maneuver geometry
 
 - Named turn events must agree with the actual route geometry. Left-turn events must exit on the route's left-turn heading, right-turn events on the right-turn heading, and the u-turn event must reverse travel direction rather than approximate it with unrelated corners.
