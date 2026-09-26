@@ -29,6 +29,7 @@ export const SAME_DIRECTION_DIVIDER = -1.75
 export const CENTER_LINE_OFFSET = -5.25
 export const OPPOSITE_DIVIDER = -8.75
 export const LEFT_EDGE_OFFSET = -12.25
+export const SUBJECT3_ROUTE_NODE_PAD_SIZE = 20
 
 export interface RouteSegment {
   a: Point
@@ -113,7 +114,7 @@ function segmentRoadRect(segment: RouteSegment, paddingMeters = 0): Subject3Road
 }
 
 function cornerRoadRect(point: Point, paddingMeters = 0): Subject3RoadRect {
-  const half = 10 + paddingMeters
+  const half = SUBJECT3_ROUTE_NODE_PAD_SIZE / 2 + paddingMeters
   return {
     minX: point.x - half,
     maxX: point.x + half,
@@ -141,8 +142,8 @@ export function subject3RoadRectsNearProgress(
     rects.push(segmentRoadRect(SUBJECT3_SEGMENTS[index], paddingMeters))
   }
 
-  const pointStart = Math.max(1, segmentStart)
-  const pointEnd = Math.min(SUBJECT3_ROUTE.length - 2, segmentEnd + 1)
+  const pointStart = Math.max(0, segmentStart)
+  const pointEnd = Math.min(SUBJECT3_ROUTE.length - 1, segmentEnd + 1)
   for (let index = pointStart; index <= pointEnd; index++) {
     rects.push(cornerRoadRect(SUBJECT3_ROUTE[index], paddingMeters))
   }
