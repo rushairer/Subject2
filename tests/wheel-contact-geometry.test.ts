@@ -4,11 +4,13 @@ import { rightFromHeading } from '../src/sim/vehicleFrame'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
   ackermannFrontAngles,
+  footprintIntersectsAxisAlignedRect,
   footprintTouchesOutsideRectUnion,
   wheelContactFootprints,
   type AxisAlignedRect,
   type WheelContactFootprint,
 } from '../src/sim/wheelContact'
+import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from '../src/subject2/courseMarkings'
 import {
   createSlopeRuntime,
   SLOPE_GEOMETRY,
@@ -98,9 +100,10 @@ test('rectangle-union coverage catches a tire patch crossing a concave road corn
   assert.equal(footprintTouchesOutsideRectUnion(footprint, legal), true)
 })
 
-test('slope line contact begins when the tire edge reaches the road boundary, not the wheel center', () => {
+test('slope line contact begins at the inner edge of the painted boundary line', () => {
   const safeX =
     SLOPE_GEOMETRY.roadHalf -
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS -
     TRAINING_CAR.trackWidthMeters / 2 -
     TRAINING_CAR.tireWidthMeters / 2 -
     0.001
@@ -130,10 +133,11 @@ test('slope line contact begins when the tire edge reaches the road boundary, no
   assert.equal(touching.infractions.some(item => item.id === 'slope-wheel-line'), true)
 })
 
-test('right-angle line judge catches tire tread crossing while the wheel center is still inside', () => {
+test('right-angle line judge triggers at the painted line before the road boundary', () => {
   const halfRoad = 1.8
   const vehicleX =
     halfRoad -
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2 -
     TRAINING_CAR.trackWidthMeters / 2 -
     TRAINING_CAR.tireWidthMeters / 2 +
     0.005
@@ -154,20 +158,23 @@ test('right-angle line judge catches tire tread crossing while the wheel center 
   assert.equal(result.infractions.some(item => item.id === 'right-angle-wheel-out'), true)
 })
 
-test('side-parking moving line check follows tires, not harmless body overhang', () => {
+test('side-parking line judge uses the painted lane-edge rectangle', () => {
   const laneHalf = 1.7
-  const safeBodyOverhangX =
+  const safeX =
     laneHalf -
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2 -
     TRAINING_CAR.trackWidthMeters / 2 -
     TRAINING_CAR.tireWidthMeters / 2 -
-    0.01
-  assert.ok(
-    safeBodyOverhangX + TRAINING_CAR.widthMeters / 2 > laneHalf,
-    'fixture must keep the body overhanging while the tires remain clear',
-  )
+    0.001
+  const runtime = {
+    ...createSideParkingRuntime(),
+    phase: 'reverse' as const,
+    entered: true,
+    started: true,
+  }
 
   const safe = updateSideParking({
-    x: safeBodyOverhangX,
+    x: safeX,
     z: 5,
     heading: 0,
     steering: 0,
@@ -175,16 +182,11 @@ test('side-parking moving line check follows tires, not harmless body overhang',
     gear: -1,
     engineOn: true,
     leftIndicator: false,
-  }, {
-    ...createSideParkingRuntime(),
-    phase: 'reverse',
-    entered: true,
-    started: true,
-  }, 0.1)
+  }, runtime, 0.1)
   assert.equal(safe.infractions.some(item => item.id.startsWith('side-parking-line-contact-')), false)
 
   const contact = updateSideParking({
-    x: safeBodyOverhangX + 0.02,
+    x: safeX + 0.002,
     z: 5,
     heading: 0,
     steering: 0,
@@ -192,13 +194,29 @@ test('side-parking moving line check follows tires, not harmless body overhang',
     gear: -1,
     engineOn: true,
     leftIndicator: false,
-  }, {
-    ...createSideParkingRuntime(),
-    phase: 'reverse',
-    entered: true,
-    started: true,
-  }, 0.1)
+  }, runtime, 0.1)
   assert.equal(contact.infractions.some(item => item.id.startsWith('side-parking-line-contact-')), true)
+})
+
+test('tire-to-painted-line tangent contact counts as an intersection', () => {
+  const footprint = wheelContactFootprints({
+    x: 0,
+    z: 0,
+    heading: 0,
+    steering: 0,
+  }).find(item => item.id === 'rear-right')
+  assert.ok(footprint)
+  const outerX = Math.max(...footprint.corners.map(point => point.x))
+
+  assert.equal(
+    footprintIntersectsAxisAlignedRect(footprint, {
+      minX: outerX,
+      maxX: outerX + 0.12,
+      minZ: -10,
+      maxZ: 10,
+    }),
+    true,
+  )
 })
 
 test('route-right vector remains consistent with tire lateral geometry', () => {
