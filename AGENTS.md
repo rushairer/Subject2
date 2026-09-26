@@ -93,6 +93,12 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 occupant-safety judging
+
+- Subject 3 must treat driving without the safety belt fastened as a fatal failure.
+- Do not penalize a stationary candidate merely for not having fastened the belt yet; the failure condition begins once the vehicle is actually moving.
+- Keep the belt rule deterministic in the Subject 3 state machine rather than relying on dashboard warnings or cockpit visuals.
+
 ## Subject 3 overtake target completion
 
 - The visual vehicle being overtaken and the state-machine target progress must share `SUBJECT3_OVERTAKE_TARGET_PROGRESS`; do not duplicate the target distance in rendering and judging.
