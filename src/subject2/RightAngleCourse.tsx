@@ -1,8 +1,13 @@
 import type { ReactElement } from 'react'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import {
+  SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
+  subject2LineRect,
+} from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import {
+  footprintIntersectsAxisAlignedRect,
   footprintTouchesOutsideRectUnion,
   wheelContactFootprints,
   type AxisAlignedRect,
@@ -87,6 +92,42 @@ function allowedRoadRects(): readonly AxisAlignedRect[] {
   ]
 }
 
+function boundaryLineRects(): readonly AxisAlignedRect[] {
+  const g = RIGHT_ANGLE_GEOMETRY
+  const line = SUBJECT2_BOUNDARY_LINE_WIDTH_METERS
+  const entryLength = g.entryMaxZ - (g.cornerCenterZ - g.half)
+  const entryCenterZ = (g.entryMaxZ + g.cornerCenterZ - g.half) / 2
+  const exitLength = g.half - g.horizontalMinX
+  const exitCenterX = (g.horizontalMinX + g.half) / 2
+  return [
+    subject2LineRect(g.half, entryCenterZ, line, entryLength),
+    subject2LineRect(
+      -g.half,
+      (g.entryMaxZ + g.cornerCenterZ + g.half) / 2,
+      line,
+      g.entryMaxZ - (g.cornerCenterZ + g.half),
+    ),
+    subject2LineRect(
+      (g.horizontalMinX - g.half) / 2,
+      g.cornerCenterZ + g.half,
+      g.half - g.horizontalMinX,
+      line,
+    ),
+    subject2LineRect(
+      exitCenterX,
+      g.cornerCenterZ - g.half,
+      exitLength,
+      line,
+    ),
+    subject2LineRect(
+      g.horizontalMinX,
+      g.cornerCenterZ,
+      line,
+      RIGHT_ANGLE.roadWidth,
+    ),
+  ]
+}
+
 function normalizedAngle(angle: number) {
   let a = angle
   while (a > Math.PI) a -= Math.PI * 2
@@ -126,7 +167,10 @@ export function updateRightAngle(
   if (
     runtime.entered &&
     wheelContactFootprints(vehicle).some(footprint =>
-      footprintTouchesOutsideRectUnion(footprint, allowedRoadRects()),
+      footprintTouchesOutsideRectUnion(footprint, allowedRoadRects(), 0) ||
+      boundaryLineRects().some(rect =>
+        footprintIntersectsAxisAlignedRect(footprint, rect),
+      ),
     )
   ) {
     infractions.push(subject2Infraction('right-angle-wheel-out'))
@@ -201,11 +245,11 @@ export function RightAngleCourse(): ReactElement {
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
 
-    <Line x={g.half} z={entryCenterZ} width={0.12} depth={entryLength} />
-    <Line x={-g.half} z={(g.entryMaxZ + g.cornerCenterZ + g.half) / 2} width={0.12} depth={g.entryMaxZ - (g.cornerCenterZ + g.half)} />
-    <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={g.half - g.horizontalMinX} depth={0.12} />
-    <Line x={exitCenterX} z={g.cornerCenterZ - g.half} width={exitLength} depth={0.12} />
-    <Line x={g.horizontalMinX} z={g.cornerCenterZ} width={0.12} depth={RIGHT_ANGLE.roadWidth} />
+    <Line x={g.half} z={entryCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={entryLength} />
+    <Line x={-g.half} z={(g.entryMaxZ + g.cornerCenterZ + g.half) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.entryMaxZ - (g.cornerCenterZ + g.half)} />
+    <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={g.half - g.horizontalMinX} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <Line x={exitCenterX} z={g.cornerCenterZ - g.half} width={exitLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <Line x={g.horizontalMinX} z={g.cornerCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={RIGHT_ANGLE.roadWidth} />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
       <planeGeometry args={[42, 42]} />
