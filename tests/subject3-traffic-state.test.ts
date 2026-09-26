@@ -3,12 +3,14 @@ import test from 'node:test'
 import {
   SUBJECT3_CROSSING_DURATION_SECONDS,
   SUBJECT3_CROSSWALK_PROGRESS,
+  SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
 } from '../src/subject3/subject3Traffic'
 import {
   CENTER_LINE_OFFSET,
   RIGHT_EDGE_OFFSET,
+  SUBJECT3_EVENTS,
 } from '../src/subject3/subject3Route'
 
 test('crosswalk traffic state starts clear', () => {
@@ -51,4 +53,12 @@ test('pedestrian motion is clamped after the crossing completes', () => {
     SUBJECT3_CROSSING_DURATION_SECONDS + 20,
   )
   assert.deepEqual(later, atEnd)
+})
+
+
+test('overtake target sits inside the modeled overtake event window', () => {
+  const event = SUBJECT3_EVENTS.find(item => item.id === 'overtake')
+  assert.ok(event)
+  assert.ok(SUBJECT3_OVERTAKE_TARGET_PROGRESS > event.start)
+  assert.ok(SUBJECT3_OVERTAKE_TARGET_PROGRESS < event.end)
 })
