@@ -1,5 +1,33 @@
+import { DRIVING_RULES } from './drivingRules'
+import { TRAINING_CAR } from '../sim/vehicleDimensions'
+
 export const SUBJECT3_RULE_LIMITS = {
   passScore: 90,
+  movingSpeedThresholdMps: 0.2,
+  signalLeadSeconds: 3,
+  maneuverSteeringThreshold: 0.18,
+  maneuverLateralThreshold: 0.42,
+  maneuverHeadingToleranceRadians: 0.45,
+  roadBoundaryToleranceMeters: 0.55,
+  laneChangeTargetLateralMeters: -2.0,
+  overtakeTargetLateralMeters: -2.0,
+  overtakeReturnLateralMeters: -1.25,
+  overtake: {
+    passClearanceMeters: TRAINING_CAR.lengthMeters,
+  },
+  gear: {
+    minimumRequiredGear: DRIVING_RULES.manualTransmission.highestForwardGear - 1,
+    minimumHighGearSeconds: 5,
+  },
+  crosswalk: {
+    stoppedSpeedMps: 0.08,
+  },
+  pullOver: {
+    idealMaxGapMeters: 0.30,
+    warningMaxGapMeters: 0.50,
+    stableStopSeconds: 0.9,
+    stoppedSpeedMps: 0.08,
+  },
 } as const
 
 export interface Subject3InfractionRule {
