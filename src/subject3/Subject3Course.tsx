@@ -690,10 +690,6 @@ export function updateSubject3(
     }
   }
 
-  if (runtime.progress >= SUBJECT3_ROUTE_LENGTH - 35) {
-    runtime.completed = true
-  }
-
   return { runtime, infractions, status: instructionFor(runtime) }
 }
 
