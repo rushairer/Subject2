@@ -3,6 +3,11 @@ import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rul
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import {
+  footprintTouchesOutsideRectUnion,
+  wheelContactFootprints,
+  type AxisAlignedRect,
+} from '../sim/wheelContact'
 
 export const SIDE_PARKING = {
   carLength: TRAINING_CAR.lengthMeters,
@@ -43,6 +48,7 @@ export interface SideParkingVehicle {
   x: number
   z: number
   heading: number
+  steering?: number
   speed: number
   gear: number
   engineOn: boolean
@@ -96,15 +102,29 @@ function corners(vehicle: SideParkingVehicle) {
 
 }
 
-function pointAllowed(x: number, z: number) {
+function allowedRoadRects(): readonly AxisAlignedRect[] {
   const g = SIDE_PARKING_GEOMETRY
-  const lane = x >= -g.laneHalf && x <= g.laneHalf && z <= g.laneStartZ && z >= g.laneEndZ
-  const bay = x >= g.bayMouthX && x <= g.bayBackX && Math.abs(z) <= g.bayHalfLength
-  return lane || bay
+  return [
+    {
+      minX: -g.laneHalf,
+      maxX: g.laneHalf,
+      minZ: g.laneEndZ,
+      maxZ: g.laneStartZ,
+    },
+    {
+      minX: g.bayMouthX,
+      maxX: g.bayBackX,
+      minZ: -g.bayHalfLength,
+      maxZ: g.bayHalfLength,
+    },
+  ]
 }
 
-function bodyOutside(vehicle: SideParkingVehicle) {
-  return corners(vehicle).some(([x, z]) => !pointAllowed(x, z))
+function wheelTouchesBoundary(vehicle: SideParkingVehicle) {
+  const legalRects = allowedRoadRects()
+  return wheelContactFootprints(vehicle).some(footprint =>
+    footprintTouchesOutsideRectUnion(footprint, legalRects),
+  )
 }
 
 function fullyInsideBay(vehicle: SideParkingVehicle) {
@@ -167,7 +187,7 @@ export function updateSideParking(
     }
   }
 
-  if (runtime.started && bodyOutside(vehicle)) {
+  if (runtime.started && wheelTouchesBoundary(vehicle)) {
     if (!runtime.contactLatched) {
       infractions.push(subject2Infraction('side-parking-line-contact', Math.floor(runtime.elapsed * 10)))
       runtime.contactLatched = true
