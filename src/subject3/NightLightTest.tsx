@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
+import {
+  createNightLightAttempt,
+  nightLightAnswerSatisfied,
+  observeNightLightState,
+  recordNightLightAction,
+  type NightLightAnswer,
+} from './nightLightExam'
 
 export interface LightTestVehicle {
   lowBeam: boolean
   highBeam: boolean
 }
 
-type Answer = 'low' | 'flash'
-
 interface Prompt {
   id: string
   text: string
   hint: string
-  answer: Answer
+  answer: NightLightAnswer
 }
 
 const PROMPTS: Prompt[] = [
@@ -63,7 +68,7 @@ export function NightLightTest({
   const prompts = useMemo(() => [...PROMPTS].sort(() => Math.random() - 0.5).slice(0, 3), [])
   const [index, setIndex] = useState(0)
   const [remaining, setRemaining] = useState(5)
-  const actionCount = useRef(0)
+  const attempt = useRef(createNightLightAttempt())
   const onPassRef = useRef(onPass)
   const onFailRef = useRef(onFail)
   const prompt = prompts[index]
@@ -72,13 +77,13 @@ export function NightLightTest({
 
   useEffect(() => {
     let resolved = false
-    actionCount.current = 0
+    attempt.current = createNightLightAttempt()
     setRemaining(5)
     speak(`模拟夜间灯光考试。${prompt.text}。`)
 
     const keyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
-      if (key === 'l' || key === 'k') actionCount.current += 1
+      if (key === 'l' || key === 'k') recordNightLightAction(attempt.current)
     }
     window.addEventListener('keydown', keyDown)
 
@@ -88,10 +93,12 @@ export function NightLightTest({
       const elapsed = (performance.now() - start) / 1000
       setRemaining(Math.max(0, 5 - elapsed))
       const state = vehicle.current
-      const correct =
-        prompt.answer === 'low'
-          ? actionCount.current > 0 && state.lowBeam && !state.highBeam
-          : actionCount.current >= 2 && state.lowBeam && !state.highBeam
+      observeNightLightState(attempt.current, state)
+      const correct = nightLightAnswerSatisfied(
+        prompt.answer,
+        attempt.current,
+        state,
+      )
 
       if (correct) {
         resolved = true
