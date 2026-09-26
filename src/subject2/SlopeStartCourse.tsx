@@ -4,6 +4,7 @@ import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rul
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import { wheelContactFootprints } from '../sim/wheelContact'
 
 export const SLOPE_START = {
   carLength: TRAINING_CAR.lengthMeters,
@@ -42,6 +43,7 @@ export interface SlopeVehicle {
   x: number
   z: number
   heading: number
+  steering?: number
   speed: number
   engineOn: boolean
   handbrake: boolean
@@ -80,19 +82,6 @@ export function createSlopeRuntime(): SlopeRuntime {
     rollbackEvaluated: false,
     completed: false,
   }
-}
-
-function wheelPoints(vehicle: SlopeVehicle) {
-  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
-  const front = TRAINING_CAR.frontAxleFromCenterMeters
-  const rear = TRAINING_CAR.rearAxleFromCenterMeters
-  return [
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
-  ].map(point => [point.x, point.z] as const)
-
 }
 
 function frontBumperZ(vehicle: SlopeVehicle) {
@@ -141,7 +130,12 @@ export function updateSlopeStart(
 
   if (!runtime.entered && movingForward && inCourseEntry) runtime.entered = true
 
-  if (runtime.entered && wheelPoints(vehicle).some(([x]) => Math.abs(x) >= SLOPE_GEOMETRY.roadHalf)) {
+  if (
+    runtime.entered &&
+    wheelContactFootprints(vehicle).some(footprint =>
+      footprint.corners.some(point => Math.abs(point.x) >= SLOPE_GEOMETRY.roadHalf),
+    )
+  ) {
     infractions.push(subject2Infraction('slope-wheel-line'))
   }
 

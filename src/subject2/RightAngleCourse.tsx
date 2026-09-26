@@ -2,7 +2,11 @@ import type { ReactElement } from 'react'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import {
+  footprintTouchesOutsideRectUnion,
+  wheelContactFootprints,
+  type AxisAlignedRect,
+} from '../sim/wheelContact'
 
 export const RIGHT_ANGLE = {
   carLength: TRAINING_CAR.lengthMeters,
@@ -28,6 +32,7 @@ export interface RightAngleVehicle {
   x: number
   z: number
   heading: number
+  steering?: number
   speed: number
   engineOn: boolean
   leftIndicator: boolean
@@ -64,24 +69,22 @@ export function createRightAngleRuntime(): RightAngleRuntime {
   }
 }
 
-function wheelPoints(vehicle: RightAngleVehicle) {
-  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
-  const front = TRAINING_CAR.frontAxleFromCenterMeters
-  const rear = TRAINING_CAR.rearAxleFromCenterMeters
-  return [
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
-  ].map(point => [point.x, point.z] as const)
-
-}
-
-function pointAllowed(x: number, z: number) {
+function allowedRoadRects(): readonly AxisAlignedRect[] {
   const g = RIGHT_ANGLE_GEOMETRY
-  const entry = x >= -g.half && x <= g.half && z <= g.entryMaxZ && z >= g.cornerCenterZ - g.half
-  const exit = z >= g.cornerCenterZ - g.half && z <= g.cornerCenterZ + g.half && x <= g.half && x >= g.horizontalMinX
-  return entry || exit
+  return [
+    {
+      minX: -g.half,
+      maxX: g.half,
+      minZ: g.cornerCenterZ - g.half,
+      maxZ: g.entryMaxZ,
+    },
+    {
+      minX: g.horizontalMinX,
+      maxX: g.half,
+      minZ: g.cornerCenterZ - g.half,
+      maxZ: g.cornerCenterZ + g.half,
+    },
+  ]
 }
 
 function normalizedAngle(angle: number) {
@@ -120,7 +123,12 @@ export function updateRightAngle(
 
   if (!runtime.entered && inEntryLane) runtime.entered = true
 
-  if (runtime.entered && wheelPoints(vehicle).some(([x, z]) => !pointAllowed(x, z))) {
+  if (
+    runtime.entered &&
+    wheelContactFootprints(vehicle).some(footprint =>
+      footprintTouchesOutsideRectUnion(footprint, allowedRoadRects()),
+    )
+  ) {
     infractions.push(subject2Infraction('right-angle-wheel-out'))
   }
 

@@ -6,4 +6,8 @@ export const TRAINING_CAR = {
   frontAxleFromCenterMeters: 1.41,
   rearAxleFromCenterMeters: 1.41,
   wheelRadiusMeters: 0.31,
+  // Matches the rendered training-car tire tread width.
+  tireWidthMeters: 0.19,
+  // Finite ground-contact patch used by line-contact judging.
+  tireContactPatchLengthMeters: 0.16,
 } as const
