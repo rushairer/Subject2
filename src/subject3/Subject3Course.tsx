@@ -67,6 +67,9 @@ export interface Subject3Runtime {
   eventMaxSpeed: number
   eventMaxSteering: number
   eventMaxGear: number
+  eventHighGearSeconds: number
+  lastPositiveGear: number
+  skippedUpshift: boolean
   minLateral: number
   maxLateral: number
   lastLateral: number
@@ -85,6 +88,7 @@ export interface Subject3Runtime {
   backObservedBeforeManeuver: boolean
   leftObservedInEvent: boolean
   rightObservedInEvent: boolean
+  backObservedInEvent: boolean
   hornSeen: boolean
   stopSeen: boolean
   pullOverStopSeconds: number
@@ -99,6 +103,9 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.eventMaxSpeed = 0
   runtime.eventMaxSteering = 0
   runtime.eventMaxGear = 0
+  runtime.eventHighGearSeconds = 0
+  runtime.lastPositiveGear = 0
+  runtime.skippedUpshift = false
   runtime.minLateral = 0
   runtime.maxLateral = 0
   runtime.lastLateral = 0
@@ -117,6 +124,7 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.backObservedBeforeManeuver = false
   runtime.leftObservedInEvent = false
   runtime.rightObservedInEvent = false
+  runtime.backObservedInEvent = false
   runtime.hornSeen = false
   runtime.stopSeen = false
   runtime.pullOverStopSeconds = 0
@@ -132,6 +140,9 @@ export function createSubject3Runtime(): Subject3Runtime {
     eventMaxSpeed: 0,
     eventMaxSteering: 0,
     eventMaxGear: 0,
+    eventHighGearSeconds: 0,
+    lastPositiveGear: 0,
+    skippedUpshift: false,
     minLateral: 0,
     maxLateral: 0,
     lastLateral: 0,
@@ -150,6 +161,7 @@ export function createSubject3Runtime(): Subject3Runtime {
     backObservedBeforeManeuver: false,
     leftObservedInEvent: false,
     rightObservedInEvent: false,
+    backObservedInEvent: false,
     hornSeen: false,
     stopSeen: false,
     pullOverStopSeconds: 0,
@@ -266,12 +278,40 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 10)
   }
 
-  if (event.kind === 'straight' && runtime.eventMaxSteering > 0.5) {
-    add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 100, true)
+  if (event.kind === 'straight') {
+    if (runtime.eventMaxSteering > 0.5) {
+      add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 100, true)
+    }
+    if (
+      !runtime.leftObservedInEvent &&
+      !runtime.rightObservedInEvent &&
+      !runtime.backObservedInEvent
+    ) {
+      add('observation', '直线行驶过程中未适时观察后方交通情况', 10)
+    }
   }
 
-  if (event.kind === 'gear' && !automatic && runtime.eventMaxGear < 3) {
-    add('gear', '加减挡位项目未完成合理挡位变化', 10)
+  if (event.kind === 'gear' && !automatic) {
+    if (runtime.skippedUpshift) {
+      add('skip-gear', '加挡过程中发生越级加挡', 100, true)
+    }
+    if (runtime.eventMaxGear < DRIVING_RULES.subject3.gear.minimumRequiredGear) {
+      add(
+        'gear',
+        `加减挡位项目未加至至少 ${DRIVING_RULES.subject3.gear.minimumRequiredGear} 挡`,
+        100,
+        true,
+      )
+    } else if (
+      runtime.eventHighGearSeconds <
+      DRIVING_RULES.subject3.gear.minimumHighGearSeconds
+    ) {
+      add(
+        'high-gear-duration',
+        `在 ${DRIVING_RULES.subject3.gear.minimumRequiredGear} 挡及以上行驶时间不足 ${DRIVING_RULES.subject3.gear.minimumHighGearSeconds} 秒`,
+        10,
+      )
+    }
   }
 
   if (
@@ -432,11 +472,25 @@ export function updateSubject3(
       runtime.eventStartLateral = projection.lateral
       runtime.eventStartHeading = vehicle.heading
       runtime.lastHeading = vehicle.heading
+      runtime.lastPositiveGear = vehicle.gear > 0 ? vehicle.gear : 0
     }
     const kmh = Math.abs(vehicle.speed) * 3.6
     runtime.eventMaxSpeed = Math.max(runtime.eventMaxSpeed, kmh)
     runtime.eventMaxSteering = Math.max(runtime.eventMaxSteering, Math.abs(vehicle.steering))
     runtime.eventMaxGear = Math.max(runtime.eventMaxGear, vehicle.gear > 0 ? vehicle.gear : 0)
+    if (event.kind === 'gear' && !automatic) {
+      if (
+        vehicle.gear > 0 &&
+        runtime.lastPositiveGear > 0 &&
+        vehicle.gear > runtime.lastPositiveGear + 1
+      ) {
+        runtime.skippedUpshift = true
+      }
+      if (vehicle.gear > 0) runtime.lastPositiveGear = vehicle.gear
+      if (vehicle.gear >= DRIVING_RULES.subject3.gear.minimumRequiredGear) {
+        runtime.eventHighGearSeconds += dt
+      }
+    }
     runtime.minLateral = Math.min(runtime.minLateral, projection.lateral)
     runtime.maxLateral = Math.max(runtime.maxLateral, projection.lateral)
     runtime.lastLateral = projection.lateral
@@ -451,6 +505,7 @@ export function updateSubject3(
     runtime.rightSignalSeen ||= vehicle.rightIndicator
     runtime.leftObservedInEvent ||= vehicle.lookLeft
     runtime.rightObservedInEvent ||= vehicle.lookRight
+    runtime.backObservedInEvent ||= vehicle.lookBack
     runtime.hornSeen ||= vehicle.horn
 
     const relevantLeft = event.kind === 'start' || event.kind === 'left-turn' || event.kind === 'lane-change' || event.kind === 'overtake' || event.kind === 'uturn'
