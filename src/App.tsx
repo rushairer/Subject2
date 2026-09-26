@@ -14,6 +14,7 @@ import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 }
 import { createSubject3TrafficState } from './subject3/subject3Traffic'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
+import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
@@ -771,7 +772,18 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
           <button className="finish-btn" onClick={finishSession}>结束并查看结果</button>
         </div>
       </div>
-      {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
+      {activeExamId === 'subject3' && !lightTestDone && <NightLightTest
+        vehicle={vehicle}
+        onPass={() => setLightTestDone(true)}
+        onFail={(prompt) => {
+          addInfraction(subject3Infraction(
+            'subject3-light-test',
+            `模拟夜间灯光考试操作错误：${prompt}`,
+            'lightTest',
+          ))
+          setLightTestDone(true)
+        }}
+      />}
       {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">

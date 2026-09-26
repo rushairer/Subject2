@@ -29,6 +29,7 @@ export const SUBJECT3_INFRACTION_RULES = {
   seatbelt: { points: 100, fatal: true },
   nightLightsOff: { points: 100, fatal: true },
   nightStartMinor: { points: 10, fatal: false },
+  lightTest: { points: 100, fatal: true },
   collision: { points: 100, fatal: true },
 } as const satisfies Record<string, Subject3InfractionRule>
 
