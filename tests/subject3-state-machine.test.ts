@@ -14,7 +14,10 @@ import {
   SUBJECT3_EVENTS,
   poseAtRouteDistance,
 } from '../src/subject3/subject3Route'
-import { createSubject3TrafficState } from '../src/subject3/subject3Traffic'
+import {
+  SUBJECT3_OVERTAKE_TARGET_PROGRESS,
+  createSubject3TrafficState,
+} from '../src/subject3/subject3Traffic'
 
 function eventIndex(id: string) {
   const index = SUBJECT3_EVENTS.findIndex(event => event.id === id)
@@ -678,6 +681,20 @@ test('overtake requires both the outward and return signal/observation sequence'
   }), runtime, false, false, 0.1)
   runtime = result.runtime
 
+  result = updateSubject3(vehicleAt(
+    SUBJECT3_OVERTAKE_TARGET_PROGRESS +
+      DRIVING_RULES.subject3.overtake.passClearanceMeters +
+      1,
+    -2.2,
+    {
+      leftIndicator: true,
+      leftSignalAge: 4.5,
+      lookLeft: true,
+    },
+  ), runtime, false, false, 0.1)
+  runtime = result.runtime
+  assert.equal(runtime.overtakeTargetPassed, true)
+
   result = updateSubject3(vehicleAt(event.start + 120, -1.0, {
     rightIndicator: true,
     rightSignalAge: 3.2,
@@ -693,6 +710,52 @@ test('overtake requires both the outward and return signal/observation sequence'
   }), runtime, false, false, 0.1)
 
   assert.deepEqual(result.infractions, [])
+})
+
+test('overtake cannot start the return before actually passing the target vehicle', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('overtake')]
+  let runtime = runtimeFor('overtake')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(
+    SUBJECT3_OVERTAKE_TARGET_PROGRESS - 8,
+    -2.2,
+    {
+      leftIndicator: true,
+      leftSignalAge: 4,
+      lookLeft: true,
+    },
+  ), runtime, false, false, 0.1)
+  runtime = result.runtime
+  assert.equal(runtime.overtakeTargetPassed, false)
+
+  result = updateSubject3(vehicleAt(
+    SUBJECT3_OVERTAKE_TARGET_PROGRESS - 4,
+    -1.0,
+    {
+      rightIndicator: true,
+      rightSignalAge: 3.2,
+      lookRight: true,
+    },
+  ), runtime, false, false, 0.1)
+  runtime = result.runtime
+  assert.equal(runtime.returnManeuverStarted, false)
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    rightIndicator: true,
+    rightSignalAge: 4,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'target-pass'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('target-pass'))?.fatal, true)
 })
 
 test('overtake must finish back in the original lane after starting the return', () => {
@@ -713,6 +776,20 @@ test('overtake must finish back in the original lane after starting the return',
     lookLeft: true,
   }), runtime, false, false, 0.1)
   runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(
+    SUBJECT3_OVERTAKE_TARGET_PROGRESS +
+      DRIVING_RULES.subject3.overtake.passClearanceMeters +
+      1,
+    -2.2,
+    {
+      leftIndicator: true,
+      leftSignalAge: 4.5,
+      lookLeft: true,
+    },
+  ), runtime, false, false, 0.1)
+  runtime = result.runtime
+  assert.equal(runtime.overtakeTargetPassed, true)
 
   result = updateSubject3(vehicleAt(event.start + 120, -1.0, {
     rightIndicator: true,
