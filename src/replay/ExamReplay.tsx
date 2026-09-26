@@ -19,6 +19,7 @@ export interface TrajectorySample {
   leftIndicator?: boolean
   rightIndicator?: boolean
   handbrake?: boolean
+  automatic?: boolean
 }
 
 export interface ReplayInfraction {
@@ -39,16 +40,21 @@ interface ReferenceLine {
   kind: ReferenceKind
 }
 
+const PROJECT_LABELS: Record<string, string> = {
+  'reverse-parking': '倒车入库',
+  'side-parking': '侧方停车',
+  'slope-start': '坡道定点停车和起步',
+  'curve-driving': '曲线行驶',
+  'right-angle': '直角转弯',
+  'subject3': '科目三道路驾驶',
+}
+
 function projectLabel(project: string) {
-  const labels: Record<string, string> = {
-    'reverse-parking': '倒车入库',
-    'side-parking': '侧方停车',
-    'slope-start': '坡道定点停车和起步',
-    'curve-driving': '曲线行驶',
-    'right-angle': '直角转弯',
-    'subject3': '科目三道路驾驶',
+  if (project.startsWith('transition:')) {
+    const [, from, to] = project.split(':')
+    return `连接道路 · ${PROJECT_LABELS[from] ?? from} → ${PROJECT_LABELS[to] ?? to}`
   }
-  return labels[project] ?? project
+  return PROJECT_LABELS[project] ?? project
 }
 
 function pathStats(samples: TrajectorySample[]) {
@@ -261,10 +267,11 @@ function ReplayLegend() {
   </div>
 }
 
-function gearLabel(gear: number) {
-  if (gear < 0) return 'R'
-  if (gear === 0) return 'N'
-  return String(gear)
+function gearLabel(sample: TrajectorySample) {
+  if (sample.gear < 0) return 'R'
+  if (sample.gear === 0) return 'N'
+  if (sample.automatic) return 'D'
+  return String(sample.gear)
 }
 
 function steeringLabel(angle = 0) {
@@ -332,7 +339,7 @@ function ProjectReplay({
       />
       <div className="replay-live-readout">
         <span><b>{(Math.abs(current.speed) * 3.6).toFixed(1)}</b><small>km/h</small></span>
-        <span><b>{gearLabel(current.gear)}</b><small>挡位</small></span>
+        <span><b>{gearLabel(current)}</b><small>挡位</small></span>
         <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
