@@ -154,21 +154,95 @@ test('manual gear event penalizes insufficient upshift while automatic mode does
   assert.equal(hasInfraction(result, 'gear'), false)
 })
 
-test('speed-sensitive slow zone penalizes exceeding the event allowance', () => {
+test('slow-zone speeding is fatal and independent from observation coverage', () => {
   const event = SUBJECT3_EVENTS[eventIndex('school')]
   let runtime = runtimeFor('school')
   const speed = 34 / 3.6
 
   let result = updateSubject3(vehicleAt(event.start + 1, 0, {
     speed,
+    lookLeft: true,
+    lookRight: true,
   }), runtime, false, false, 0.1)
   runtime = result.runtime
   result = updateSubject3(vehicleAt(event.end + 1, 0, {
     speed,
+    lookLeft: true,
+    lookRight: true,
   }), runtime, false, false, 0.1)
 
   assert.equal(hasInfraction(result, 'speed'), true)
-  assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.points, 10)
+  assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.points, 100)
+  assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.fatal, true)
+  assert.equal(hasInfraction(result, 'observation'), false)
+})
+
+test('intersection, school, bus-stop and crosswalk slow zones require left/right observation', () => {
+  for (const id of ['intersection', 'school', 'bus-stop', 'crosswalk', 'intersection-2']) {
+    const event = SUBJECT3_EVENTS[eventIndex(id)]
+    let runtime = runtimeFor(id)
+
+    let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+      lookLeft: true,
+      lookRight: false,
+    }), runtime, false, false, 0.1)
+    runtime = result.runtime
+
+    result = updateSubject3(vehicleAt(event.end + 1, 0, {
+      lookLeft: true,
+      lookRight: false,
+    }), runtime, false, false, 0.1)
+
+    assert.equal(hasInfraction(result, 'observation'), true, `${id} must require both-side observation`)
+    assert.equal(result.infractions.find(item => item.id.endsWith('observation'))?.fatal, true)
+  }
+})
+
+test('observed slow zones pass without a false observation penalty', () => {
+  for (const id of ['intersection', 'school', 'bus-stop', 'crosswalk', 'intersection-2']) {
+    const event = SUBJECT3_EVENTS[eventIndex(id)]
+    let runtime = runtimeFor(id)
+
+    let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+      lookLeft: true,
+      lookRight: true,
+    }), runtime, false, false, 0.1)
+    runtime = result.runtime
+
+    result = updateSubject3(vehicleAt(event.end + 1, 0, {
+      lookLeft: true,
+      lookRight: true,
+    }), runtime, false, false, 0.1)
+
+    assert.equal(hasInfraction(result, 'observation'), false, `${id} should accept both-side observation`)
+  }
+})
+
+test('intersection turn speeding is fatal under the same deceleration rule', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('left-turn-1')]
+  const speed = 34 / 3.6
+  let runtime = runtimeFor('left-turn-1')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    speed,
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    speed,
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'speed'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.fatal, true)
 })
 
 test('legal left and right turns require both-side observation and finish on the route heading', () => {
