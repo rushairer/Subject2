@@ -110,6 +110,7 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 completion must come from successfully completing the final pull-over maneuver. Reaching a route-distance threshold alone must never set `runtime.completed`.
 - A jump to the physical route end must not skip unfinished events, award completion, or produce a passing session result.
 - The deterministic golden-route E2E must traverse every `SUBJECT3_EVENTS` entry in order for both C1 and C2, including manual gear sequencing for C1, live crosswalk yielding, actual target passing during overtake, the u-turn, and a secured final pull-over.
+- Physics-integrated full-route coverage must exist for both C1 and C2. C1 coverage must exercise clutch use, sequential positive upshifts, the required high-gear duration, zero engine stalls, clutch disengagement during the final stop, and neutral + parking brake completion.
 - Per-event reset must clear maneuver-local state without clearing session-wide facts such as seatbelt/parking-brake/route-speed records.
 - If the final pull-over window is passed without a secured stop, keep the route incomplete; a fatal failure may end an exam, but it does not fabricate successful project completion.
 
