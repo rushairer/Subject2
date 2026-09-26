@@ -40,6 +40,7 @@ export interface RightAngleInfraction {
 
 export interface RightAngleRuntime {
   phase: 'approach' | 'turning' | 'exit' | 'complete'
+  entered: boolean
   stopSeconds: number
   stopPenaltyLatched: boolean
   turnSignalChecked: boolean
@@ -50,6 +51,7 @@ export interface RightAngleRuntime {
 export function createRightAngleRuntime(): RightAngleRuntime {
   return {
     phase: 'approach',
+    entered: false,
     stopSeconds: 0,
     stopPenaltyLatched: false,
     turnSignalChecked: false,
@@ -105,8 +107,14 @@ export function updateRightAngle(
 
   const stopped = Math.abs(vehicle.speed) < 0.035
   const heading = normalizedAngle(vehicle.heading)
+  const inEntryLane =
+    Math.abs(vehicle.x) <= RIGHT_ANGLE_GEOMETRY.half &&
+    vehicle.z <= RIGHT_ANGLE_GEOMETRY.entryMaxZ &&
+    vehicle.z >= RIGHT_ANGLE_GEOMETRY.cornerCenterZ - RIGHT_ANGLE_GEOMETRY.half
 
-  if (wheelPoints(vehicle).some(([x, z]) => !pointAllowed(x, z))) {
+  if (!runtime.entered && inEntryLane) runtime.entered = true
+
+  if (runtime.entered && wheelPoints(vehicle).some(([x, z]) => !pointAllowed(x, z))) {
     infractions.push({
       id: 'right-angle-wheel-out',
       title: '直角转弯车轮轧道路边缘线',
@@ -115,7 +123,9 @@ export function updateRightAngle(
     })
   }
 
-  const enteringTurn = vehicle.z < RIGHT_ANGLE_GEOMETRY.cornerCenterZ + 2.2 || heading < -0.15
+  const enteringTurn =
+    runtime.entered &&
+    (vehicle.z < RIGHT_ANGLE_GEOMETRY.cornerCenterZ + 2.2 || heading < -0.15)
   if (runtime.phase === 'approach' && enteringTurn) {
     runtime.phase = 'turning'
     if (!runtime.turnSignalChecked) {
@@ -151,7 +161,7 @@ export function updateRightAngle(
     runtime.completed = true
   }
 
-  if (!['complete'].includes(runtime.phase) && stopped && vehicle.engineOn) {
+  if (runtime.entered && !['complete'].includes(runtime.phase) && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
     if (runtime.stopSeconds > RIGHT_ANGLE.stopLimitSeconds && !runtime.stopPenaltyLatched) {
       infractions.push({

@@ -30,6 +30,15 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 
 `src/subject2/courseStartPoses.ts` owns the canonical spawn position and heading for every Subject 2 project. Do not duplicate start X/Z/heading values in `App.tsx`, replay code, tests, or future continuous-course routing.
 
+## Continuous Subject 2 exam world
+
+Standalone course geometry and judging remain defined in each course's **local frame**. The continuous exam world must place courses through `src/subject2/subject2ExamLayout.ts` and convert the global vehicle pose back through `src/subject2/courseTransform.ts` before calling a course state machine.
+
+- Do not duplicate translated/rotated copies of course geometry.
+- Do not rewrite course judges in global coordinates.
+- Connection-road driving must not activate the next project's penalties before the vehicle reaches that project's entry envelope.
+- Continuous-exam trajectory/infraction samples should be stored in the active project's local frame so existing replay geometry remains meaningful.
+
 ## User-facing replay coordinate convention
 
 Driving replay must never expose raw world X/Z as if screen-left/screen-right were vehicle-left/vehicle-right. Replay maps must transform every trajectory, infraction, and field reference into the vehicle's initial local frame:
