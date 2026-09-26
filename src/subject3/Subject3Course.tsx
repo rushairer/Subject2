@@ -18,6 +18,7 @@ import {
   SUBJECT3_EVENTS,
   SUBJECT3_ROUTE,
   SUBJECT3_ROUTE_LENGTH,
+  SUBJECT3_ROUTE_NODE_PAD_SIZE,
   SUBJECT3_SEGMENTS,
   SUBJECT3_START,
   poseAtRouteDistance,
@@ -745,9 +746,9 @@ export function Subject3Course({
     </mesh>
 
     {SUBJECT3_SEGMENTS.map((segment, index) => <RoadSegmentMesh key={index} segment={segment} />)}
-    {SUBJECT3_ROUTE.slice(1, -1).map((point, index) => (
-      <mesh key={`corner-${index}`} rotation-x={-Math.PI / 2} position={[point.x, -0.015, point.z]}>
-        <planeGeometry args={[20, 20]} />
+    {SUBJECT3_ROUTE.map((point, index) => (
+      <mesh key={`route-node-${index}`} rotation-x={-Math.PI / 2} position={[point.x, -0.015, point.z]}>
+        <planeGeometry args={[SUBJECT3_ROUTE_NODE_PAD_SIZE, SUBJECT3_ROUTE_NODE_PAD_SIZE]} />
         <meshStandardMaterial color="#393e43" roughness={0.96} />
       </mesh>
     ))}
