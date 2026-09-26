@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
@@ -10,8 +11,8 @@ export const SIDE_PARKING = {
   laneWidth: 3.4,
   frontEdgeLength: 4.5,
   rearEdgeLength: 1.0,
-  timeLimitSeconds: 90,
-  stopLimitSeconds: 2,
+  timeLimitSeconds: SUBJECT2_RULE_LIMITS.sideParking.timeLimitSeconds,
+  stopLimitSeconds: SUBJECT2_RULE_LIMITS.sideParking.stopLimitSeconds,
 } as const
 
 const laneHalf = SIDE_PARKING.laneWidth / 2
@@ -159,22 +160,13 @@ export function updateSideParking(
   if (runtime.started && runtime.phase !== 'complete') {
     runtime.elapsed += dt
     if (runtime.elapsed > SIDE_PARKING.timeLimitSeconds) {
-      infractions.push({
-        id: 'side-parking-timeout',
-        title: '侧方停车项目完成时间超过 90 秒',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('side-parking-timeout'))
     }
   }
 
   if (runtime.started && bodyOutside(vehicle)) {
     if (!runtime.contactLatched) {
-      infractions.push({
-        id: `side-parking-line-contact-${Math.floor(runtime.elapsed * 10)}`,
-        title: '侧方停车行驶中车轮或车身触碰边线',
-        points: 10,
-      })
+      infractions.push(subject2Infraction('side-parking-line-contact', Math.floor(runtime.elapsed * 10)))
       runtime.contactLatched = true
     }
   } else {
@@ -183,7 +175,7 @@ export function updateSideParking(
 
   if (runtime.phase === 'reverse' && stopped && inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= 0.35) {
+    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.sideParking.parkedHoldSeconds) {
       runtime.phase = 'parked'
       runtime.parkedHoldSeconds = 0
       runtime.stopSeconds = 0
@@ -191,13 +183,8 @@ export function updateSideParking(
     }
   } else if (runtime.phase === 'reverse' && stopped && centerInsideBay(vehicle) && !inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= 0.5) {
-      infractions.push({
-        id: 'side-parking-body-out-after-stop',
-        title: '侧方停车入库停止后车身出线',
-        points: 100,
-        fatal: true,
-      })
+    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.sideParking.bodyOutAfterStopHoldSeconds) {
+      infractions.push(subject2Infraction('side-parking-body-out-after-stop'))
     }
   } else {
     runtime.parkedHoldSeconds = 0
@@ -207,11 +194,7 @@ export function updateSideParking(
     if (!runtime.exitSignalChecked) {
       runtime.exitSignalChecked = true
       if (!vehicle.leftIndicator) {
-        infractions.push({
-          id: 'side-parking-exit-signal',
-          title: '侧方停车出库时未使用或错误使用转向灯',
-          points: 10,
-        })
+        infractions.push(subject2Infraction('side-parking-exit-signal'))
       }
     }
     runtime.phase = 'exit'
@@ -226,11 +209,7 @@ export function updateSideParking(
   if (mayPenalizeStop && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
     if (runtime.stopSeconds > SIDE_PARKING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
-      infractions.push({
-        id: `side-parking-stop-${Math.floor(runtime.elapsed * 10)}`,
-        title: '侧方停车中途停车超过 2 秒',
-        points: 5,
-      })
+      infractions.push(subject2Infraction('side-parking-stop', Math.floor(runtime.elapsed * 10)))
       runtime.stopPenaltyLatched = true
     }
   } else if (!stopped) {
