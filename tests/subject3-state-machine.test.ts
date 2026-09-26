@@ -6,6 +6,8 @@ import {
   type Subject3Runtime,
   type Subject3Vehicle,
 } from '../src/subject3/Subject3Course'
+import { DRIVING_RULES } from '../src/rules/drivingRules'
+import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
   RIGHT_EDGE_OFFSET,
   SUBJECT3_EVENTS,
@@ -218,6 +220,35 @@ test('a complete observed/signalled lane change passes the event', () => {
   assert.deepEqual(result.infractions, [])
 })
 
+test('lane change must end in the target lane, not merely visit it briefly', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('lane-change')]
+  let runtime = runtimeFor('lane-change')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt((event.start + event.end) / 2, -2.2, {
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    leftIndicator: true,
+    leftSignalAge: 5,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'completion'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('completion'))?.fatal, true)
+})
+
 test('overtake requires both the outward and return signal/observation sequence', () => {
   const event = SUBJECT3_EVENTS[eventIndex('overtake')]
   let runtime = runtimeFor('overtake')
@@ -252,6 +283,43 @@ test('overtake requires both the outward and return signal/observation sequence'
   }), runtime, false, false, 0.1)
 
   assert.deepEqual(result.infractions, [])
+})
+
+test('overtake must finish back in the original lane after starting the return', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('overtake')]
+  let runtime = runtimeFor('overtake')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 70, -2.2, {
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 120, -1.0, {
+    rightIndicator: true,
+    rightSignalAge: 3.2,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+  assert.equal(runtime.returnManeuverStarted, true)
+
+  result = updateSubject3(vehicleAt(event.end + 1, -1.5, {
+    rightIndicator: true,
+    rightSignalAge: 4,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'return-path'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('return-path'))?.fatal, true)
 })
 
 test('pull-over records the 30-50cm band and completes only after a stable secured stop', () => {
@@ -294,6 +362,55 @@ test('night driving with all headlamps off is immediately fatal while moving', (
   assert.equal(
     result.infractions.find(item => item.id === 'subject3-night-lights-off')?.fatal,
     true,
+  )
+})
+
+test('road boundary uses the full vehicle body even while the center remains inside', () => {
+  const centerLateral =
+    RIGHT_EDGE_OFFSET +
+    DRIVING_RULES.subject3.roadBoundaryToleranceMeters -
+    TRAINING_CAR.widthMeters / 2 +
+    0.01
+
+  assert.ok(centerLateral < RIGHT_EDGE_OFFSET, 'fixture center must still be inside the painted road edge')
+
+  const result = updateSubject3(vehicleAt(200, centerLateral), {
+    ...createSubject3Runtime(),
+    started: true,
+  }, false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-road-boundary'),
+    true,
+  )
+})
+
+test('body tangent to the tolerated Subject 3 road boundary remains legal', () => {
+  const centerLateral =
+    RIGHT_EDGE_OFFSET +
+    DRIVING_RULES.subject3.roadBoundaryToleranceMeters -
+    TRAINING_CAR.widthMeters / 2
+
+  const result = updateSubject3(vehicleAt(200, centerLateral), {
+    ...createSubject3Runtime(),
+    started: true,
+  }, false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-road-boundary'),
+    false,
+  )
+})
+
+test('full-body boundary judging does not reject a legal vehicle at a 90-degree route corner', () => {
+  const result = updateSubject3(vehicleAt(700), {
+    ...createSubject3Runtime(),
+    started: true,
+  }, false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-road-boundary'),
+    false,
   )
 })
 
