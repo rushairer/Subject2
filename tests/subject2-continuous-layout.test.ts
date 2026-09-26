@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createCurveRuntime, updateCurveDriving } from '../src/subject2/CurveDrivingCourse'
 import { createRightAngleRuntime, updateRightAngle } from '../src/subject2/RightAngleCourse'
+import { createSideParkingRuntime, updateSideParking } from '../src/subject2/SideParkingCourse'
+import { createSlopeRuntime, updateSlopeStart } from '../src/subject2/SlopeStartCourse'
 import { SUBJECT2_START_POSES } from '../src/subject2/courseStartPoses'
 import {
   localPoseToWorld,
@@ -75,6 +77,78 @@ test('continuous C1 transitions connect each project exit to the next project en
       `${transition.from} -> ${transition.to} transition must have usable driving distance`,
     )
   })
+})
+
+
+test('side-parking judging remains dormant on the transition road before its entrance', () => {
+  const start = subject2ExamWorldStartPose('side-parking')
+  const local = subject2ExamLocalPose('side-parking', {
+    x: start.x,
+    z: start.z + 15,
+    heading: start.heading,
+  })
+
+  const result = updateSideParking({
+    ...local,
+    speed: -0.5,
+    gear: -1,
+    engineOn: true,
+    leftIndicator: false,
+  }, createSideParkingRuntime(), 0.1)
+
+  assert.equal(result.runtime.entered, false)
+  assert.equal(result.runtime.started, false)
+  assert.equal(result.runtime.phase, 'approach')
+  assert.equal(result.infractions.length, 0)
+})
+
+test('side-parking judging activates at the canonical entry lane', () => {
+  const start = SUBJECT2_START_POSES['side-parking']
+  const result = updateSideParking({
+    ...start,
+    speed: 0.5,
+    gear: 1,
+    engineOn: true,
+    leftIndicator: false,
+  }, createSideParkingRuntime(), 0.1)
+
+  assert.equal(result.runtime.entered, true)
+  assert.equal(result.runtime.started, false)
+  assert.equal(result.infractions.length, 0)
+})
+
+test('slope judging remains dormant on the transition road before its entrance', () => {
+  const start = subject2ExamWorldStartPose('slope-start')
+  const local = subject2ExamLocalPose('slope-start', {
+    x: start.x,
+    z: start.z + 15,
+    heading: start.heading,
+  })
+
+  const result = updateSlopeStart({
+    ...local,
+    speed: 0.5,
+    engineOn: true,
+    handbrake: false,
+  }, createSlopeRuntime(), 0.1)
+
+  assert.equal(result.runtime.entered, false)
+  assert.equal(result.runtime.phase, 'approach')
+  assert.equal(result.infractions.length, 0)
+})
+
+test('slope judging activates on the canonical approach road', () => {
+  const start = SUBJECT2_START_POSES['slope-start']
+  const result = updateSlopeStart({
+    ...start,
+    speed: 0.5,
+    engineOn: true,
+    handbrake: false,
+  }, createSlopeRuntime(), 0.1)
+
+  assert.equal(result.runtime.entered, true)
+  assert.equal(result.runtime.phase, 'approach')
+  assert.equal(result.infractions.length, 0)
 })
 
 test('curve judging remains dormant on the transition road before its entrance', () => {

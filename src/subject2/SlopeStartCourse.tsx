@@ -132,8 +132,12 @@ export function updateSlopeStart(
 
   const movingForward = vehicle.speed > 0.08
   const stopped = Math.abs(vehicle.speed) < 0.035
+  const inCourseEntry =
+    Math.abs(vehicle.x) <= SLOPE_GEOMETRY.roadHalf &&
+    vehicle.z <= SLOPE_GEOMETRY.roadStartZ &&
+    vehicle.z >= SLOPE_GEOMETRY.roadEndZ
 
-  if (!runtime.entered && movingForward && vehicle.z < SLOPE_GEOMETRY.slopeBottomZ + 1) runtime.entered = true
+  if (!runtime.entered && movingForward && inCourseEntry) runtime.entered = true
 
   if (runtime.entered && wheelPoints(vehicle).some(([x]) => Math.abs(x) >= SLOPE_GEOMETRY.roadHalf)) {
     infractions.push({

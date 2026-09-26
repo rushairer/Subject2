@@ -56,6 +56,7 @@ export interface SideParkingInfraction {
 
 export interface SideParkingRuntime {
   phase: SideParkingPhase
+  entered: boolean
   started: boolean
   elapsed: number
   stopSeconds: number
@@ -69,6 +70,7 @@ export interface SideParkingRuntime {
 export function createSideParkingRuntime(): SideParkingRuntime {
   return {
     phase: 'approach',
+    entered: false,
     started: false,
     elapsed: 0,
     stopSeconds: 0,
@@ -142,8 +144,14 @@ export function updateSideParking(
   const movingForward = vehicle.speed > 0.08
   const stopped = Math.abs(vehicle.speed) < 0.035
   const inBay = fullyInsideBay(vehicle)
+  const inEntryLane =
+    Math.abs(vehicle.x) <= SIDE_PARKING_GEOMETRY.laneHalf &&
+    vehicle.z <= SIDE_PARKING_GEOMETRY.laneStartZ &&
+    vehicle.z >= SIDE_PARKING_GEOMETRY.laneEndZ
 
-  if (runtime.phase === 'approach' && movingReverse) {
+  if (!runtime.entered && inEntryLane) runtime.entered = true
+
+  if (runtime.phase === 'approach' && runtime.entered && movingReverse) {
     runtime.phase = 'reverse'
     runtime.started = true
   }

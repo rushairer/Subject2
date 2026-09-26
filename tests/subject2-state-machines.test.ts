@@ -172,6 +172,7 @@ test('side parking completes a legal park-and-exit sequence with no false bounda
     leftIndicator: false,
   }, runtime, 0.1)
   runtime = result.runtime
+  assert.equal(runtime.entered, true)
   assert.equal(runtime.phase, 'reverse')
   assert.equal(result.infractions.length, 0)
 
