@@ -94,6 +94,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Changes to scoring severity require an explicit rule-matrix edit and regression update.
 - `tests/subject3-rule-matrix.test.ts` guards the matrix and rejects inline severity literals in the state machine.
 
+## Subject 3 global driving rules
+
+- Subject 3 global penalties belong in `updateSubject3` and `subject3Rules.ts`, not in generic `App.tsx` driving checks.
+- Route-speed judging keeps the shared 50km/h limit and 1.2s continuous-overlimit grace in `DRIVING_RULES.subject3`; emit it once per Subject 3 session through the scoring matrix.
+- The parking-brake moving penalty remains exam-only. Pass the current session mode into the Subject 3 state machine rather than hard-coding exam behavior in the renderer loop.
+- Safety-belt failure is owned solely by the Subject 3 state machine for Subject 3 sessions; the generic Subject 2 safety check must exclude Subject 3 to avoid duplicate IDs/penalties.
+- Session-wide Subject 3 facts such as route overspeed, parking-brake violation and seatbelt violation must not be reset by per-event `resetEventStats`.
+
 ## Subject 3 road and maneuver completion
 
 - Subject 3 road-boundary judging must use the full training-car body footprint, not the vehicle center alone.
