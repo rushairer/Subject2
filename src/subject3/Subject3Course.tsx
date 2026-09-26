@@ -568,16 +568,15 @@ function checkVehicleCollision(
   z: number,
   id: string,
   onInfraction: (item: Subject3Infraction) => void,
-  radius = 2.6,
+  radius = SUBJECT3_RULE_LIMITS.trafficCollisionRadiusMeters,
 ) {
   const distance = Math.hypot(player.current.x - x, player.current.z - z)
   if (distance < radius) {
-    onInfraction({
+    onInfraction(subject3Infraction(
       id,
-      title: '道路驾驶过程中与其他交通参与者发生碰撞',
-      points: 100,
-      fatal: true,
-    })
+      '道路驾驶过程中与其他交通参与者发生碰撞',
+      'collision',
+    ))
   }
 }
 
