@@ -6,6 +6,7 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  subject3TrafficCollision,
 } from '../src/subject3/subject3Traffic'
 import {
   CENTER_LINE_OFFSET,
@@ -61,4 +62,22 @@ test('overtake target sits inside the modeled overtake event window', () => {
   assert.ok(event)
   assert.ok(SUBJECT3_OVERTAKE_TARGET_PROGRESS > event.start)
   assert.ok(SUBJECT3_OVERTAKE_TARGET_PROGRESS < event.end)
+})
+
+
+test('traffic collision uses one strict shared distance boundary', () => {
+  const player = { x: 0, z: 0 }
+
+  assert.equal(
+    subject3TrafficCollision(player, { x: 2.59, z: 0 }, 2.6),
+    true,
+  )
+  assert.equal(
+    subject3TrafficCollision(player, { x: 2.6, z: 0 }, 2.6),
+    false,
+  )
+  assert.equal(
+    subject3TrafficCollision(player, { x: 2.61, z: 0 }, 2.6),
+    false,
+  )
 })
