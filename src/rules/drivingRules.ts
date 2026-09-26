@@ -21,6 +21,10 @@ export const DRIVING_RULES = {
     signalLeadSeconds: 3,
     maneuverSteeringThreshold: 0.18,
     maneuverLateralThreshold: 0.42,
+    roadBoundaryToleranceMeters: 0.55,
+    laneChangeTargetLateralMeters: -2.0,
+    overtakeTargetLateralMeters: -2.0,
+    overtakeReturnLateralMeters: -1.25,
     pullOver: {
       idealMaxGapMeters: 0.30,
       warningMaxGapMeters: 0.50,
