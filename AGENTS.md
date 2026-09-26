@@ -93,6 +93,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 overtake target completion
+
+- The visual vehicle being overtaken and the state-machine target progress must share `SUBJECT3_OVERTAKE_TARGET_PROGRESS`; do not duplicate the target distance in rendering and judging.
+- Returning to the original lane is not a valid overtake return until the candidate has been in the overtaking lane and has passed the target vehicle by the configured clearance.
+- The overtake clearance belongs in `DRIVING_RULES.subject3.overtake` and is currently derived from the training-car length.
+- Reaching the event end after an early left-right weave must fail even if both turn signals and observations were used correctly.
+- Keep "entered overtaking lane", "passed target vehicle", and "returned to original lane" as separate state-machine facts with separate regressions.
+
 ## Subject 3 dynamic traffic state
 
 - Dynamic actors that materially affect exam rules must publish deterministic shared traffic state; rendering alone is not sufficient evidence for a rule judgment.
