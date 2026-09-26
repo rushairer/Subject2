@@ -118,18 +118,41 @@ test('straight-driving instability is a fatal event failure', () => {
 
   let result = updateSubject3(vehicleAt(event.start + 1, 0, {
     steering: 0.55,
+    lookBack: true,
   }), runtime, false, false, 0.1)
   runtime = result.runtime
 
   result = updateSubject3(vehicleAt(event.end + 1, 0, {
     steering: 0.55,
+    lookBack: true,
   }), runtime, false, false, 0.1)
 
   assert.equal(hasInfraction(result, 'direction'), true)
   assert.equal(result.infractions.find(item => item.id.endsWith('direction'))?.fatal, true)
 })
 
-test('manual gear event penalizes insufficient upshift while automatic mode does not', () => {
+test('straight driving requires periodic rear-traffic observation', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('straight-1')]
+  let runtime = runtimeFor('straight-1')
+
+  let result = updateSubject3(vehicleAt(event.start + 1), runtime, false, false, 0.1)
+  runtime = result.runtime
+  result = updateSubject3(vehicleAt(event.end + 1), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'observation'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('observation'))?.points, 10)
+
+  runtime = runtimeFor('straight-1')
+  result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    lookBack: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+  result = updateSubject3(vehicleAt(event.end + 1), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'observation'), false)
+})
+
+test('manual gear event fails if fourth gear is never reached while automatic mode is exempt', () => {
   const event = SUBJECT3_EVENTS[eventIndex('gear')]
 
   let runtime = runtimeFor('gear')
@@ -138,10 +161,12 @@ test('manual gear event penalizes insufficient upshift while automatic mode does
   }), runtime, false, false, 0.1)
   runtime = result.runtime
   result = updateSubject3(vehicleAt(event.end + 1, 0, {
-    gear: 2,
+    gear: 3,
   }), runtime, false, false, 0.1)
+
   assert.equal(hasInfraction(result, 'gear'), true)
-  assert.equal(result.infractions.find(item => item.id.endsWith('gear'))?.points, 10)
+  assert.equal(result.infractions.find(item => item.id.endsWith('gear'))?.points, 100)
+  assert.equal(result.infractions.find(item => item.id.endsWith('gear'))?.fatal, true)
 
   runtime = runtimeFor('gear')
   result = updateSubject3(vehicleAt(event.start + 1, 0, {
@@ -151,7 +176,90 @@ test('manual gear event penalizes insufficient upshift while automatic mode does
   result = updateSubject3(vehicleAt(event.end + 1, 0, {
     gear: 2,
   }), runtime, true, false, 0.1)
+
   assert.equal(hasInfraction(result, 'gear'), false)
+  assert.equal(hasInfraction(result, 'skip-gear'), false)
+  assert.equal(hasInfraction(result, 'high-gear-duration'), false)
+})
+
+test('manual gear event rejects skipped upshifts', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('gear')]
+  let runtime = runtimeFor('gear')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    gear: 2,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 60, 0, {
+    gear: 4,
+  }), runtime, false, false, 5.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    gear: 4,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'skip-gear'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('skip-gear'))?.fatal, true)
+})
+
+test('manual gear event penalizes insufficient time in fourth gear or above', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('gear')]
+  let runtime = runtimeFor('gear')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    gear: 2,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 50, 0, {
+    gear: 3,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 100, 0, {
+    gear: 4,
+  }), runtime, false, false, 1.0)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    gear: 4,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'gear'), false)
+  assert.equal(hasInfraction(result, 'skip-gear'), false)
+  assert.equal(hasInfraction(result, 'high-gear-duration'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('high-gear-duration'))?.points, 10)
+  assert.equal(result.infractions.find(item => item.id.endsWith('high-gear-duration'))?.fatal, false)
+})
+
+test('manual gear event passes a sequential upshift held in fourth gear long enough', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('gear')]
+  let runtime = runtimeFor('gear')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    gear: 2,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 45, 0, {
+    gear: 3,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 90, 0, {
+    gear: 4,
+  }), runtime, false, false, 5.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    gear: 4,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'gear'), false)
+  assert.equal(hasInfraction(result, 'skip-gear'), false)
+  assert.equal(hasInfraction(result, 'high-gear-duration'), false)
 })
 
 test('slow-zone speeding is fatal and independent from observation coverage', () => {
