@@ -2,6 +2,10 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { DRIVING_RULES } from '../rules/drivingRules'
+import {
+  subject3Infraction,
+  type Subject3InfractionRuleId,
+} from '../rules/subject3Rules'
 import { polygonTouchesOutsideRectUnion } from '../sim/planarGeometry'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { vehicleBodyFootprint } from '../sim/vehicleFootprint'
@@ -214,15 +218,14 @@ function requireSignalLead(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
   direction: 'left' | 'right',
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   const age = direction === 'left' ? runtime.leftSignalLeadAtManeuver : runtime.rightSignalLeadAtManeuver
   if (age < DRIVING_RULES.subject3.signalLeadSeconds) {
     add(
       `${direction}-signal-lead`,
       `${event.title}前开启${direction === 'left' ? '左' : '右'}转向灯不足 ${DRIVING_RULES.subject3.signalLeadSeconds} 秒即开始转向`,
-      100,
-      true,
+      'signalLead',
     )
   }
 }
@@ -231,7 +234,7 @@ function requireObservation(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
   direction: 'left' | 'right',
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   const observed = direction === 'left'
     ? runtime.leftObservedBeforeManeuver || runtime.backObservedBeforeManeuver
@@ -240,7 +243,7 @@ function requireObservation(
     add(
       `${direction}-observation`,
       `${event.title}前未完成${direction === 'left' ? '左侧/后方' : '右侧/后方'}观察`,
-      10,
+      'observationMinor',
     )
   }
 }
@@ -248,14 +251,13 @@ function requireObservation(
 function requireIntersectionObservation(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   if (!runtime.leftObservedBeforeManeuver || !runtime.rightObservedBeforeManeuver) {
     add(
       'observation',
       `${event.title}前未完整观察左、右方交通情况`,
-      100,
-      true,
+      'observationRequired',
     )
   }
 }
@@ -267,7 +269,7 @@ function routeHeadingAtEventEnd(event: Subject3RouteEvent) {
 function requireTurnCompletion(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   const headingError = Math.abs(normalizeAngle(
     runtime.lastHeading - routeHeadingAtEventEnd(event),
@@ -279,47 +281,52 @@ function requireTurnCompletion(
     add(
       'path',
       `${event.title}未按考试路线完成规定转向`,
-      100,
-      true,
+      'path',
     )
   }
 }
 
 function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, automatic: boolean, night: boolean) {
   const infractions: Subject3Infraction[] = []
-  const add = (suffix: string, title: string, points: number, fatal = false) =>
-    infractions.push({ id: `subject3-${event.id}-${suffix}`, title, points, fatal })
+  const add = (
+    suffix: string,
+    title: string,
+    ruleId: Subject3InfractionRuleId,
+  ) => infractions.push(subject3Infraction(
+    `subject3-${event.id}-${suffix}`,
+    title,
+    ruleId,
+  ))
 
   if (event.kind === 'start') {
-    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 10)
+    if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 'nightStartMinor')
   }
 
   if (event.kind === 'straight') {
     if (runtime.eventMaxSteering > 0.5) {
-      add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 100, true)
+      add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 'straightDirection')
     }
     if (
       !runtime.leftObservedInEvent &&
       !runtime.rightObservedInEvent &&
       !runtime.backObservedInEvent
     ) {
-      add('observation', '直线行驶过程中未适时观察后方交通情况', 10)
+      add('observation', '直线行驶过程中未适时观察后方交通情况', 'observationMinor')
     }
   }
 
   if (event.kind === 'gear' && !automatic) {
     if (runtime.skippedUpshift) {
-      add('skip-gear', '加挡过程中发生越级加挡', 100, true)
+      add('skip-gear', '加挡过程中发生越级加挡', 'gearSkip')
     }
     if (runtime.eventMaxGear < DRIVING_RULES.subject3.gear.minimumRequiredGear) {
       add(
         'gear',
         `加减挡位项目未加至至少 ${DRIVING_RULES.subject3.gear.minimumRequiredGear} 挡`,
-        100,
-        true,
+        'gearMinimum',
       )
     } else if (
       runtime.eventHighGearSeconds <
@@ -328,7 +335,7 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
       add(
         'high-gear-duration',
         `在 ${DRIVING_RULES.subject3.gear.minimumRequiredGear} 挡及以上行驶时间不足 ${DRIVING_RULES.subject3.gear.minimumHighGearSeconds} 秒`,
-        10,
+        'gearDuration',
       )
     }
   }
@@ -342,8 +349,7 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     add(
       'speed',
       `${event.title}时未按道路情景合理减速`,
-      fatalSpeed ? 100 : 10,
-      fatalSpeed,
+      fatalSpeed ? 'speedFatal' : 'speedMinor',
     )
   }
 
@@ -354,8 +360,7 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     add(
       'observation',
       `${event.title}过程中未完整观察左、右方交通情况`,
-      100,
-      true,
+      'observationRequired',
     )
   }
 
@@ -367,25 +372,24 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     add(
       'yield',
       '人行横道有行人通行时未停车礼让',
-      100,
-      true,
+      'yield',
     )
   }
 
   if (event.kind === 'left-turn') {
-    if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireIntersectionObservation(event, runtime, add)
     requireTurnCompletion(event, runtime, add)
   }
   if (event.kind === 'right-turn') {
-    if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 100, true)
+    if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'right', add)
     requireIntersectionObservation(event, runtime, add)
     requireTurnCompletion(event, runtime, add)
   }
   if (event.kind === 'uturn') {
-    if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
     requireTurnCompletion(event, runtime, add)
@@ -395,53 +399,53 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     event.kind === 'meeting' &&
     runtime.minBodyLateral < CENTER_LINE_OFFSET
   ) {
-    add('opposite-lane', '会车时车身越过道路中心线进入对向车道', 100, true)
+    add('opposite-lane', '会车时车身越过道路中心线进入对向车道', 'path')
   }
 
   if (event.kind === 'lane-change') {
-    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
     if (runtime.minLateral > DRIVING_RULES.subject3.laneChangeTargetLateralMeters) {
-      add('path', '未完成指令要求的变更车道动作', 100, true)
+      add('path', '未完成指令要求的变更车道动作', 'path')
     } else if (runtime.lastLateral > DRIVING_RULES.subject3.laneChangeTargetLateralMeters) {
-      add('completion', '变更车道项目结束时未保持在目标左侧车道', 100, true)
+      add('completion', '变更车道项目结束时未保持在目标左侧车道', 'path')
     }
   }
 
   if (event.kind === 'overtake') {
-    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 100, true)
-    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 'signal')
+    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (runtime.rightSignalLeadAtManeuver < DRIVING_RULES.subject3.signalLeadSeconds) add('right-signal-lead', '超车返回原车道前右转向灯开启不足 3 秒', 100, true)
-    if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 10)
+    if (runtime.rightSignalLeadAtManeuver < DRIVING_RULES.subject3.signalLeadSeconds) add('right-signal-lead', '超车返回原车道前右转向灯开启不足 3 秒', 'signalLead')
+    if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 'observationMinor')
     if (runtime.minLateral > DRIVING_RULES.subject3.overtakeTargetLateralMeters) {
-      add('path', '未完成有效的超车车道变化', 100, true)
+      add('path', '未完成有效的超车车道变化', 'path')
     }
     if (!runtime.overtakeTargetPassed) {
-      add('target-pass', '未在超车道内实际驶过被超目标车辆', 100, true)
+      add('target-pass', '未在超车道内实际驶过被超目标车辆', 'path')
     }
     if (
       !runtime.returnManeuverStarted ||
       runtime.lastLateral <= DRIVING_RULES.subject3.overtakeReturnLateralMeters
     ) {
-      add('return-path', '超车项目结束时未完成返回原车道', 100, true)
+      add('return-path', '超车项目结束时未完成返回原车道', 'path')
     }
   }
 
   if (event.kind === 'pull-over') {
-    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 100, true)
+    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'right', add)
     requireObservation(event, runtime, 'right', add)
     if (!runtime.pullOverSecuredStopSeen || runtime.pullOverStopGap == null) {
-      add('stop', '未在靠边停车项目区域内完成稳定停车并完成驻车操作', 100, true)
+      add('stop', '未在靠边停车项目区域内完成稳定停车并完成驻车操作', 'pullOverStop')
     } else if (runtime.pullOverStopGap < 0) {
-      add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 100, true)
+      add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 'pullOverCrossLine')
     } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.warningMaxGapMeters) {
-      add('distance-fail', '停车后车身距离道路右侧边缘线超过 50cm', 100, true)
+      add('distance-fail', '停车后车身距离道路右侧边缘线超过 50cm', 'pullOverDistanceFail')
     } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.idealMaxGapMeters) {
-      add('distance-10', '停车后车身距离道路右侧边缘线超过 30cm 但未超过 50cm', 10)
+      add('distance-10', '停车后车身距离道路右侧边缘线超过 30cm 但未超过 50cm', 'pullOverDistanceMinor')
     }
   }
 
@@ -482,32 +486,29 @@ export function updateSubject3(
       0,
     )
   ) {
-    infractions.push({
-      id: 'subject3-road-boundary',
-      title: '科目三道路驾驶中车辆驶出道路边界',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-road-boundary',
+      '科目三道路驾驶中车辆驶出道路边界',
+      'roadBoundary',
+    ))
   }
 
   if (Math.abs(vehicle.speed) > 0.2 && !vehicle.seatbelt) {
-    infractions.push({
-      id: 'subject3-seatbelt',
-      title: '科目三道路驾驶过程中未按规定使用安全带',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-seatbelt',
+      '科目三道路驾驶过程中未按规定使用安全带',
+      'seatbelt',
+    ))
   }
 
   if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
 
   if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
-    infractions.push({
-      id: 'subject3-night-lights-off',
-      title: '夜间道路驾驶时未开启前照灯',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-night-lights-off',
+      '夜间道路驾驶时未开启前照灯',
+      'nightLightsOff',
+    ))
   }
 
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
@@ -766,12 +767,11 @@ function StaticCar({
 
   useFrame(() => {
     if (subject3TrafficCollision(player.current, { x, z })) {
-      onInfraction({
-        id: `subject3-collision-${id}`,
-        title: '道路驾驶过程中与其他交通参与者发生碰撞',
-        points: 100,
-        fatal: true,
-      })
+      onInfraction(subject3Infraction(
+        `subject3-collision-${id}`,
+        '道路驾驶过程中与其他交通参与者发生碰撞',
+        'collision',
+      ))
     }
   })
 
@@ -820,12 +820,11 @@ function checkVehicleCollision(
   radius = 2.6,
 ) {
   if (subject3TrafficCollision(player.current, { x, z }, radius)) {
-    onInfraction({
+    onInfraction(subject3Infraction(
       id,
-      title: '道路驾驶过程中与其他交通参与者发生碰撞',
-      points: 100,
-      fatal: true,
-    })
+      '道路驾驶过程中与其他交通参与者发生碰撞',
+      'collision',
+    ))
   }
 }
 
