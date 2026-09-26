@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
@@ -9,8 +10,8 @@ export const REVERSE_PARKING = {
   bayLength: 5.1,
   laneWidth: 6.7,
   controlDistance: 6.7,
-  timeLimitSeconds: 210,
-  stopLimitSeconds: 2,
+  timeLimitSeconds: SUBJECT2_RULE_LIMITS.reverseParking.timeLimitSeconds,
+  stopLimitSeconds: SUBJECT2_RULE_LIMITS.reverseParking.stopLimitSeconds,
 } as const
 
 const laneHalf = REVERSE_PARKING.laneWidth / 2
@@ -167,12 +168,7 @@ export function updateReverseParking(
 
   if (runtime.phase === 'approach' && movingReverse) {
     if (!runtime.firstControlPassed) {
-      infractions.push({
-        id: 'reverse-before-first-control',
-        title: '倒车前两个前轮触地点未均驶过起始控制线',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('reverse-before-first-control'))
     }
     runtime.phase = 'first-reverse'
     runtime.started = true
@@ -181,29 +177,19 @@ export function updateReverseParking(
   if (runtime.started && runtime.phase !== 'complete') {
     runtime.elapsed += dt
     if (runtime.elapsed > REVERSE_PARKING.timeLimitSeconds) {
-      infractions.push({
-        id: 'reverse-parking-timeout',
-        title: '倒车入库项目完成时间超过 210 秒',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('reverse-parking-timeout'))
     }
   }
 
   if (runtime.started && bodyOutsideProject(vehicle)) {
-    infractions.push({
-      id: 'reverse-parking-body-out',
-      title: '倒车入库过程中车身出线',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject2Infraction('reverse-parking-body-out'))
   }
 
   const inBay = fullyInsideBay(vehicle)
   const parkingPhase = runtime.phase === 'first-reverse' || runtime.phase === 'second-reverse'
   if (parkingPhase && stopped && inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= 0.35) {
+    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.reverseParking.parkedHoldSeconds) {
       runtime.phase = runtime.phase === 'first-reverse' ? 'first-parked' : 'second-parked'
       runtime.parkedHoldSeconds = 0
       runtime.stopSeconds = 0
@@ -214,20 +200,10 @@ export function updateReverseParking(
   }
 
   if (runtime.phase === 'first-reverse' && movingForward && !inBay) {
-    infractions.push({
-      id: 'first-reverse-not-in-bay',
-      title: '第一次倒库不入',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject2Infraction('first-reverse-not-in-bay'))
   }
   if (runtime.phase === 'second-reverse' && movingForward && !inBay) {
-    infractions.push({
-      id: 'second-reverse-not-in-bay',
-      title: '第二次倒库不入',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject2Infraction('second-reverse-not-in-bay'))
   }
 
   if (runtime.phase === 'first-parked' && movingForward) {
@@ -237,12 +213,7 @@ export function updateReverseParking(
 
   if (runtime.phase === 'cross-to-opposite' && movingReverse) {
     if (!runtime.oppositeControlPassed) {
-      infractions.push({
-        id: 'reverse-before-opposite-control',
-        title: '第二次倒车前两个前轮触地点未均驶过另一端控制线',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('reverse-before-opposite-control'))
     }
     runtime.phase = 'second-reverse'
   }
@@ -264,11 +235,7 @@ export function updateReverseParking(
   if (mayPenalizeStop && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
     if (runtime.stopSeconds > REVERSE_PARKING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
-      infractions.push({
-        id: `reverse-parking-stop-${Math.floor(runtime.elapsed * 10)}`,
-        title: '倒车入库中途停车超过 2 秒',
-        points: 5,
-      })
+      infractions.push(subject2Infraction('reverse-parking-stop', Math.floor(runtime.elapsed * 10)))
       runtime.stopPenaltyLatched = true
     }
   } else if (!stopped) {
