@@ -102,6 +102,12 @@ function rightBodyGap(vehicle: SlopeVehicle) {
   return SLOPE_GEOMETRY.roadHalf - rightSide.x
 }
 
+const MEASUREMENT_EPSILON = 1e-6
+
+function exceedsMeasurement(value: number, limit: number) {
+  return value > limit + MEASUREMENT_EPSILON
+}
+
 function status(runtime: SlopeRuntime) {
   switch (runtime.phase) {
     case 'approach':
@@ -148,14 +154,14 @@ export function updateSlopeStart(
       if (!runtime.stopEvaluated) {
         runtime.stopEvaluated = true
         const longitudinalError = Math.abs(frontBumperZ(vehicle) - SLOPE_GEOMETRY.stopLineZ)
-        if (longitudinalError > 0.5) {
+        if (exceedsMeasurement(longitudinalError, 0.5)) {
           infractions.push({
             id: 'slope-stop-longitudinal-fail',
             title: '定点停车后前保险杠距桩杆线前后偏差超过 50cm',
             points: 100,
             fatal: true,
           })
-        } else if (longitudinalError > SLOPE_START.stopLineWidth / 2) {
+        } else if (exceedsMeasurement(longitudinalError, SLOPE_START.stopLineWidth / 2)) {
           infractions.push({
             id: 'slope-stop-longitudinal-10',
             title: '定点停车后前保险杠未定于桩杆线，前后偏差不超过 50cm',
@@ -164,14 +170,14 @@ export function updateSlopeStart(
         }
 
         const gap = rightBodyGap(vehicle)
-        if (gap > 0.5) {
+        if (exceedsMeasurement(gap, 0.5)) {
           infractions.push({
             id: 'slope-right-gap-fail',
             title: '定点停车后车身距右侧道路边缘线超过 50cm',
             points: 100,
             fatal: true,
           })
-        } else if (gap > 0.3) {
+        } else if (exceedsMeasurement(gap, 0.3)) {
           infractions.push({
             id: 'slope-right-gap-10',
             title: '定点停车后车身距右侧道路边缘线超过 30cm 但未超过 50cm',
@@ -217,14 +223,14 @@ export function updateSlopeStart(
     runtime.maxRollback = Math.max(runtime.maxRollback, vehicle.z - runtime.stopCenterZ)
     if (!runtime.rollbackEvaluated && vehicle.z < runtime.stopCenterZ - 0.35) {
       runtime.rollbackEvaluated = true
-      if (runtime.maxRollback > 0.30) {
+      if (exceedsMeasurement(runtime.maxRollback, 0.30)) {
         infractions.push({
           id: 'slope-rollback-fail',
           title: '坡道起步车辆后溜距离超过 30cm',
           points: 100,
           fatal: true,
         })
-      } else if (runtime.maxRollback > 0.02) {
+      } else if (exceedsMeasurement(runtime.maxRollback, 0.02)) {
         infractions.push({
           id: 'slope-rollback-10',
           title: '坡道起步车辆发生后溜，距离不超过 30cm',
