@@ -35,11 +35,13 @@ import {
 import {
   SUBJECT3_CROSSWALK_PROGRESS,
   SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
+  SUBJECT3_TRAFFIC_CAR,
   SUBJECT3_OVERTAKE_TARGET_LATERAL,
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
   subject3TrafficCollision,
+  subject3VehicleCollision,
   type Subject3TrafficState,
 } from './subject3Traffic'
 
@@ -765,8 +767,13 @@ function StaticCar({
   const x = pose.x + pose.rightX * lateral
   const z = pose.z + pose.rightZ * lateral
 
+  const actorHeading = pose.heading + (opposite ? Math.PI : 0)
+
   useFrame(() => {
-    if (subject3TrafficCollision(player.current, { x, z })) {
+    if (subject3VehicleCollision(
+      player.current,
+      { x, z, heading: actorHeading },
+    )) {
       onInfraction(subject3Infraction(
         `subject3-collision-${id}`,
         '道路驾驶过程中与其他交通参与者发生碰撞',
@@ -777,9 +784,9 @@ function StaticCar({
 
   return <group
     position={[x, 0.45, z]}
-    rotation-y={sceneYawFromHeading(pose.heading) + (opposite ? Math.PI : 0)}
+    rotation-y={sceneYawFromHeading(actorHeading)}
   >
-    <mesh><boxGeometry args={[1.75, 0.65, 4.2]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
+    <mesh><boxGeometry args={[SUBJECT3_TRAFFIC_CAR.widthMeters, 0.65, SUBJECT3_TRAFFIC_CAR.lengthMeters]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
     <mesh position={[0, 0.45, -0.15]}><boxGeometry args={[1.5, 0.55, 1.9]} /><meshStandardMaterial color="#60707a" metalness={0.5} roughness={0.28} /></mesh>
   </group>
 }
@@ -795,7 +802,7 @@ function Pedestrian({ distance, lateral, color }: { distance: number; lateral: n
 
 function CarBody({ color = '#c7cbd0' }: { color?: string }) {
   return <group>
-    <mesh position={[0, 0.38, 0]}><boxGeometry args={[1.78, 0.62, 4.25]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.46} /></mesh>
+    <mesh position={[0, 0.38, 0]}><boxGeometry args={[SUBJECT3_TRAFFIC_CAR.widthMeters, 0.62, SUBJECT3_TRAFFIC_CAR.lengthMeters]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.46} /></mesh>
     <mesh position={[0, 0.82, -0.2]}><boxGeometry args={[1.48, 0.55, 1.9]} /><meshStandardMaterial color="#526775" metalness={0.48} roughness={0.25} /></mesh>
     <mesh position={[-0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
     <mesh position={[0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
@@ -859,7 +866,17 @@ function MovingTrafficCar({
       group.current.position.set(world.x, 0.04, world.z)
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + (opposite ? Math.PI : 0)
     }
-    checkVehicleCollision(player, world.x, world.z, `subject3-collision-${id}`, onInfraction)
+    const actorHeading = world.pose.heading + (opposite ? Math.PI : 0)
+    if (subject3VehicleCollision(
+      player.current,
+      { x: world.x, z: world.z, heading: actorHeading },
+    )) {
+      onInfraction(subject3Infraction(
+        `subject3-collision-${id}`,
+        '道路驾驶过程中与其他交通参与者发生碰撞',
+        'collision',
+      ))
+    }
   })
 
   return <group ref={group}><CarBody color={color} /></group>
@@ -887,7 +904,16 @@ function SuddenBrakeCar({
       group.current.position.set(world.x, 0.04, world.z)
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
     }
-    checkVehicleCollision(player, world.x, world.z, 'subject3-collision-sudden-brake', onInfraction)
+    if (subject3VehicleCollision(
+      player.current,
+      { x: world.x, z: world.z, heading: world.pose.heading },
+    )) {
+      onInfraction(subject3Infraction(
+        'subject3-collision-sudden-brake',
+        '道路驾驶过程中与其他交通参与者发生碰撞',
+        'collision',
+      ))
+    }
   })
 
   return <group ref={group}><CarBody color="#d8d4c9" /></group>
@@ -1039,8 +1065,8 @@ export function Subject3Course({
     <StaticCar player={player} onInfraction={onInfraction} id="overtake-left" distance={2185} lateral={-3.5} color="#395f88" />
 
     <Pedestrian distance={1205} lateral={3.2} color="#e2a544" />
-    <Pedestrian distance={2530} lateral={1.1} color="#4e79aa" />
-    <Pedestrian distance={2540} lateral={-0.4} color="#8c5d92" />
+    <Pedestrian distance={2530} lateral={RIGHT_EDGE_OFFSET + 1.35} color="#4e79aa" />
+    <Pedestrian distance={2540} lateral={LEFT_EDGE_OFFSET - 1.35} color="#8c5d92" />
 
     <DynamicTraffic player={player} traffic={traffic} onInfraction={onInfraction} />
 
