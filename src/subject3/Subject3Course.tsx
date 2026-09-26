@@ -70,6 +70,9 @@ export interface Subject3Runtime {
   minLateral: number
   maxLateral: number
   lastLateral: number
+  minBodyLateral: number
+  eventStartHeading: number
+  lastHeading: number
   leftSignalSeen: boolean
   rightSignalSeen: boolean
   leftSignalLeadAtManeuver: number
@@ -97,6 +100,9 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.minLateral = 0
   runtime.maxLateral = 0
   runtime.lastLateral = 0
+  runtime.minBodyLateral = 0
+  runtime.eventStartHeading = 0
+  runtime.lastHeading = 0
   runtime.leftSignalSeen = false
   runtime.rightSignalSeen = false
   runtime.leftSignalLeadAtManeuver = 0
@@ -125,6 +131,9 @@ export function createSubject3Runtime(): Subject3Runtime {
     minLateral: 0,
     maxLateral: 0,
     lastLateral: 0,
+    minBodyLateral: 0,
+    eventStartHeading: 0,
+    lastHeading: 0,
     leftSignalSeen: false,
     rightSignalSeen: false,
     leftSignalLeadAtManeuver: 0,
@@ -199,6 +208,46 @@ function requireObservation(
   }
 }
 
+function requireIntersectionObservation(
+  event: Subject3RouteEvent,
+  runtime: Subject3Runtime,
+  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+) {
+  if (!runtime.leftObservedBeforeManeuver || !runtime.rightObservedBeforeManeuver) {
+    add(
+      'observation',
+      `${event.title}前未完整观察左、右方交通情况`,
+      100,
+      true,
+    )
+  }
+}
+
+function routeHeadingAtEventEnd(event: Subject3RouteEvent) {
+  return poseAtRouteDistance(event.end).heading
+}
+
+function requireTurnCompletion(
+  event: Subject3RouteEvent,
+  runtime: Subject3Runtime,
+  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+) {
+  const headingError = Math.abs(normalizeAngle(
+    runtime.lastHeading - routeHeadingAtEventEnd(event),
+  ))
+  if (
+    !runtime.maneuverStarted ||
+    headingError > DRIVING_RULES.subject3.maneuverHeadingToleranceRadians
+  ) {
+    add(
+      'path',
+      `${event.title}未按考试路线完成规定转向`,
+      100,
+      true,
+    )
+  }
+}
+
 function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, automatic: boolean, night: boolean) {
   const infractions: Subject3Infraction[] = []
   const add = (suffix: string, title: string, points: number, fatal = false) =>
@@ -227,17 +276,27 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
   if (event.kind === 'left-turn') {
     if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 100, true)
     requireSignalLead(event, runtime, 'left', add)
-    requireObservation(event, runtime, 'left', add)
+    requireIntersectionObservation(event, runtime, add)
+    requireTurnCompletion(event, runtime, add)
   }
   if (event.kind === 'right-turn') {
     if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 100, true)
     requireSignalLead(event, runtime, 'right', add)
-    requireObservation(event, runtime, 'right', add)
+    requireIntersectionObservation(event, runtime, add)
+    requireTurnCompletion(event, runtime, add)
   }
   if (event.kind === 'uturn') {
     if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 100, true)
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
+    requireTurnCompletion(event, runtime, add)
+  }
+
+  if (
+    event.kind === 'meeting' &&
+    runtime.minBodyLateral < CENTER_LINE_OFFSET
+  ) {
+    add('opposite-lane', '会车时车身越过道路中心线进入对向车道', 100, true)
   }
 
   if (event.kind === 'lane-change') {
@@ -344,6 +403,8 @@ export function updateSubject3(
     if (!runtime.eventActive) {
       runtime.eventActive = true
       runtime.eventStartLateral = projection.lateral
+      runtime.eventStartHeading = vehicle.heading
+      runtime.lastHeading = vehicle.heading
     }
     const kmh = Math.abs(vehicle.speed) * 3.6
     runtime.eventMaxSpeed = Math.max(runtime.eventMaxSpeed, kmh)
@@ -352,6 +413,13 @@ export function updateSubject3(
     runtime.minLateral = Math.min(runtime.minLateral, projection.lateral)
     runtime.maxLateral = Math.max(runtime.maxLateral, projection.lateral)
     runtime.lastLateral = projection.lateral
+    runtime.lastHeading = vehicle.heading
+    const minBodyLateral = Math.min(
+      ...vehicleBodyFootprint(vehicle).map(point =>
+        projectToSubject3Route(point.x, point.z).lateral,
+      ),
+    )
+    runtime.minBodyLateral = Math.min(runtime.minBodyLateral, minBodyLateral)
     runtime.leftSignalSeen ||= vehicle.leftIndicator
     runtime.rightSignalSeen ||= vehicle.rightIndicator
     runtime.hornSeen ||= vehicle.horn
