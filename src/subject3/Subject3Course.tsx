@@ -6,6 +6,7 @@ import {
   subject3Infraction,
   type Subject3InfractionRuleId,
 } from '../rules/subject3Rules'
+import { playCollisionImpact, playMeetingWhoosh, type VehicleAudioState } from '../audio/vehicleAudio'
 import { polygonTouchesOutsideRectUnion } from '../sim/planarGeometry'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { vehicleBodyFootprint } from '../sim/vehicleFootprint'
@@ -798,6 +799,8 @@ function StaticCar({
   lateral,
   opposite = false,
   color = '#d7d9dd',
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   onInfraction: (item: Subject3Infraction) => void
@@ -806,6 +809,8 @@ function StaticCar({
   lateral: number
   opposite?: boolean
   color?: string
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const pose = poseAtRouteDistance(distance)
   const x = pose.x + pose.rightX * lateral
@@ -814,15 +819,21 @@ function StaticCar({
   const actorHeading = pose.heading + (opposite ? Math.PI : 0)
 
   useFrame(() => {
+    if (opposite) {
+      const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
+      const dist = distance - playerProgress
+      if (dist >= -4 && dist <= 4) {
+        const relSpeed = Math.abs(player.current.speed)
+        if (relSpeed > 2.0) {
+          playMeetingWhoosh(audioContext ?? null, relSpeed, audioState)
+        }
+      }
+    }
     if (subject3VehicleCollision(
       player.current,
       { x, z, heading: actorHeading },
     )) {
-      onInfraction(subject3Infraction(
-        `subject3-collision-${id}`,
-        '道路驾驶过程中与其他交通参与者发生碰撞',
-        'collision',
-      ))
+      handleVehicleCollision(player, `subject3-collision-${id}`, onInfraction, audioContext, audioState)
     }
   })
 
@@ -862,6 +873,22 @@ function actorWorldPosition(progress: number, lateral: number) {
   }
 }
 
+function handleVehicleCollision(
+  player: MutableRefObject<Subject3Vehicle>,
+  id: string,
+  onInfraction: (item: Subject3Infraction) => void,
+  audioContext?: AudioContext | null,
+  audioState?: VehicleAudioState,
+) {
+  playCollisionImpact(audioContext ?? null, player.current.speed, audioState)
+  player.current.speed = 0
+  onInfraction(subject3Infraction(
+    id,
+    '道路驾驶过程中与其他交通参与者发生碰撞',
+    'collision',
+  ))
+}
+
 function checkVehicleCollision(
   player: MutableRefObject<Subject3Vehicle>,
   x: number,
@@ -869,13 +896,11 @@ function checkVehicleCollision(
   id: string,
   onInfraction: (item: Subject3Infraction) => void,
   radius = 2.6,
+  audioContext?: AudioContext | null,
+  audioState?: VehicleAudioState,
 ) {
   if (subject3TrafficCollision(player.current, { x, z }, radius)) {
-    onInfraction(subject3Infraction(
-      id,
-      '道路驾驶过程中与其他交通参与者发生碰撞',
-      'collision',
-    ))
+    handleVehicleCollision(player, id, onInfraction, audioContext, audioState)
   }
 }
 
@@ -888,6 +913,8 @@ function MovingTrafficCar({
   lateral,
   opposite = false,
   color,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   onInfraction: (item: Subject3Infraction) => void
@@ -897,6 +924,8 @@ function MovingTrafficCar({
   lateral: number
   opposite?: boolean
   color: string
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const group = useRef<THREE.Group>(null)
   const progress = useRef(startProgress)
@@ -910,16 +939,24 @@ function MovingTrafficCar({
       group.current.position.set(world.x, 0.04, world.z)
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + (opposite ? Math.PI : 0)
     }
+
+    if (opposite) {
+      const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
+      const dist = progress.current - playerProgress
+      if (dist >= -4 && dist <= 4) {
+        const relSpeed = Math.abs(player.current.speed) + speed
+        if (relSpeed > 2.0) {
+          playMeetingWhoosh(audioContext ?? null, relSpeed, audioState)
+        }
+      }
+    }
+
     const actorHeading = world.pose.heading + (opposite ? Math.PI : 0)
     if (subject3VehicleCollision(
       player.current,
       { x: world.x, z: world.z, heading: actorHeading },
     )) {
-      onInfraction(subject3Infraction(
-        `subject3-collision-${id}`,
-        '道路驾驶过程中与其他交通参与者发生碰撞',
-        'collision',
-      ))
+      handleVehicleCollision(player, `subject3-collision-${id}`, onInfraction, audioContext, audioState)
     }
   })
 
@@ -929,9 +966,13 @@ function MovingTrafficCar({
 function SuddenBrakeCar({
   player,
   onInfraction,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   onInfraction: (item: Subject3Infraction) => void
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const group = useRef<THREE.Group>(null)
   const progress = useRef(2760)
@@ -952,11 +993,7 @@ function SuddenBrakeCar({
       player.current,
       { x: world.x, z: world.z, heading: world.pose.heading },
     )) {
-      onInfraction(subject3Infraction(
-        'subject3-collision-sudden-brake',
-        '道路驾驶过程中与其他交通参与者发生碰撞',
-        'collision',
-      ))
+      handleVehicleCollision(player, 'subject3-collision-sudden-brake', onInfraction, audioContext, audioState)
     }
   })
 
@@ -967,10 +1004,14 @@ function CrossingPedestrian({
   player,
   traffic,
   onInfraction,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
@@ -998,7 +1039,7 @@ function CrossingPedestrian({
     const world = actorWorldPosition(motion.progress, motion.lateral)
     if (group.current) group.current.position.set(world.x, 0, world.z)
     if (triggered.current) {
-      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45)
+      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45, audioContext, audioState)
     }
   })
 
@@ -1011,9 +1052,13 @@ function CrossingPedestrian({
 function CutInScooter({
   player,
   onInfraction,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   onInfraction: (item: Subject3Infraction) => void
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
@@ -1035,7 +1080,7 @@ function CutInScooter({
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
     }
     if (triggered.current) {
-      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-scooter', onInfraction, 1.55)
+      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-scooter', onInfraction, 1.55, audioContext, audioState)
     }
   })
 
@@ -1052,19 +1097,23 @@ function DynamicTraffic({
   player,
   traffic,
   onInfraction,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   return <>
-    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-a" startProgress={620} speed={9.2} lateral={-3.5} color="#40698e" />
-    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-b" startProgress={1540} speed={7.5} lateral={0} color="#b5b8b3" />
-    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-a" startProgress={1900} speed={10.5} lateral={-8.75} opposite color="#a84742" />
-    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-b" startProgress={3650} speed={8.6} lateral={-8.75} opposite color="#4f6e51" />
-    <SuddenBrakeCar player={player} onInfraction={onInfraction} />
-    <CrossingPedestrian player={player} traffic={traffic} onInfraction={onInfraction} />
-    <CutInScooter player={player} onInfraction={onInfraction} />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-a" startProgress={620} speed={9.2} lateral={-3.5} color="#40698e" audioContext={audioContext} audioState={audioState} />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="flow-b" startProgress={1540} speed={7.5} lateral={0} color="#b5b8b3" audioContext={audioContext} audioState={audioState} />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-a" startProgress={1900} speed={10.5} lateral={-8.75} opposite color="#a84742" audioContext={audioContext} audioState={audioState} />
+    <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-b" startProgress={3650} speed={8.6} lateral={-8.75} opposite color="#4f6e51" audioContext={audioContext} audioState={audioState} />
+    <SuddenBrakeCar player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
+    <CrossingPedestrian player={player} traffic={traffic} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
+    <CutInScooter player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
   </>
 }
 
@@ -1072,10 +1121,14 @@ export function Subject3Course({
   player,
   traffic,
   onInfraction,
+  audioContext,
+  audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
   traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }): ReactElement {
   return <group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.09, -1200]}>
@@ -1104,15 +1157,15 @@ export function Subject3Course({
     <TrafficLight distance={850} />
     <TrafficLight distance={3090} />
 
-    <StaticCar player={player} onInfraction={onInfraction} id="meeting-opposing" distance={1735} lateral={-8.75} opposite color="#bd4b42" />
-    <StaticCar player={player} onInfraction={onInfraction} id="overtake-target" distance={SUBJECT3_OVERTAKE_TARGET_PROGRESS} lateral={SUBJECT3_OVERTAKE_TARGET_LATERAL} color="#d4d4d0" />
-    <StaticCar player={player} onInfraction={onInfraction} id="overtake-left" distance={2185} lateral={-3.5} color="#395f88" />
+    <StaticCar player={player} onInfraction={onInfraction} id="meeting-opposing" distance={1735} lateral={-8.75} opposite color="#bd4b42" audioContext={audioContext} audioState={audioState} />
+    <StaticCar player={player} onInfraction={onInfraction} id="overtake-target" distance={SUBJECT3_OVERTAKE_TARGET_PROGRESS} lateral={SUBJECT3_OVERTAKE_TARGET_LATERAL} color="#d4d4d0" audioContext={audioContext} audioState={audioState} />
+    <StaticCar player={player} onInfraction={onInfraction} id="overtake-left" distance={2185} lateral={-3.5} color="#395f88" audioContext={audioContext} audioState={audioState} />
 
     <Pedestrian distance={1205} lateral={3.2} color="#e2a544" />
     <Pedestrian distance={2530} lateral={RIGHT_EDGE_OFFSET + 1.35} color="#4e79aa" />
     <Pedestrian distance={2540} lateral={LEFT_EDGE_OFFSET - 1.35} color="#8c5d92" />
 
-    <DynamicTraffic player={player} traffic={traffic} onInfraction={onInfraction} />
+    <DynamicTraffic player={player} traffic={traffic} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
 
     {SUBJECT3_EVENTS.filter((_, index) => index % 2 === 0).map((event, index) => {
       const pose = poseAtRouteDistance((event.start + event.end) / 2)
