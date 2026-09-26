@@ -1,3 +1,5 @@
+import type { SessionResultStatus } from '../session/sessionResult'
+
 export interface StoredCandidate {
   name: string
   gender: '男' | '女' | '其他'
@@ -14,6 +16,9 @@ export interface ExamHistoryEntry {
   mode: 'practice' | 'exam'
   score: number
   passed: boolean
+  // Optional for records written before explicit completion tracking existed.
+  status?: SessionResultStatus
+  completed?: boolean
   infractionCount: number
 }
 
