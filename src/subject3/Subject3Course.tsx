@@ -379,7 +379,7 @@ export function updateSubject3(
 
     if (
       event.kind === 'overtake' &&
-      runtime.minLateral < DRIVING_RULES.subject3.overtakeTargetLateralMeters &&
+      runtime.minLateral <= DRIVING_RULES.subject3.overtakeTargetLateralMeters &&
       !runtime.returnManeuverStarted &&
       projection.lateral > DRIVING_RULES.subject3.overtakeReturnLateralMeters
     ) {
