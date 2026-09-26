@@ -306,24 +306,30 @@ export function updateSubject3(
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
   runtime.progress = Math.max(runtime.progress, projection.progress)
 
-  if (projection.lateral > RIGHT_EDGE_OFFSET + 0.55 || projection.lateral < LEFT_EDGE_OFFSET - 0.55) {
-    infractions.push({
-      id: 'subject3-road-boundary',
-      title: '科目三道路驾驶中车辆驶出道路边界',
-      points: 100,
-      fatal: true,
-    })
+  if (
+    projection.lateral > RIGHT_EDGE_OFFSET + SUBJECT3_RULE_LIMITS.roadBoundaryMarginMeters ||
+    projection.lateral < LEFT_EDGE_OFFSET - SUBJECT3_RULE_LIMITS.roadBoundaryMarginMeters
+  ) {
+    infractions.push(subject3Infraction(
+      'subject3-road-boundary',
+      '科目三道路驾驶中车辆驶出道路边界',
+      'roadBoundary',
+    ))
   }
 
-  if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
+  if (!runtime.started && Math.abs(vehicle.speed) > SUBJECT3_RULE_LIMITS.movingSpeedThresholdMps) runtime.started = true
 
-  if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
-    infractions.push({
-      id: 'subject3-night-lights-off',
-      title: '夜间道路驾驶时未开启前照灯',
-      points: 100,
-      fatal: true,
-    })
+  if (
+    night &&
+    Math.abs(vehicle.speed) > SUBJECT3_RULE_LIMITS.movingSpeedThresholdMps &&
+    !vehicle.lowBeam &&
+    !vehicle.highBeam
+  ) {
+    infractions.push(subject3Infraction(
+      'subject3-night-lights-off',
+      '夜间道路驾驶时未开启前照灯',
+      'nightLightsOff',
+    ))
   }
 
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
@@ -345,9 +351,11 @@ export function updateSubject3(
     const relevantLeft = event.kind === 'start' || event.kind === 'left-turn' || event.kind === 'lane-change' || event.kind === 'overtake' || event.kind === 'uturn'
     const relevantRight = event.kind === 'right-turn' || event.kind === 'pull-over'
     const lateralDelta = projection.lateral - runtime.eventStartLateral
-    const steeringStarted = Math.abs(vehicle.steering) >= DRIVING_RULES.subject3.maneuverSteeringThreshold
-    const lateralStarted = Math.abs(lateralDelta) >= DRIVING_RULES.subject3.maneuverLateralThreshold
-    const startRolling = event.kind === 'start' && Math.abs(vehicle.speed) > 0.2
+    const steeringStarted = Math.abs(vehicle.steering) >= SUBJECT3_RULE_LIMITS.maneuverSteeringThreshold
+    const lateralStarted = Math.abs(lateralDelta) >= SUBJECT3_RULE_LIMITS.maneuverLateralThreshold
+    const startRolling =
+      event.kind === 'start' &&
+      Math.abs(vehicle.speed) > SUBJECT3_RULE_LIMITS.movingSpeedThresholdMps
 
     if (!runtime.maneuverStarted && (steeringStarted || lateralStarted || startRolling)) {
       runtime.maneuverStarted = true
@@ -367,25 +375,33 @@ export function updateSubject3(
       runtime.backObservedBeforeManeuver ||= vehicle.lookBack
     }
 
-    if (event.kind === 'overtake' && runtime.minLateral < -2 && !runtime.returnManeuverStarted && projection.lateral > -1.25) {
+    if (
+      event.kind === 'overtake' &&
+      runtime.minLateral < -SUBJECT3_RULE_LIMITS.overtakeRequiredLateralMeters &&
+      !runtime.returnManeuverStarted &&
+      projection.lateral > SUBJECT3_RULE_LIMITS.overtakeReturnLateralThresholdMeters
+    ) {
       runtime.returnManeuverStarted = true
       runtime.rightSignalLeadAtManeuver = vehicle.rightSignalAge
       runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
       runtime.backObservedBeforeManeuver ||= vehicle.lookBack
     }
 
-    const stopped = Math.abs(vehicle.speed) < DRIVING_RULES.subject3.pullOver.stoppedSpeedMps
+    const stopped = Math.abs(vehicle.speed) < SUBJECT3_RULE_LIMITS.pullOver.stoppedSpeedMps
     runtime.stopSeen ||= stopped
     if (event.kind === 'pull-over' && stopped) {
       runtime.pullOverStopSeconds += dt
       runtime.pullOverStopGap = vehicleRightEdgeGap(vehicle)
-    } else if (event.kind === 'pull-over' && Math.abs(vehicle.speed) > 0.2) {
+    } else if (
+      event.kind === 'pull-over' &&
+      Math.abs(vehicle.speed) > SUBJECT3_RULE_LIMITS.movingSpeedThresholdMps
+    ) {
       runtime.pullOverStopSeconds = 0
     }
 
     if (
       event.kind === 'pull-over' &&
-      runtime.pullOverStopSeconds >= DRIVING_RULES.subject3.pullOver.stableStopSeconds &&
+      runtime.pullOverStopSeconds >= SUBJECT3_RULE_LIMITS.pullOver.stableStopSeconds &&
       vehicle.handbrake &&
       vehicle.gear === 0
     ) {
@@ -401,7 +417,10 @@ export function updateSubject3(
     }
   }
 
-  if (runtime.progress >= SUBJECT3_ROUTE_LENGTH - 35) {
+  if (
+    runtime.progress >=
+    SUBJECT3_ROUTE_LENGTH - SUBJECT3_RULE_LIMITS.routeCompletionRemainingMeters
+  ) {
     runtime.completed = true
   }
 
