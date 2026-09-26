@@ -31,6 +31,8 @@ import {
 import {
   SUBJECT3_CROSSWALK_PROGRESS,
   SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
+  SUBJECT3_OVERTAKE_TARGET_LATERAL,
+  SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
   type Subject3TrafficState,
@@ -89,6 +91,7 @@ export interface Subject3Runtime {
   rightSignalLeadAtManeuver: number
   maneuverStarted: boolean
   returnManeuverStarted: boolean
+  overtakeTargetPassed: boolean
   eventStartLateral: number
   leftObservedBeforeManeuver: boolean
   rightObservedBeforeManeuver: boolean
@@ -127,6 +130,7 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.rightSignalLeadAtManeuver = 0
   runtime.maneuverStarted = false
   runtime.returnManeuverStarted = false
+  runtime.overtakeTargetPassed = false
   runtime.eventStartLateral = 0
   runtime.leftObservedBeforeManeuver = false
   runtime.rightObservedBeforeManeuver = false
@@ -166,6 +170,7 @@ export function createSubject3Runtime(): Subject3Runtime {
     rightSignalLeadAtManeuver: 0,
     maneuverStarted: false,
     returnManeuverStarted: false,
+    overtakeTargetPassed: false,
     eventStartLateral: 0,
     leftObservedBeforeManeuver: false,
     rightObservedBeforeManeuver: false,
@@ -413,6 +418,9 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     if (runtime.minLateral > DRIVING_RULES.subject3.overtakeTargetLateralMeters) {
       add('path', '未完成有效的超车车道变化', 100, true)
     }
+    if (!runtime.overtakeTargetPassed) {
+      add('target-pass', '未在超车道内实际驶过被超目标车辆', 100, true)
+    }
     if (
       !runtime.returnManeuverStarted ||
       runtime.lastLateral <= DRIVING_RULES.subject3.overtakeReturnLateralMeters
@@ -572,6 +580,17 @@ export function updateSubject3(
 
     if (
       event.kind === 'overtake' &&
+      projection.lateral <= DRIVING_RULES.subject3.overtakeTargetLateralMeters &&
+      projection.progress >=
+        SUBJECT3_OVERTAKE_TARGET_PROGRESS +
+        DRIVING_RULES.subject3.overtake.passClearanceMeters
+    ) {
+      runtime.overtakeTargetPassed = true
+    }
+
+    if (
+      event.kind === 'overtake' &&
+      runtime.overtakeTargetPassed &&
       runtime.minLateral <= DRIVING_RULES.subject3.overtakeTargetLateralMeters &&
       !runtime.returnManeuverStarted &&
       projection.lateral > DRIVING_RULES.subject3.overtakeReturnLateralMeters
@@ -978,7 +997,7 @@ export function Subject3Course({
     <TrafficLight distance={3090} />
 
     <StaticCar distance={1735} lateral={-8.75} opposite color="#bd4b42" />
-    <StaticCar distance={2140} lateral={0} color="#d4d4d0" />
+    <StaticCar distance={SUBJECT3_OVERTAKE_TARGET_PROGRESS} lateral={SUBJECT3_OVERTAKE_TARGET_LATERAL} color="#d4d4d0" />
     <StaticCar distance={2185} lateral={-3.5} color="#395f88" />
 
     <Pedestrian distance={1205} lateral={3.2} color="#e2a544" />
