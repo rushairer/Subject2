@@ -2,7 +2,9 @@ import type { ReactElement } from 'react'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
+import { polygonTouchesOutsideRectUnion, type AxisAlignedRect } from '../sim/planarGeometry'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { vehicleBodyFootprint } from '../sim/vehicleFootprint'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
 export const REVERSE_PARKING = {
@@ -91,23 +93,22 @@ export function createReverseParkingRuntime(): ReverseParkingRuntime {
   }
 }
 
-function pointInAllowedArea(x: number, z: number) {
+function allowedRoadRects(): readonly AxisAlignedRect[] {
   const g = REVERSE_PARKING_GEOMETRY
-  const inLane = x >= -g.laneHalf && x <= g.laneHalf && Math.abs(z) <= g.laneEndZ
-  const inBay = x >= g.bayMouthX && x <= g.bayBackX && Math.abs(z) <= g.bayHalf
-  return inLane || inBay
-}
-
-function carCorners(vehicle: ReverseParkingVehicle) {
-  const halfLength = REVERSE_PARKING.carLength / 2
-  const halfWidth = REVERSE_PARKING.carWidth / 2
   return [
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, -halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, -halfWidth),
-  ].map(point => [point.x, point.z] as const)
-
+    {
+      minX: -g.laneHalf,
+      maxX: g.laneHalf,
+      minZ: -g.laneEndZ,
+      maxZ: g.laneEndZ,
+    },
+    {
+      minX: g.bayMouthX,
+      maxX: g.bayBackX,
+      minZ: -g.bayHalf,
+      maxZ: g.bayHalf,
+    },
+  ]
 }
 
 function frontWheelZs(vehicle: ReverseParkingVehicle) {
@@ -121,16 +122,20 @@ function frontWheelZs(vehicle: ReverseParkingVehicle) {
 
 function fullyInsideBay(vehicle: ReverseParkingVehicle) {
   const g = REVERSE_PARKING_GEOMETRY
-  return carCorners(vehicle).every(([x, z]) =>
-    x > g.bayMouthX + 0.02 &&
-    x < g.bayBackX - 0.02 &&
-    z > -g.bayHalf + 0.02 &&
-    z < g.bayHalf - 0.02,
+  return vehicleBodyFootprint(vehicle).every(point =>
+    point.x > g.bayMouthX + 0.02 &&
+    point.x < g.bayBackX - 0.02 &&
+    point.z > -g.bayHalf + 0.02 &&
+    point.z < g.bayHalf - 0.02,
   )
 }
 
 function bodyOutsideProject(vehicle: ReverseParkingVehicle) {
-  return carCorners(vehicle).some(([x, z]) => !pointInAllowedArea(x, z))
+  return polygonTouchesOutsideRectUnion(
+    vehicleBodyFootprint(vehicle),
+    allowedRoadRects(),
+    0,
+  )
 }
 
 function statusFor(runtime: ReverseParkingRuntime, timeLimitSeconds: number = SUBJECT2_RULE_LIMITS.reverseParking.timeLimitSeconds) {

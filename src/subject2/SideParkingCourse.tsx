@@ -6,7 +6,7 @@ import {
 } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import { vehicleBodyFootprint } from '../sim/vehicleFootprint'
 import {
   footprintIntersectsAxisAlignedRect,
   footprintTouchesOutsideRectUnion,
@@ -95,18 +95,6 @@ export function createSideParkingRuntime(): SideParkingRuntime {
   }
 }
 
-function corners(vehicle: SideParkingVehicle) {
-  const halfLength = SIDE_PARKING.carLength / 2
-  const halfWidth = SIDE_PARKING.carWidth / 2
-  return [
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, halfLength, -halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, halfWidth),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -halfLength, -halfWidth),
-  ].map(point => [point.x, point.z] as const)
-
-}
-
 function allowedRoadRects(): readonly AxisAlignedRect[] {
   const g = SIDE_PARKING_GEOMETRY
   return [
@@ -171,11 +159,11 @@ function wheelTouchesBoundary(vehicle: SideParkingVehicle) {
 
 function fullyInsideBay(vehicle: SideParkingVehicle) {
   const g = SIDE_PARKING_GEOMETRY
-  return corners(vehicle).every(([x, z]) =>
-    x > g.bayMouthX + 0.02 &&
-    x < g.bayBackX - 0.02 &&
-    z > -g.bayHalfLength + 0.02 &&
-    z < g.bayHalfLength - 0.02,
+  return vehicleBodyFootprint(vehicle).every(point =>
+    point.x > g.bayMouthX + 0.02 &&
+    point.x < g.bayBackX - 0.02 &&
+    point.z > -g.bayHalfLength + 0.02 &&
+    point.z < g.bayHalfLength - 0.02,
   )
 }
 
