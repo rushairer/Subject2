@@ -93,6 +93,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 straight-driving and gear judging
+
+- Straight-driving events must record at least one rear-traffic observation through the available look controls; direction stability and observation are separate judgments.
+- The training car is a 5-speed manual. Subject 3's required next-highest gear must be derived from the shared highest-forward-gear value, not duplicated as an unrelated literal.
+- Manual Subject 3 gear events must reject skipped upshifts, require reaching the next-highest gear, and accumulate the configured minimum time in that gear or above.
+- Neutral between sequential positive gears must not erase the previous positive gear used for skip detection.
+- C2 automatic mode is exempt from manual-gear sequence judgments.
+
 ## Subject 3 slow-zone judging
 
 - Straight-through intersections, pedestrian crossings, school zones, and bus-stop events must record both left- and right-side observation during the event.
