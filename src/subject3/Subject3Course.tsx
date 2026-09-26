@@ -486,32 +486,29 @@ export function updateSubject3(
       0,
     )
   ) {
-    infractions.push({
-      id: 'subject3-road-boundary',
-      title: '科目三道路驾驶中车辆驶出道路边界',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-road-boundary',
+      '科目三道路驾驶中车辆驶出道路边界',
+      'roadBoundary',
+    ))
   }
 
   if (Math.abs(vehicle.speed) > 0.2 && !vehicle.seatbelt) {
-    infractions.push({
-      id: 'subject3-seatbelt',
-      title: '科目三道路驾驶过程中未按规定使用安全带',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-seatbelt',
+      '科目三道路驾驶过程中未按规定使用安全带',
+      'seatbelt',
+    ))
   }
 
   if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
 
   if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
-    infractions.push({
-      id: 'subject3-night-lights-off',
-      title: '夜间道路驾驶时未开启前照灯',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject3Infraction(
+      'subject3-night-lights-off',
+      '夜间道路驾驶时未开启前照灯',
+      'nightLightsOff',
+    ))
   }
 
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
@@ -770,12 +767,11 @@ function StaticCar({
 
   useFrame(() => {
     if (subject3TrafficCollision(player.current, { x, z })) {
-      onInfraction({
-        id: `subject3-collision-${id}`,
-        title: '道路驾驶过程中与其他交通参与者发生碰撞',
-        points: 100,
-        fatal: true,
-      })
+      onInfraction(subject3Infraction(
+        `subject3-collision-${id}`,
+        '道路驾驶过程中与其他交通参与者发生碰撞',
+        'collision',
+      ))
     }
   })
 
@@ -824,12 +820,11 @@ function checkVehicleCollision(
   radius = 2.6,
 ) {
   if (subject3TrafficCollision(player.current, { x, z }, radius)) {
-    onInfraction({
+    onInfraction(subject3Infraction(
       id,
-      title: '道路驾驶过程中与其他交通参与者发生碰撞',
-      points: 100,
-      fatal: true,
-    })
+      '道路驾驶过程中与其他交通参与者发生碰撞',
+      'collision',
+    ))
   }
 }
 
