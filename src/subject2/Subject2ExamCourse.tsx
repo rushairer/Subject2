@@ -1,4 +1,6 @@
-import type { ReactElement } from 'react'
+import type { MutableRefObject, ReactElement } from 'react'
+import type { Vehicle } from '../sim/vehicleCollision'
+import type { VehicleAudioState } from '../audio/vehicleAudio'
 import { sceneYawFromHeading } from '../sim/vehicleFrame'
 import { CurveDrivingCourse } from './CurveDrivingCourse'
 import { ReverseParkingCourse } from './ReverseParkingCourse'
@@ -88,9 +90,15 @@ function TransitionRoad({ transition }: { transition: Subject2Transition }) {
 export function Subject2ExamCourse({
   automatic,
   activeProject,
+  vehicle,
+  audioContext,
+  audioState,
 }: {
   automatic: boolean
   activeProject: Subject2ProjectId
+  vehicle?: MutableRefObject<Vehicle>
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }): ReactElement {
   const transitions = subject2ExamTransitions(automatic)
   const sequence = subject2ExamSequence(automatic)
@@ -106,19 +114,39 @@ export function Subject2ExamCourse({
       <TransitionRoad key={`${transition.from}-${transition.to}`} transition={transition} />
     ))}
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['reverse-parking']}>
-      <ReverseParkingCourse />
+      <ReverseParkingCourse
+        vehicle={vehicle}
+        placement={SUBJECT2_EXAM_PLACEMENTS['reverse-parking']}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
     </PlacedCourse>
     {!automatic && <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['slope-start']}>
-      <SlopeStartCourse />
+      <SlopeStartCourse
+        vehicle={vehicle}
+        placement={SUBJECT2_EXAM_PLACEMENTS['slope-start']}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
     </PlacedCourse>}
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['side-parking']}>
-      <SideParkingCourse />
+      <SideParkingCourse
+        vehicle={vehicle}
+        placement={SUBJECT2_EXAM_PLACEMENTS['side-parking']}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
     </PlacedCourse>
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['curve-driving']}>
       <CurveDrivingCourse />
     </PlacedCourse>
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['right-angle']}>
-      <RightAngleCourse />
+      <RightAngleCourse
+        vehicle={vehicle}
+        placement={SUBJECT2_EXAM_PLACEMENTS['right-angle']}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
     </PlacedCourse>
   </group>
 }

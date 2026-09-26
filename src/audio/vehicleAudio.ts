@@ -13,6 +13,7 @@ export interface VehicleAudioState {
   relayPhaseOn: boolean
   lastWhooshTime: number
   lastCollisionTime: number
+  lastConeImpactTime: number
 }
 
 export function createVehicleAudioState(): VehicleAudioState {
@@ -21,6 +22,7 @@ export function createVehicleAudioState(): VehicleAudioState {
     relayPhaseOn: false,
     lastWhooshTime: -999,
     lastCollisionTime: -999,
+    lastConeImpactTime: -999,
   }
 }
 
@@ -232,3 +234,76 @@ export function playCollisionImpact(
 
   noiseSource.start(now)
 }
+
+/**
+ * Synthesizes a hollow plastic traffic cone impact and asphalt ground rattle.
+ */
+export function playConeImpact(
+  ctx: AudioContext | null,
+  impactSpeedMps: number,
+  state?: VehicleAudioState,
+) {
+  if (!ctx) return
+  if (ctx.state === 'suspended') void ctx.resume()
+
+  const now = ctx.currentTime
+  if (state && now - state.lastConeImpactTime < 0.25) {
+    return // Debounce rapid consecutive frames
+  }
+  if (state) state.lastConeImpactTime = now
+
+  const intensity = Math.min(1.0, Math.max(0.25, Math.abs(impactSpeedMps) / 3.5))
+
+  // 1. Resonant hollow plastic thump (bandpass filtered triangle wave ~360Hz -> ~180Hz)
+  const osc = ctx.createOscillator()
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(360, now)
+  osc.frequency.exponentialRampToValueAtTime(160, now + 0.12)
+
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.setValueAtTime(340, now)
+  filter.Q.setValueAtTime(3.2, now)
+
+  const oscGain = ctx.createGain()
+  oscGain.gain.setValueAtTime(0.35 * intensity, now)
+  oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14)
+
+  osc.connect(filter)
+  filter.connect(oscGain)
+  oscGain.connect(ctx.destination)
+  osc.start(now)
+  osc.stop(now + 0.15)
+
+  // 2. Plastic clatter / pavement scrape noise (bandpass 800 - 2400Hz with double-tap decay)
+  const noiseDuration = 0.22
+  const noiseSize = Math.floor(ctx.sampleRate * noiseDuration)
+  const noiseBuffer = ctx.createBuffer(1, noiseSize, ctx.sampleRate)
+  const noiseData = noiseBuffer.getChannelData(0)
+  for (let i = 0; i < noiseSize; i++) {
+    const t = i / ctx.sampleRate
+    // Envelope has primary hit at t=0 and secondary ground bounce at t=0.06s
+    const env1 = Math.exp(-t / 0.04)
+    const env2 = t > 0.06 ? Math.exp(-(t - 0.06) / 0.035) * 0.7 : 0
+    noiseData[i] = (Math.random() * 2 - 1) * (env1 + env2)
+  }
+
+  const noiseSource = ctx.createBufferSource()
+  noiseSource.buffer = noiseBuffer
+
+  const noiseFilter = ctx.createBiquadFilter()
+  noiseFilter.type = 'bandpass'
+  noiseFilter.frequency.setValueAtTime(1400, now)
+  noiseFilter.Q.setValueAtTime(1.8, now)
+
+  const noiseGain = ctx.createGain()
+  noiseGain.gain.setValueAtTime(0.24 * intensity, now)
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + noiseDuration)
+
+  noiseSource.connect(noiseFilter)
+  noiseFilter.connect(noiseGain)
+  noiseGain.connect(ctx.destination)
+
+  noiseSource.start(now)
+}
+

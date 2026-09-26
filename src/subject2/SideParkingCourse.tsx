@@ -1,4 +1,8 @@
-import type { ReactElement } from 'react'
+import type { MutableRefObject, ReactElement } from 'react'
+import type { Vehicle } from '../sim/vehicleCollision'
+import type { VehicleAudioState } from '../audio/vehicleAudio'
+import type { CoursePlacement } from './courseTransform'
+import { TrafficCone } from './TrafficCone'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
   SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
@@ -280,7 +284,19 @@ function Line({ x, z, width, depth }: { x: number; z: number; width: number; dep
   </mesh>
 }
 
-export function SideParkingCourse(): ReactElement {
+export interface SideParkingCourseProps {
+  vehicle?: MutableRefObject<Vehicle>
+  placement?: CoursePlacement
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
+}
+
+export function SideParkingCourse({
+  vehicle,
+  placement,
+  audioContext,
+  audioState,
+}: SideParkingCourseProps = {}): ReactElement {
   const g = SIDE_PARKING_GEOMETRY
   const laneCenterZ = (g.laneStartZ + g.laneEndZ) / 2
   const laneLength = g.laneStartZ - g.laneEndZ
@@ -301,6 +317,23 @@ export function SideParkingCourse(): ReactElement {
     <Line x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={g.bayBackX} z={0} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={SIDE_PARKING.bayLength} />
+
+    {[
+      [g.bayBackX + 0.25, g.bayHalfLength + 0.3],
+      [g.bayBackX + 0.25, -g.bayHalfLength - 0.3],
+      [g.bayMouthX + 0.2, -g.bayHalfLength - 0.3],
+      [g.bayMouthX + 0.2, g.bayHalfLength + 0.3],
+    ].map(([x, z], i) => (
+      <TrafficCone
+        key={i}
+        x={x}
+        z={z}
+        vehicle={vehicle}
+        placement={placement}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
+    ))}
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
       <planeGeometry args={[45, 40]} />

@@ -1,5 +1,9 @@
-import { useMemo, type ReactElement } from 'react'
+import { useMemo, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
+import type { Vehicle } from '../sim/vehicleCollision'
+import type { VehicleAudioState } from '../audio/vehicleAudio'
+import type { CoursePlacement } from './courseTransform'
+import { SignPost } from './SignPost'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
@@ -240,7 +244,19 @@ function Marking({ z, width, depth, color }: { z: number; width: number; depth: 
   </mesh>
 }
 
-export function SlopeStartCourse(): ReactElement {
+export interface SlopeStartCourseProps {
+  vehicle?: MutableRefObject<Vehicle>
+  placement?: CoursePlacement
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
+}
+
+export function SlopeStartCourse({
+  vehicle,
+  placement,
+  audioContext,
+  audioState,
+}: SlopeStartCourseProps = {}): ReactElement {
   const terrain = useMemo(() => surfaceGeometry(24, -0.07), [])
   const road = useMemo(() => surfaceGeometry(SLOPE_START.roadWidth, 0), [])
   const leftEdge = useMemo(() => surfaceGeometry(SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, 0.025), [])
@@ -256,9 +272,15 @@ export function SlopeStartCourse(): ReactElement {
     <Marking z={SLOPE_GEOMETRY.stopLineZ + SLOPE_START.controlOffset + SLOPE_START.stopLineWidth / 2} width={SLOPE_START.roadWidth} depth={0.08} color="#f3d34a" />
     <Marking z={SLOPE_GEOMETRY.stopLineZ - SLOPE_START.controlOffset - SLOPE_START.stopLineWidth / 2} width={SLOPE_START.roadWidth} depth={0.08} color="#f3d34a" />
 
-    <group position={[SLOPE_GEOMETRY.roadHalf + 0.55, getSlopePose(SLOPE_GEOMETRY.stopLineZ).y, SLOPE_GEOMETRY.stopLineZ]}>
-      <mesh position={[0, 1.0, 0]}><cylinderGeometry args={[0.035, 0.035, 2.0, 10]} /><meshStandardMaterial color="#f2f2f2" /></mesh>
-      <mesh position={[0, 1.75, 0]}><boxGeometry args={[0.08, 0.55, 0.9]} /><meshStandardMaterial color="#176aa7" /></mesh>
+    <group position-y={getSlopePose(SLOPE_GEOMETRY.stopLineZ).y}>
+      <SignPost
+        x={SLOPE_GEOMETRY.roadHalf + 0.55}
+        z={SLOPE_GEOMETRY.stopLineZ}
+        vehicle={vehicle}
+        placement={placement}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
     </group>
   </group>
 }

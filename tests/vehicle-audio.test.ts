@@ -6,6 +6,7 @@ import {
   playRelayClick,
   playMeetingWhoosh,
   playCollisionImpact,
+  playConeImpact,
 } from '../src/audio/vehicleAudio'
 
 test('vehicle audio state initializes correctly', () => {
@@ -14,6 +15,7 @@ test('vehicle audio state initializes correctly', () => {
   assert.equal(state.relayPhaseOn, false)
   assert.equal(state.lastWhooshTime, -999)
   assert.equal(state.lastCollisionTime, -999)
+  assert.equal(state.lastConeImpactTime, -999)
 })
 
 test('turn indicator audio cycles between tick and tock at flasher frequency', () => {
@@ -77,5 +79,60 @@ test('null audio context does not crash any audio function', () => {
     playRelayClick(null, true)
     playMeetingWhoosh(null, 20)
     playCollisionImpact(null, 10)
+    playConeImpact(null, 5)
   })
+})
+
+test('playConeImpact debounces rapid consecutive collisions', () => {
+  const state = createVehicleAudioState()
+  let played = 0
+  const mockCtx = {
+    currentTime: 10.0,
+    state: 'running',
+    sampleRate: 44100,
+    destination: {},
+    createOscillator: () => {
+      played += 1
+      return {
+        type: 'triangle',
+        frequency: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+        connect: () => {},
+        start: () => {},
+        stop: () => {},
+      }
+    },
+    createBiquadFilter: () => ({
+      type: 'bandpass',
+      frequency: { setValueAtTime: () => {} },
+      Q: { setValueAtTime: () => {} },
+      connect: () => {},
+    }),
+    createGain: () => ({
+      gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+      connect: () => {},
+    }),
+    createBuffer: () => ({
+      getChannelData: () => new Float32Array(100),
+    }),
+    createBufferSource: () => ({
+      buffer: null,
+      connect: () => {},
+      start: () => {},
+    }),
+  } as unknown as AudioContext
+
+  // First hit plays
+  playConeImpact(mockCtx, 3.0, state)
+  assert.equal(played, 1)
+  assert.equal(state.lastConeImpactTime, 10.0)
+
+  // Hit 0.1s later (within 0.25s debounce window) is skipped
+  mockCtx.currentTime = 10.1
+  playConeImpact(mockCtx, 3.0, state)
+  assert.equal(played, 1)
+
+  // Hit 0.3s later (after 0.25s debounce window) plays
+  mockCtx.currentTime = 10.35
+  playConeImpact(mockCtx, 3.0, state)
+  assert.equal(played, 2)
 })

@@ -628,7 +628,51 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   return <>
     <fog attach="fog" args={[night ? '#142034' : '#c7d5d9', 65, 260]} />
     <DrivingLighting vehicle={vehicle} night={night} />
-    {continuousExam ? <Subject2ExamCourse automatic={automatic} activeProject={session.examId as Subject2ProjectId} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} traffic={subject3Traffic} onInfraction={onInfraction} audioContext={audioContext.current} audioState={vehicleAudioState.current} /> : <Road />}
+    {continuousExam ? (
+      <Subject2ExamCourse
+        automatic={automatic}
+        activeProject={session.examId as Subject2ProjectId}
+        vehicle={vehicle}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : session.examId === 'reverse-parking' ? (
+      <ReverseParkingCourse
+        vehicle={vehicle}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : session.examId === 'side-parking' ? (
+      <SideParkingCourse
+        vehicle={vehicle}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : session.examId === 'right-angle' ? (
+      <RightAngleCourse
+        vehicle={vehicle}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : session.examId === 'curve-driving' ? (
+      <CurveDrivingCourse />
+    ) : session.examId === 'slope-start' ? (
+      <SlopeStartCourse
+        vehicle={vehicle}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : session.examId === 'subject3' ? (
+      <Subject3Course
+        player={vehicle}
+        traffic={subject3Traffic}
+        onInfraction={onInfraction}
+        audioContext={audioContext.current}
+        audioState={vehicleAudioState.current}
+      />
+    ) : (
+      <Road />
+    )}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>

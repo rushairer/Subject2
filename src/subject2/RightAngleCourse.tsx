@@ -1,4 +1,8 @@
-import type { ReactElement } from 'react'
+import type { MutableRefObject, ReactElement } from 'react'
+import type { Vehicle } from '../sim/vehicleCollision'
+import type { VehicleAudioState } from '../audio/vehicleAudio'
+import type { CoursePlacement } from './courseTransform'
+import { TrafficCone } from './TrafficCone'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
   SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
@@ -228,7 +232,19 @@ function Line({ x, z, width, depth }: { x: number; z: number; width: number; dep
   </mesh>
 }
 
-export function RightAngleCourse(): ReactElement {
+export interface RightAngleCourseProps {
+  vehicle?: MutableRefObject<Vehicle>
+  placement?: CoursePlacement
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
+}
+
+export function RightAngleCourse({
+  vehicle,
+  placement,
+  audioContext,
+  audioState,
+}: RightAngleCourseProps = {}): ReactElement {
   const g = RIGHT_ANGLE_GEOMETRY
   const entryLength = g.entryMaxZ - (g.cornerCenterZ - g.half)
   const entryCenterZ = (g.entryMaxZ + g.cornerCenterZ - g.half) / 2
@@ -250,6 +266,16 @@ export function RightAngleCourse(): ReactElement {
     <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={g.half - g.horizontalMinX} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={exitCenterX} z={g.cornerCenterZ - g.half} width={exitLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={g.horizontalMinX} z={g.cornerCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={RIGHT_ANGLE.roadWidth} />
+
+    {/* Inner corner apex traffic cone */}
+    <TrafficCone
+      x={-g.half - 0.22}
+      z={g.cornerCenterZ + g.half + 0.22}
+      vehicle={vehicle}
+      placement={placement}
+      audioContext={audioContext}
+      audioState={audioState}
+    />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
       <planeGeometry args={[42, 42]} />

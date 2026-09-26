@@ -1,4 +1,9 @@
-import type { ReactElement } from 'react'
+import type { MutableRefObject, ReactElement } from 'react'
+import type { Vehicle } from '../sim/vehicleCollision'
+import type { VehicleAudioState } from '../audio/vehicleAudio'
+import type { CoursePlacement } from './courseTransform'
+import { TrafficCone } from './TrafficCone'
+import { SignPost } from './SignPost'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
@@ -262,7 +267,19 @@ function GroundLine({ x, z, width, depth }: { x: number; z: number; width: numbe
   </mesh>
 }
 
-export function ReverseParkingCourse(): ReactElement {
+export interface ReverseParkingCourseProps {
+  vehicle?: MutableRefObject<Vehicle>
+  placement?: CoursePlacement
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
+}
+
+export function ReverseParkingCourse({
+  vehicle,
+  placement,
+  audioContext,
+  audioState,
+}: ReverseParkingCourseProps = {}): ReactElement {
   const g = REVERSE_PARKING_GEOMETRY
   return <group>
     <mesh rotation-x={-Math.PI / 2} position={[2.6, -0.025, 0]}>
@@ -286,15 +303,26 @@ export function ReverseParkingCourse(): ReactElement {
       [g.bayMouthX + 0.35, -g.bayHalf - 0.45],
       [g.bayBackX - 0.25, g.bayHalf + 0.45],
       [g.bayBackX - 0.25, -g.bayHalf - 0.45],
-    ].map(([x, z], i) => <group key={i} position={[x, 0, z]}>
-      <mesh position={[0, 0.22, 0]}><cylinderGeometry args={[0.12, 0.16, 0.44, 16]} /><meshStandardMaterial color="#df6a31" /></mesh>
-      <mesh position={[0, 0.29, 0]}><cylinderGeometry args={[0.13, 0.13, 0.06, 16]} /><meshStandardMaterial color="#f4f4f4" /></mesh>
-    </group>)}
+    ].map(([x, z], i) => (
+      <TrafficCone
+        key={i}
+        x={x}
+        z={z}
+        vehicle={vehicle}
+        placement={placement}
+        audioContext={audioContext}
+        audioState={audioState}
+      />
+    ))}
 
-    <group position={[-2.45, 0, 0]}>
-      <mesh position={[0, 1.4, 0]}><cylinderGeometry args={[0.06, 0.08, 2.8, 8]} /><meshStandardMaterial color="#777" /></mesh>
-      <mesh position={[0, 2.55, 0]}><boxGeometry args={[0.08, 0.8, 1.55]} /><meshStandardMaterial color="#176aa7" /></mesh>
-    </group>
+    <SignPost
+      x={-2.45}
+      z={0}
+      vehicle={vehicle}
+      placement={placement}
+      audioContext={audioContext}
+      audioState={audioState}
+    />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
       <planeGeometry args={[60, 48]} />
