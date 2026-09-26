@@ -29,6 +29,9 @@ export const DRIVING_RULES = {
     laneChangeTargetLateralMeters: -2.0,
     overtakeTargetLateralMeters: -2.0,
     overtakeReturnLateralMeters: -1.25,
+    overtake: {
+      passClearanceMeters: TRAINING_CAR.lengthMeters,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
