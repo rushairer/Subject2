@@ -55,6 +55,19 @@ import {
   subject3VehicleCollision,
   type Subject3TrafficState,
 } from './subject3Traffic'
+import {
+  CornerJunctionMarkings,
+  StandardCrosswalk,
+  StandardRoadSegment,
+} from './subject3Markings'
+import {
+  makeBusStopSignTexture,
+  makeCrosswalkSignTexture,
+  makeExamProjectSignTexture,
+  makeSchoolSignTexture,
+  makeSpeedLimitTexture,
+  makeUTurnSignTexture,
+} from './subject3Signs'
 
 export { SUBJECT3_START } from './subject3Route'
 
@@ -704,64 +717,9 @@ export function updateSubject3(
   return { runtime, infractions, status: instructionFor(runtime) }
 }
 
-function RoadSegmentMesh({ segment }: { segment: RouteSegment }) {
-  const dashCount = Math.floor(segment.length / 14)
-  return <group
-    position={[(segment.a.x + segment.b.x) / 2, 0, (segment.a.z + segment.b.z) / 2]}
-    rotation-y={sceneYawFromHeading(segment.heading)}
-  >
-    <mesh rotation-x={-Math.PI / 2} position={[ROAD_CENTER_OFFSET, -0.02, 0]} receiveShadow>
-      <planeGeometry args={[ROAD_WIDTH, segment.length + 1]} />
-      <meshStandardMaterial color="#393e43" roughness={0.96} />
-    </mesh>
-
-    {[RIGHT_EDGE_OFFSET, CENTER_LINE_OFFSET, LEFT_EDGE_OFFSET].map((offset, index) =>
-      <mesh key={offset} rotation-x={-Math.PI / 2} position={[offset, 0.005 + index * 0.001, 0]}>
-        <planeGeometry args={[index === 1 ? 0.13 : 0.11, segment.length]} />
-        <meshBasicMaterial color={index === 1 ? '#e3bd38' : '#f1f1ea'} />
-      </mesh>
-    )}
-
-    {[SAME_DIRECTION_DIVIDER, OPPOSITE_DIVIDER].flatMap(offset =>
-      Array.from({ length: dashCount }, (_, index) => {
-        const z = -segment.length / 2 + 7 + index * 14
-        return <mesh key={`${offset}-${index}`} rotation-x={-Math.PI / 2} position={[offset, 0.008, z]}>
-          <planeGeometry args={[0.09, 5]} />
-          <meshBasicMaterial color="#ecece6" />
-        </mesh>
-      })
-    )}
-  </group>
-}
-
-function makeSignTexture(label: string, accent: string) {
-  const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 300
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = accent
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 18
-  ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24)
-  ctx.fillStyle = '#ffffff'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.font = '700 62px system-ui, sans-serif'
-  const chunks = label.length > 5 ? [label.slice(0, Math.ceil(label.length / 2)), label.slice(Math.ceil(label.length / 2))] : [label]
-  chunks.forEach((text, index) => {
-    const y = chunks.length === 1 ? 150 : 112 + index * 82
-    ctx.fillText(text, 256, y)
-  })
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
-}
-
 function RouteSign({
   distance,
   label,
-  accent = '#176aa7',
   player,
   onInfraction,
   audioContext,
@@ -776,8 +734,6 @@ function RouteSign({
   audioState?: VehicleAudioState
 }) {
   const pose = poseAtRouteDistance(distance)
-  const texture = useMemo(() => makeSignTexture(label, accent), [accent, label])
-  useEffect(() => () => texture.dispose(), [texture])
   const lateral = RIGHT_EDGE_OFFSET + 2.1
   const signX = pose.x + pose.rightX * lateral
   const signZ = pose.z + pose.rightZ * lateral
@@ -790,47 +746,97 @@ function RouteSign({
     }
   })
 
-  return <group
-    position={[signX, 0, signZ]}
-    rotation-y={sceneYawFromHeading(pose.heading)}
-  >
-    {/* Support pole mounted cleanly behind the sign board */}
-    <mesh position={[0, 1.4, -0.06]} castShadow>
-      <cylinderGeometry args={[0.045, 0.06, 2.8, 12]} />
-      <meshStandardMaterial color="#7c858b" metalness={0.6} roughness={0.35} />
-    </mesh>
-    {/* Upper and lower mounting brackets connecting pole to sign back */}
-    <mesh position={[0, 2.75, -0.025]} castShadow>
-      <boxGeometry args={[0.24, 0.06, 0.08]} />
-      <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
-    </mesh>
-    <mesh position={[0, 2.35, -0.025]} castShadow>
-      <boxGeometry args={[0.24, 0.06, 0.08]} />
-      <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
-    </mesh>
-    {/* Protective backboard and border frame */}
-    <mesh position={[0, 2.55, 0.015]} castShadow receiveShadow>
-      <boxGeometry args={[1.50, 0.90, 0.03]} />
-      <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
-    </mesh>
-    {/* Front sign graphics face */}
-    <mesh position={[0, 2.55, 0.032]} castShadow receiveShadow>
-      <planeGeometry args={[1.44, 0.84]} />
-      <meshBasicMaterial map={texture} toneMapped={false} />
-    </mesh>
-  </group>
-}
+  const isSpeedLimit = label.includes('限速')
+  const isSchool = label.includes('学校')
+  const isCrosswalk = label.includes('人行横道')
+  const isBusStop = label.includes('公交')
+  const isUTurn = label.includes('掉头')
 
-function Crosswalk({ distance }: { distance: number }) {
-  const pose = poseAtRouteDistance(distance)
-  return <group position={[pose.x + pose.rightX * ROAD_CENTER_OFFSET, 0.012, pose.z + pose.rightZ * ROAD_CENTER_OFFSET]} rotation-y={sceneYawFromHeading(pose.heading)}>
-    {Array.from({ length: 8 }, (_, index) =>
-      <mesh key={index} rotation-x={-Math.PI / 2} position={[0, 0, -3.1 + index * 0.88]} receiveShadow>
-        <planeGeometry args={[ROAD_WIDTH - 0.8, 0.48]} />
-        <meshBasicMaterial color="#f5f5f3" />
+  const speedLimit = useMemo(() => {
+    const match = label.match(/限速(\d+)/)
+    return match ? parseInt(match[1], 10) : 50
+  }, [label])
+
+  const texture = useMemo(() => {
+    if (isSpeedLimit) return makeSpeedLimitTexture(speedLimit)
+    if (isSchool) return makeSchoolSignTexture()
+    if (isCrosswalk) return makeCrosswalkSignTexture()
+    if (isBusStop) return makeBusStopSignTexture()
+    if (isUTurn) return makeUTurnSignTexture()
+    return makeExamProjectSignTexture(label)
+  }, [isSpeedLimit, speedLimit, isSchool, isCrosswalk, isBusStop, isUTurn, label])
+
+  useEffect(() => () => texture.dispose(), [texture])
+
+  return (
+    <group position={[signX, 0, signZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
+      {/* Support pole mounted cleanly behind the sign board */}
+      <mesh position={[0, 1.35, -0.06]} castShadow>
+        <cylinderGeometry args={[0.045, 0.06, 2.7, 12]} />
+        <meshStandardMaterial color="#7c858b" metalness={0.6} roughness={0.35} />
       </mesh>
-    )}
-  </group>
+      {/* Upper and lower mounting brackets connecting pole to sign back */}
+      <mesh position={[0, 2.65, -0.025]} castShadow>
+        <boxGeometry args={[0.22, 0.05, 0.08]} />
+        <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, 2.25, -0.025]} castShadow>
+        <boxGeometry args={[0.22, 0.05, 0.08]} />
+        <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
+      </mesh>
+
+      {/* Render matching geometric shape for each sign type */}
+      {isSpeedLimit || isUTurn ? (
+        // Circular Sign (限速 / 允许掉头)
+        <group position={[0, 2.45, 0]}>
+          <mesh position={[0, 0, 0.015]} rotation-x={Math.PI / 2} castShadow receiveShadow>
+            <cylinderGeometry args={[0.43, 0.43, 0.03, 32]} />
+            <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.032]} castShadow receiveShadow>
+            <circleGeometry args={[0.42, 32]} />
+            <meshBasicMaterial map={texture} toneMapped={false} />
+          </mesh>
+        </group>
+      ) : isSchool ? (
+        // Equilateral Triangular Sign (学校区域 GB 5768.2 警告标志)
+        <group position={[0, 2.45, 0]}>
+          <mesh position={[0, 0, 0.015]} rotation-z={Math.PI / 2} rotation-x={Math.PI / 2} castShadow receiveShadow>
+            <cylinderGeometry args={[0.55, 0.55, 0.03, 3]} />
+            <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.032]} castShadow receiveShadow>
+            <planeGeometry args={[0.92, 0.92]} />
+            <meshBasicMaterial map={texture} transparent toneMapped={false} />
+          </mesh>
+        </group>
+      ) : isCrosswalk || isBusStop ? (
+        // Square Sign (人行横道 / 公交站)
+        <group position={[0, 2.45, 0]}>
+          <mesh position={[0, 0, 0.015]} castShadow receiveShadow>
+            <boxGeometry args={[0.90, 0.90, 0.03]} />
+            <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.032]} castShadow receiveShadow>
+            <planeGeometry args={[0.85, 0.85]} />
+            <meshBasicMaterial map={texture} toneMapped={false} />
+          </mesh>
+        </group>
+      ) : (
+        // Rectangular Exam Project Sign (考试起点 / 靠边停车)
+        <group position={[0, 2.55, 0]}>
+          <mesh position={[0, 0, 0.015]} castShadow receiveShadow>
+            <boxGeometry args={[1.50, 0.90, 0.03]} />
+            <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.032]} castShadow receiveShadow>
+            <planeGeometry args={[1.44, 0.84]} />
+            <meshBasicMaterial map={texture} toneMapped={false} />
+          </mesh>
+        </group>
+      )}
+    </group>
+  )
 }
 
 function TrafficLight({
@@ -1624,12 +1630,11 @@ export function Subject3Course({
       <meshStandardMaterial color="#62755a" roughness={1} />
     </mesh>
 
-    {SUBJECT3_SEGMENTS.map((segment, index) => <RoadSegmentMesh key={index} segment={segment} />)}
-    {SUBJECT3_ROUTE.map((point, index) => (
-      <mesh key={`route-node-${index}`} rotation-x={-Math.PI / 2} position={[point.x, -0.015, point.z]} receiveShadow>
-        <planeGeometry args={[SUBJECT3_ROUTE_NODE_PAD_SIZE, SUBJECT3_ROUTE_NODE_PAD_SIZE]} />
-        <meshStandardMaterial color="#393e43" roughness={0.96} />
-      </mesh>
+    {SUBJECT3_SEGMENTS.map((segment, index) => (
+      <StandardRoadSegment key={`segment-${index}`} segment={segment} index={index} />
+    ))}
+    {SUBJECT3_ROUTE.map((_, index) => (
+      <CornerJunctionMarkings key={`route-node-${index}`} nodeIndex={index} />
     ))}
 
     <RouteSign distance={45} label="考试起点" player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
@@ -1640,8 +1645,8 @@ export function Subject3Course({
     <RouteSign distance={3470} label="允许掉头" player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
     <RouteSign distance={4110} label="靠边停车" player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
 
-    <Crosswalk distance={850} />
-    <Crosswalk distance={SUBJECT3_CROSSWALK_PROGRESS} />
+    <StandardCrosswalk distance={850} />
+    <StandardCrosswalk distance={SUBJECT3_CROSSWALK_PROGRESS} />
     <TrafficLight distance={850} player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
     <TrafficLight distance={3090} player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
 
