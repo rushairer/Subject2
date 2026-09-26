@@ -175,7 +175,7 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     )
     const target = targetWorld(
       lookAheadProgress,
-      desiredLateral(lookAheadProgress),
+      desiredLateral(before.progress),
     )
     const desiredHeading = Math.atan2(
       target.x - vehicle.x,
