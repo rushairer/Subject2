@@ -93,6 +93,13 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 traffic collision judging
+
+- Static and dynamic traffic actors must share the same deterministic collision-distance helper; visible traffic must not be non-collidable scenery.
+- Static Subject 3 vehicles used for meeting/overtaking scenarios must report fatal collision infractions through the same `onInfraction` path as moving traffic.
+- Keep the collision threshold centralized in the helper call and cover its exact strict boundary in unit tests.
+- Visual traffic placement and collision placement must use the same route-distance/lateral coordinates.
+
 ## Subject 3 occupant-safety judging
 
 - Subject 3 must treat driving without the safety belt fastened as a fatal failure.
