@@ -7,7 +7,7 @@ import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './s
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
 import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
-import { subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
+import { subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
@@ -527,7 +527,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {continuousExam ? <Subject2ExamCourse automatic={automatic} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
+    {continuousExam ? <Subject2ExamCourse automatic={automatic} activeProject={session.examId as Subject2ProjectId} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
@@ -548,6 +548,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const [infractions, setInfractions] = useState<Infraction[]>([])
   const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
   const [projectComplete, setProjectComplete] = useState(false)
+  const [activeEntryReached, setActiveEntryReached] = useState(!combinedExam || activeIndex === 0)
   const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
   const finishLatched = useRef(false)
@@ -581,8 +582,9 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     }
     setProjectStatus(initialProjectStatus(activeExamId))
     setProjectComplete(false)
+    setActiveEntryReached(!combinedExam || activeIndex === 0)
     setLightTestDone(!(activeExamId === 'subject3' && session.time === 'day'))
-  }, [activeExamId, combinedExam, session.time])
+  }, [activeExamId, activeIndex, combinedExam, session.time])
 
   const tick = () => {
     const now = performance.now()
@@ -606,6 +608,18 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     }
   }
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
+  const activeEntryDistance = combinedExam
+    ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
+    : 0
+  const navigatingToProject = combinedExam && !activeEntryReached
+  const hudProjectStatus = navigatingToProject
+    ? `连接道路 · 前往${examTitle(activeExamId)} · 距入口约 ${Math.max(1, Math.ceil(activeEntryDistance))} m`
+    : projectStatus
+
+  useEffect(() => {
+    if (!combinedExam || activeEntryReached) return
+    if (activeEntryDistance <= 6) setActiveEntryReached(true)
+  }, [activeEntryDistance, activeEntryReached, combinedExam])
 
   useEffect(() => {
     if (session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
@@ -662,7 +676,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
         </div>
       </div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
-      {projectStatus && <div className="project-status">{projectStatus}</div>}
+      {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
