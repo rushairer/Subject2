@@ -2,6 +2,7 @@ import {
   SUBJECT2_NATIONAL_RULE_PROFILE,
   type Subject2RuleProfile,
 } from '../rules/subject2RuleProfile'
+import { SUBJECT3_RULE_LIMITS } from '../rules/subject3Rules'
 
 export type SessionResultStatus = 'passed' | 'failed' | 'incomplete'
 
@@ -9,7 +10,7 @@ export function passLineForExam(
   examId: string,
   profile: Subject2RuleProfile = SUBJECT2_NATIONAL_RULE_PROFILE,
 ) {
-  return examId === 'subject3' ? 90 : profile.limits.passScore
+  return examId === 'subject3' ? SUBJECT3_RULE_LIMITS.passScore : profile.limits.passScore
 }
 
 export function assessSessionResult({ examId, score, completed, infractions, ruleProfile }: {
