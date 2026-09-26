@@ -48,6 +48,8 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 - Body-out rules and wheel-line rules are different concepts. Do not substitute body corners for wheel contact unless the rule explicitly evaluates the body.
 - `src/sim/vehicleFootprint.ts` owns the full rectangular body footprint. For concave/L-shaped legal regions, body containment must use exact polygon coverage through `src/sim/planarGeometry.ts`; checking only the four body corners can miss an edge crossing a forbidden notch.
 - `src/sim/planarGeometry.ts` owns reusable polygon/axis-aligned-rectangle intersection and rectangle-union coverage. Do not duplicate clipping math in individual courses.
+- Rectangle-union containment must tolerate floating-point error on internal subdivision seams. A polygon wholly inside one legal rectangle must never be rejected because overlapping rectangles introduced extra clipping cells.
+- Numerical area tolerance must remain far below any physically meaningful tire/body overlap; do not solve seam noise by weakening real boundary geometry.
 - Add regression coverage at the exact safe/contact boundary whenever a line-contact algorithm changes.
 - `src/subject2/courseMarkings.ts` owns the painted Subject 2 boundary-line width. Visual markings and line-contact judging must use the same value.
 - For a painted boundary, contact starts at the physical paint region, not at an abstract road-edge centerline. L-shaped courses must model only lines that are actually painted; do not shrink rectangle unions and create artificial internal seams.
