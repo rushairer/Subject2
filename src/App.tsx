@@ -25,6 +25,7 @@ import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
 import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { createKeyboardSteeringState, resetKeyboardSteering, stepKeyboardSteer } from './input/keyboardSteering'
+import { createPedalControlsState, resetPedalControls, stepPedalControls } from './input/pedalControls'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
@@ -71,6 +72,7 @@ interface Vehicle {
   lookLeft: boolean
   lookRight: boolean
   lookBack: boolean
+  biteLatched?: boolean
 }
 interface Infraction {
   id: string
@@ -150,6 +152,7 @@ const initialVehicle = (
     lookLeft: false,
     lookRight: false,
     lookBack: false,
+    biteLatched: false,
   }
 }
 
@@ -255,6 +258,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
 }) {
   const keys = useRef<DrivingKeys>({})
   const keyboardSteeringState = useRef(createKeyboardSteeringState())
+  const pedalControlsState = useRef(createPedalControlsState())
   const cameraYaw = useRef(0)
   const { camera } = useThree()
   const speedTimer = useRef(0)
@@ -312,6 +316,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const releaseAll = () => {
       clearDrivingKeys(keys.current)
       resetKeyboardSteering(keyboardSteeringState.current)
+      resetPedalControls(pedalControlsState.current)
       syncLook()
       const v = vehicle.current
       v.throttle = 0
@@ -382,6 +387,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     if (runtimeProject.current !== session.examId) {
       runtimeProject.current = session.examId
       resetKeyboardSteering(keyboardSteeringState.current)
+      resetPedalControls(pedalControlsState.current)
       reverseParkingRuntime.current = createReverseParkingRuntime()
       sideParkingRuntime.current = createSideParkingRuntime()
       rightAngleRuntime.current = createRightAngleRuntime()
@@ -394,15 +400,20 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
     const wheel = readRacingWheelControls()
-    const keyboardThrottle = keys.current['w'] || keys.current['arrowup'] ? 1 : 0
-    const keyboardBrake = keys.current['s'] || keys.current['arrowdown'] ? 1 : 0
-    const keyboardClutch = automatic
-      ? 0
-      : keys.current['c']
-        ? 1
-        : keys.current['shift']
-          ? DRIVING_RULES.manualTransmission.biteClutchPosition
-          : 0
+    const pedalOutput = stepPedalControls(pedalControlsState.current, {
+      throttleKey: !controlsLocked && !wheel.deviceId && !!(keys.current['w'] || keys.current['arrowup']),
+      brakeKey: !controlsLocked && !wheel.deviceId && !!(keys.current['s'] || keys.current['arrowdown']),
+      clutchFloorKey: !controlsLocked && !wheel.deviceId && !automatic && !!keys.current['c'],
+      clutchBiteKey: !controlsLocked && !wheel.deviceId && !automatic && !!keys.current['shift'],
+      automatic,
+      speed: v.speed,
+      gear: v.gear,
+      dt,
+    })
+    v.biteLatched = pedalOutput.biteLatched
+    const keyboardThrottle = pedalOutput.throttle
+    const keyboardBrake = pedalOutput.brake
+    const keyboardClutch = pedalOutput.clutch
     const keyboardSteer = stepKeyboardSteer(keyboardSteeringState.current, {
       left: !controlsLocked && !wheel.deviceId && !!(keys.current['a'] || keys.current['arrowleft']),
       right: !controlsLocked && !wheel.deviceId && !!(keys.current['d'] || keys.current['arrowright']),
@@ -795,7 +806,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         }}
       />}
       {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 转向（短按微调/长按加速/松开回正/A+D居中）{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 渐进油门 · S 渐进刹车（双击急刹）· A/D 转向（短按微调/长按加速/松开回正/A+D居中）{automatic ? '' : ' · Shift 半联动巡航(W/S微调) · C 踩死离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
@@ -808,7 +819,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         </div>
         <b>{Math.abs(display.steeringWheelAngle) < 0.03 ? '方向盘正' : `${display.steeringWheelAngle < 0 ? '左' : '右'} ${(Math.abs(display.steeringWheelAngle) / (Math.PI * 2)).toFixed(2)} 圈`}</b>
       </div>
-      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>公里/时</span></div><div className="gear">{display.gear === -1 ? '倒挡' : display.gear === 0 ? '空挡' : automatic ? '前进' : `${display.gear} 挡`}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
+      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>公里/时</span></div><div className="gear">{display.gear === -1 ? '倒挡' : display.gear === 0 ? '空挡' : automatic ? '前进' : `${display.gear} 挡`}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span>{!automatic && <span className={display.biteLatched ? 'on' : ''}>{display.biteLatched ? '半联动巡航' : '离合结合'}</span>}<span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>

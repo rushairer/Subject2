@@ -162,7 +162,8 @@ export function stepVehiclePhysics(
     vehicle.speed += driveForce * direction * dt
 
     if (!automatic && input.throttle < 0.05 && clutchEngagement > 0.72) {
-      vehicle.speed *= Math.pow(0.991, dt * 60)
+      const gearBrakeFactor = 0.996 - (gearRatioFactor[absGear] ?? 0.45) * 0.009
+      vehicle.speed *= Math.pow(gearBrakeFactor, dt * 60)
     }
   }
 
