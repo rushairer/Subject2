@@ -5,6 +5,40 @@ export type Subject2RuleProject =
   | 'curve-driving'
   | 'right-angle'
 
+export interface Subject2RuleLimits {
+  passScore: number
+  reverseParking: {
+    timeLimitSeconds: number
+    stopLimitSeconds: number
+    parkedHoldSeconds: number
+  }
+  sideParking: {
+    timeLimitSeconds: number
+    stopLimitSeconds: number
+    parkedHoldSeconds: number
+    bodyOutAfterStopHoldSeconds: number
+  }
+  slopeStart: {
+    stopHoldSeconds: number
+    startLimitSeconds: number
+    parkingBrakeCheckSeconds: number
+    stopLongitudinalMinorMeters: number
+    stopLongitudinalFatalMeters: number
+    rightGapMinorMeters: number
+    rightGapFatalMeters: number
+    rollbackMinimumMeters: number
+    rollbackFatalMeters: number
+    rollbackEvaluateAfterForwardMeters: number
+    measurementEpsilon: number
+  }
+  curveDriving: {
+    stopLimitSeconds: number
+  }
+  rightAngle: {
+    stopLimitSeconds: number
+  }
+}
+
 export const SUBJECT2_RULE_LIMITS = {
   passScore: 80,
   reverseParking: {
@@ -37,7 +71,7 @@ export const SUBJECT2_RULE_LIMITS = {
   rightAngle: {
     stopLimitSeconds: 2,
   },
-} as const
+} as const satisfies Subject2RuleLimits
 
 export interface Subject2InfractionRule {
   project: Subject2RuleProject
