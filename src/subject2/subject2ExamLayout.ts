@@ -123,6 +123,14 @@ export function subject2ExamLocalPose(project: Subject2ProjectId, worldPose: Cou
   return worldPoseToLocal(worldPose, SUBJECT2_EXAM_PLACEMENTS[project])
 }
 
+export function subject2ExamLocalVehicle<T extends CoursePose>(
+  project: Subject2ProjectId,
+  worldVehicle: T,
+): T {
+  const local = subject2ExamLocalPose(project, worldVehicle)
+  return { ...worldVehicle, ...local }
+}
+
 export function subject2ExamSequence(automatic: boolean) {
   return automatic ? SUBJECT2_C2_SEQUENCE : SUBJECT2_C1_SEQUENCE
 }
