@@ -28,6 +28,13 @@ import {
   type RouteSegment,
   type Subject3RouteEvent,
 } from './subject3Route'
+import {
+  SUBJECT3_CROSSWALK_PROGRESS,
+  SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
+  createSubject3TrafficState,
+  crossingPedestrianMotion,
+  type Subject3TrafficState,
+} from './subject3Traffic'
 
 export { SUBJECT3_START } from './subject3Route'
 
@@ -94,6 +101,8 @@ export interface Subject3Runtime {
   pullOverStopSeconds: number
   pullOverStopGap: number | null
   pullOverSecuredStopSeen: boolean
+  crosswalkConflictSeen: boolean
+  crosswalkYieldStopSeen: boolean
   completed: boolean
   progress: number
 }
@@ -130,6 +139,8 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.pullOverStopSeconds = 0
   runtime.pullOverStopGap = null
   runtime.pullOverSecuredStopSeen = false
+  runtime.crosswalkConflictSeen = false
+  runtime.crosswalkYieldStopSeen = false
 }
 
 export function createSubject3Runtime(): Subject3Runtime {
@@ -167,6 +178,8 @@ export function createSubject3Runtime(): Subject3Runtime {
     pullOverStopSeconds: 0,
     pullOverStopGap: null,
     pullOverSecuredStopSeen: false,
+    crosswalkConflictSeen: false,
+    crosswalkYieldStopSeen: false,
     completed: false,
     progress: 0,
   }
@@ -340,6 +353,19 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     )
   }
 
+  if (
+    event.id === 'crosswalk' &&
+    runtime.crosswalkConflictSeen &&
+    !runtime.crosswalkYieldStopSeen
+  ) {
+    add(
+      'yield',
+      '人行横道有行人通行时未停车礼让',
+      100,
+      true,
+    )
+  }
+
   if (event.kind === 'left-turn') {
     if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 100, true)
     requireSignalLead(event, runtime, 'left', add)
@@ -427,6 +453,7 @@ export function updateSubject3(
   automatic: boolean,
   night: boolean,
   dt: number,
+  traffic: Readonly<Subject3TrafficState> = createSubject3TrafficState(),
 ): { runtime: Subject3Runtime; infractions: Subject3Infraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: Subject3Infraction[] = []
@@ -507,6 +534,16 @@ export function updateSubject3(
     runtime.rightObservedInEvent ||= vehicle.lookRight
     runtime.backObservedInEvent ||= vehicle.lookBack
     runtime.hornSeen ||= vehicle.horn
+
+    if (event.id === 'crosswalk' && traffic.crosswalkPedestrianConflict) {
+      runtime.crosswalkConflictSeen = true
+      if (
+        Math.abs(vehicle.speed) <
+        DRIVING_RULES.subject3.crosswalk.stoppedSpeedMps
+      ) {
+        runtime.crosswalkYieldStopSeen = true
+      }
+    }
 
     const relevantLeft = event.kind === 'start' || event.kind === 'left-turn' || event.kind === 'lane-change' || event.kind === 'overtake' || event.kind === 'uturn'
     const relevantRight = event.kind === 'right-turn' || event.kind === 'pull-over'
@@ -801,23 +838,37 @@ function SuddenBrakeCar({
 
 function CrossingPedestrian({
   player,
+  traffic,
   onInfraction,
 }: {
   player: MutableRefObject<Subject3Vehicle>
+  traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
 }) {
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
   const triggered = useRef(false)
-  const progress = 2532
+
+  useEffect(() => () => {
+    traffic.current.crosswalkPedestrianConflict = false
+  }, [traffic])
 
   useFrame((_, delta) => {
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-    if (!triggered.current && playerProgress > 2440) triggered.current = true
-    if (triggered.current) elapsed.current = Math.min(6, elapsed.current + delta)
-    const t = Math.min(1, elapsed.current / 4.8)
-    const lateral = 3.4 - t * 9.1
-    const world = actorWorldPosition(progress, lateral)
+    if (
+      !triggered.current &&
+      playerProgress > SUBJECT3_CROSSWALK_TRIGGER_PROGRESS
+    ) {
+      triggered.current = true
+    }
+    if (triggered.current) elapsed.current += delta
+
+    const motion = crossingPedestrianMotion(
+      triggered.current,
+      elapsed.current,
+    )
+    traffic.current.crosswalkPedestrianConflict = motion.conflict
+    const world = actorWorldPosition(motion.progress, motion.lateral)
     if (group.current) group.current.position.set(world.x, 0, world.z)
     if (triggered.current) {
       checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45)
@@ -872,9 +923,11 @@ function CutInScooter({
 
 function DynamicTraffic({
   player,
+  traffic,
   onInfraction,
 }: {
   player: MutableRefObject<Subject3Vehicle>
+  traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
 }) {
   return <>
@@ -883,16 +936,18 @@ function DynamicTraffic({
     <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-a" startProgress={1900} speed={10.5} lateral={-8.75} opposite color="#a84742" />
     <MovingTrafficCar player={player} onInfraction={onInfraction} id="oncoming-b" startProgress={3650} speed={8.6} lateral={-8.75} opposite color="#4f6e51" />
     <SuddenBrakeCar player={player} onInfraction={onInfraction} />
-    <CrossingPedestrian player={player} onInfraction={onInfraction} />
+    <CrossingPedestrian player={player} traffic={traffic} onInfraction={onInfraction} />
     <CutInScooter player={player} onInfraction={onInfraction} />
   </>
 }
 
 export function Subject3Course({
   player,
+  traffic,
   onInfraction,
 }: {
   player: MutableRefObject<Subject3Vehicle>
+  traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
 }): ReactElement {
   return <group>
@@ -918,7 +973,7 @@ export function Subject3Course({
     <RouteSign distance={4110} label="靠边停车" />
 
     <Crosswalk distance={850} />
-    <Crosswalk distance={2520} />
+    <Crosswalk distance={SUBJECT3_CROSSWALK_PROGRESS} />
     <TrafficLight distance={850} />
     <TrafficLight distance={3090} />
 
@@ -930,7 +985,7 @@ export function Subject3Course({
     <Pedestrian distance={2530} lateral={1.1} color="#4e79aa" />
     <Pedestrian distance={2540} lateral={-0.4} color="#8c5d92" />
 
-    <DynamicTraffic player={player} onInfraction={onInfraction} />
+    <DynamicTraffic player={player} traffic={traffic} onInfraction={onInfraction} />
 
     {SUBJECT3_EVENTS.filter((_, index) => index % 2 === 0).map((event, index) => {
       const pose = poseAtRouteDistance((event.start + event.end) / 2)
