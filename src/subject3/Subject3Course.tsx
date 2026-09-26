@@ -35,6 +35,7 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  subject3TrafficCollision,
   type Subject3TrafficState,
 } from './subject3Traffic'
 
@@ -742,10 +743,40 @@ function TrafficLight({ distance }: { distance: number }) {
   </group>
 }
 
-function StaticCar({ distance, lateral, opposite = false, color = '#d7d9dd' }: { distance: number; lateral: number; opposite?: boolean; color?: string }) {
+function StaticCar({
+  player,
+  onInfraction,
+  id,
+  distance,
+  lateral,
+  opposite = false,
+  color = '#d7d9dd',
+}: {
+  player: MutableRefObject<Subject3Vehicle>
+  onInfraction: (item: Subject3Infraction) => void
+  id: string
+  distance: number
+  lateral: number
+  opposite?: boolean
+  color?: string
+}) {
   const pose = poseAtRouteDistance(distance)
+  const x = pose.x + pose.rightX * lateral
+  const z = pose.z + pose.rightZ * lateral
+
+  useFrame(() => {
+    if (subject3TrafficCollision(player.current, { x, z })) {
+      onInfraction({
+        id: `subject3-collision-${id}`,
+        title: '道路驾驶过程中与其他交通参与者发生碰撞',
+        points: 100,
+        fatal: true,
+      })
+    }
+  })
+
   return <group
-    position={[pose.x + pose.rightX * lateral, 0.45, pose.z + pose.rightZ * lateral]}
+    position={[x, 0.45, z]}
     rotation-y={sceneYawFromHeading(pose.heading) + (opposite ? Math.PI : 0)}
   >
     <mesh><boxGeometry args={[1.75, 0.65, 4.2]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
@@ -788,8 +819,7 @@ function checkVehicleCollision(
   onInfraction: (item: Subject3Infraction) => void,
   radius = 2.6,
 ) {
-  const distance = Math.hypot(player.current.x - x, player.current.z - z)
-  if (distance < radius) {
+  if (subject3TrafficCollision(player.current, { x, z }, radius)) {
     onInfraction({
       id,
       title: '道路驾驶过程中与其他交通参与者发生碰撞',
@@ -1005,9 +1035,9 @@ export function Subject3Course({
     <TrafficLight distance={850} />
     <TrafficLight distance={3090} />
 
-    <StaticCar distance={1735} lateral={-8.75} opposite color="#bd4b42" />
-    <StaticCar distance={SUBJECT3_OVERTAKE_TARGET_PROGRESS} lateral={SUBJECT3_OVERTAKE_TARGET_LATERAL} color="#d4d4d0" />
-    <StaticCar distance={2185} lateral={-3.5} color="#395f88" />
+    <StaticCar player={player} onInfraction={onInfraction} id="meeting-opposing" distance={1735} lateral={-8.75} opposite color="#bd4b42" />
+    <StaticCar player={player} onInfraction={onInfraction} id="overtake-target" distance={SUBJECT3_OVERTAKE_TARGET_PROGRESS} lateral={SUBJECT3_OVERTAKE_TARGET_LATERAL} color="#d4d4d0" />
+    <StaticCar player={player} onInfraction={onInfraction} id="overtake-left" distance={2185} lateral={-3.5} color="#395f88" />
 
     <Pedestrian distance={1205} lateral={3.2} color="#e2a544" />
     <Pedestrian distance={2530} lateral={1.1} color="#4e79aa" />

@@ -43,3 +43,12 @@ export function crossingPedestrianMotion(
     conflict,
   }
 }
+
+
+export function subject3TrafficCollision(
+  player: { x: number; z: number },
+  actor: { x: number; z: number },
+  radiusMeters = 2.6,
+) {
+  return Math.hypot(player.x - actor.x, player.z - actor.z) < radiusMeters
+}
