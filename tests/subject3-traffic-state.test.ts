@@ -107,6 +107,15 @@ test('vehicle collision uses full longitudinal body footprints, not a 2.6m cente
   assert.equal(
     subject3VehicleCollision(player, {
       x: 0,
+      z: -longitudinalContact,
+      heading: 0,
+    }),
+    true,
+    'exact bumper contact counts as collision',
+  )
+  assert.equal(
+    subject3VehicleCollision(player, {
+      x: 0,
       z: -longitudinalContact - 0.01,
       heading: 0,
     }),
@@ -131,6 +140,15 @@ test('vehicle collision avoids false side-by-side hits from a circular proxy', (
       heading: 0,
     }),
     false,
+  )
+  assert.equal(
+    subject3VehicleCollision(player, {
+      x: lateralContact,
+      z: 0,
+      heading: 0,
+    }),
+    true,
+    'exact side contact counts as collision',
   )
   assert.equal(
     subject3VehicleCollision(player, {
