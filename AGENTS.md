@@ -105,9 +105,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 
 ## Subject 3 traffic collision judging
 
-- Static and dynamic traffic actors must share the same deterministic collision-distance helper; visible traffic must not be non-collidable scenery.
+- Visible traffic must not be non-collidable scenery.
+- Vehicle-vs-vehicle collision must use oriented body footprints and convex-polygon intersection, not a center-distance circle proxy.
+- `src/sim/vehicleFootprint.ts` owns reusable oriented rectangular footprints; `src/sim/planarGeometry.ts` owns convex SAT intersection.
+- `SUBJECT3_TRAFFIC_CAR` owns the rendered/judged traffic-car length and width. Static and moving traffic vehicles must share those dimensions and the same heading used by rendering.
 - Static Subject 3 vehicles used for meeting/overtaking scenarios must report fatal collision infractions through the same `onInfraction` path as moving traffic.
-- Keep the collision threshold centralized in the helper call and cover its exact strict boundary in unit tests.
+- Pedestrians/scooters may continue to use small radial collision proxies where their rendered footprint is approximately compact; do not reuse that proxy for cars.
+- Decorative pedestrians must remain outside the carriageway unless they are explicitly connected to collision/yield state.
+- Cover longitudinal overlap, adjacent-lane separation, angled contact, and exact contact boundaries in unit tests.
 - Visual traffic placement and collision placement must use the same route-distance/lateral coordinates.
 
 ## Subject 3 occupant-safety judging
