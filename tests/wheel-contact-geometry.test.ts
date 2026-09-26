@@ -21,6 +21,12 @@ import {
   updateRightAngle,
 } from '../src/subject2/RightAngleCourse'
 import {
+  CURVE_CENTERLINE,
+  CURVE_DRIVING,
+  createCurveRuntime,
+  updateCurveDriving,
+} from '../src/subject2/CurveDrivingCourse'
+import {
   createSideParkingRuntime,
   updateSideParking,
 } from '../src/subject2/SideParkingCourse'
@@ -131,6 +137,39 @@ test('slope line contact begins at the inner edge of the painted boundary line',
     handbrake: false,
   }, runtime, 0.1)
   assert.equal(touching.infractions.some(item => item.id === 'slope-wheel-line'), true)
+})
+
+test('curve-driving line judge triggers at the inner edge of the painted ribbon', () => {
+  const index = 20
+  const point = CURVE_CENTERLINE[index]
+  const next = CURVE_CENTERLINE[index + 1]
+  const heading = Math.atan2(next.x - point.x, -(next.z - point.z))
+  const right = rightFromHeading(heading)
+  const threshold =
+    CURVE_DRIVING.roadWidth / 2 -
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2
+  const lateralTireReach =
+    TRAINING_CAR.trackWidthMeters / 2 +
+    TRAINING_CAR.tireWidthMeters / 2
+
+  const run = (extraOffset: number) => updateCurveDriving({
+    x: point.x + right.x * (threshold - lateralTireReach + extraOffset),
+    z: point.z + right.z * (threshold - lateralTireReach + extraOffset),
+    heading,
+    steering: 0,
+    speed: 0.5,
+    engineOn: true,
+  }, {
+    ...createCurveRuntime(),
+    started: true,
+    progressIndex: index,
+  }, 0.1)
+
+  const safe = run(-0.03)
+  assert.equal(safe.infractions.some(item => item.id === 'curve-wheel-line'), false)
+
+  const touching = run(0.03)
+  assert.equal(touching.infractions.some(item => item.id === 'curve-wheel-line'), true)
 })
 
 test('right-angle line judge triggers at the painted line before the road boundary', () => {
