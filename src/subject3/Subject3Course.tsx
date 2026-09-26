@@ -1,7 +1,11 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
-import { DRIVING_RULES } from '../rules/drivingRules'
+import {
+  SUBJECT3_RULE_LIMITS,
+  subject3Infraction,
+  type Subject3InfractionRuleId,
+} from '../rules/subject3Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { sceneYawFromHeading, worldPointFromVehicle } from '../sim/vehicleFrame'
 import {
@@ -158,15 +162,14 @@ function requireSignalLead(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
   direction: 'left' | 'right',
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   const age = direction === 'left' ? runtime.leftSignalLeadAtManeuver : runtime.rightSignalLeadAtManeuver
-  if (age < DRIVING_RULES.subject3.signalLeadSeconds) {
+  if (age < SUBJECT3_RULE_LIMITS.signalLeadSeconds) {
     add(
       `${direction}-signal-lead`,
-      `${event.title}前开启${direction === 'left' ? '左' : '右'}转向灯不足 ${DRIVING_RULES.subject3.signalLeadSeconds} 秒即开始转向`,
-      100,
-      true,
+      `${event.title}前开启${direction === 'left' ? '左' : '右'}转向灯不足 ${SUBJECT3_RULE_LIMITS.signalLeadSeconds} 秒即开始转向`,
+      'signalLead',
     )
   }
 }
@@ -175,7 +178,7 @@ function requireObservation(
   event: Subject3RouteEvent,
   runtime: Subject3Runtime,
   direction: 'left' | 'right',
-  add: (suffix: string, title: string, points: number, fatal?: boolean) => void,
+  add: (suffix: string, title: string, ruleId: Subject3InfractionRuleId) => void,
 ) {
   const observed = direction === 'left'
     ? runtime.leftObservedBeforeManeuver || runtime.backObservedBeforeManeuver
@@ -184,15 +187,19 @@ function requireObservation(
     add(
       `${direction}-observation`,
       `${event.title}前未完成${direction === 'left' ? '左侧/后方' : '右侧/后方'}观察`,
-      10,
+      'observation',
     )
   }
 }
 
 function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, automatic: boolean, night: boolean) {
   const infractions: Subject3Infraction[] = []
-  const add = (suffix: string, title: string, points: number, fatal = false) =>
-    infractions.push({ id: `subject3-${event.id}-${suffix}`, title, points, fatal })
+  const add = (suffix: string, title: string, ruleId: Subject3InfractionRuleId) =>
+    infractions.push(subject3Infraction(
+      `subject3-${event.id}-${suffix}`,
+      title,
+      ruleId,
+    ))
 
   if (event.kind === 'start') {
     if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 100, true)
