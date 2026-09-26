@@ -1,0 +1,42 @@
+import {
+  CENTER_LINE_OFFSET,
+  RIGHT_EDGE_OFFSET,
+} from './subject3Route'
+
+export const SUBJECT3_CROSSWALK_PROGRESS = 2520
+export const SUBJECT3_CROSSWALK_TRIGGER_PROGRESS = 2440
+export const SUBJECT3_CROSSING_DURATION_SECONDS = 4.8
+export const SUBJECT3_CROSSING_START_LATERAL = 3.4
+export const SUBJECT3_CROSSING_END_LATERAL = -5.7
+
+export interface Subject3TrafficState {
+  crosswalkPedestrianConflict: boolean
+}
+
+export function createSubject3TrafficState(): Subject3TrafficState {
+  return {
+    crosswalkPedestrianConflict: false,
+  }
+}
+
+export function crossingPedestrianMotion(
+  triggered: boolean,
+  elapsedSeconds: number,
+) {
+  const t = triggered
+    ? Math.max(0, Math.min(1, elapsedSeconds / SUBJECT3_CROSSING_DURATION_SECONDS))
+    : 0
+  const lateral =
+    SUBJECT3_CROSSING_START_LATERAL +
+    (SUBJECT3_CROSSING_END_LATERAL - SUBJECT3_CROSSING_START_LATERAL) * t
+  const conflict =
+    triggered &&
+    lateral <= RIGHT_EDGE_OFFSET &&
+    lateral >= CENTER_LINE_OFFSET
+
+  return {
+    progress: SUBJECT3_CROSSWALK_PROGRESS,
+    lateral,
+    conflict,
+  }
+}

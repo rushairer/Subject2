@@ -11,6 +11,7 @@ import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLoca
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
+import { createSubject3TrafficState } from './subject3/subject3Traffic'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
@@ -258,6 +259,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const curveRuntime = useRef(createCurveRuntime())
   const slopeRuntime = useRef(createSlopeRuntime())
   const subject3Runtime = useRef(createSubject3Runtime())
+  const subject3Traffic = useRef(createSubject3TrafficState())
   const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
@@ -541,7 +543,14 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         projectUpdate = update
         projectCompleted = update.runtime.completed
       } else if (session.examId === 'subject3') {
-        const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night', dt)
+        const update = updateSubject3(
+          v,
+          subject3Runtime.current,
+          automatic,
+          session.time === 'night',
+          dt,
+          subject3Traffic.current,
+        )
         subject3Runtime.current = update.runtime
         projectUpdate = update
         projectCompleted = update.runtime.completed
@@ -569,7 +578,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {continuousExam ? <Subject2ExamCourse automatic={automatic} activeProject={session.examId as Subject2ProjectId} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
+    {continuousExam ? <Subject2ExamCourse automatic={automatic} activeProject={session.examId as Subject2ProjectId} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} traffic={subject3Traffic} onInfraction={onInfraction} /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>

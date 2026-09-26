@@ -14,6 +14,7 @@ import {
   SUBJECT3_EVENTS,
   poseAtRouteDistance,
 } from '../src/subject3/subject3Route'
+import { createSubject3TrafficState } from '../src/subject3/subject3Traffic'
 
 function eventIndex(id: string) {
   const index = SUBJECT3_EVENTS.findIndex(event => event.id === id)
@@ -351,6 +352,78 @@ test('intersection turn speeding is fatal under the same deceleration rule', () 
 
   assert.equal(hasInfraction(result, 'speed'), true)
   assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.fatal, true)
+})
+
+test('crosswalk pedestrian conflict requires a real yield stop', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('crosswalk')]
+  const traffic = createSubject3TrafficState()
+  traffic.crosswalkPedestrianConflict = true
+  let runtime = runtimeFor('crosswalk')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+  runtime = result.runtime
+
+  traffic.crosswalkPedestrianConflict = false
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+
+  assert.equal(hasInfraction(result, 'yield'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('yield'))?.fatal, true)
+})
+
+test('crosswalk yield stop satisfies a live pedestrian conflict', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('crosswalk')]
+  const traffic = createSubject3TrafficState()
+  traffic.crosswalkPedestrianConflict = true
+  let runtime = runtimeFor('crosswalk')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt((event.start + event.end) / 2, 0, {
+    speed: 0,
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.2, traffic)
+  runtime = result.runtime
+
+  assert.equal(runtime.crosswalkConflictSeen, true)
+  assert.equal(runtime.crosswalkYieldStopSeen, true)
+
+  traffic.crosswalkPedestrianConflict = false
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+
+  assert.equal(hasInfraction(result, 'yield'), false)
+})
+
+test('crosswalk does not require an artificial stop when no pedestrian conflict occurs', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('crosswalk')]
+  const traffic = createSubject3TrafficState()
+  let runtime = runtimeFor('crosswalk')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1, traffic)
+
+  assert.equal(result.infractions.some(item => item.id.endsWith('yield')), false)
 })
 
 test('legal left and right turns require both-side observation and finish on the route heading', () => {

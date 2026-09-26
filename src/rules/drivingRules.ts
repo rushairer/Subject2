@@ -33,6 +33,9 @@ export const DRIVING_RULES = {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
     },
+    crosswalk: {
+      stoppedSpeedMps: 0.08,
+    },
     pullOver: {
       idealMaxGapMeters: 0.30,
       warningMaxGapMeters: 0.50,
