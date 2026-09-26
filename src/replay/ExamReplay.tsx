@@ -1,11 +1,11 @@
-import type { ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { CURVE_CENTERLINE, CURVE_DRIVING } from '../subject2/CurveDrivingCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
 import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
-import { toReplayLocal, type ReplayPoint } from './replayGeometry'
+import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 
 export interface TrajectorySample {
   t: number
@@ -15,6 +15,11 @@ export interface TrajectorySample {
   gear: number
   heading: number
   project: string
+  steeringWheelAngle?: number
+  leftIndicator?: boolean
+  rightIndicator?: boolean
+  handbrake?: boolean
+  automatic?: boolean
 }
 
 export interface ReplayInfraction {
@@ -35,16 +40,21 @@ interface ReferenceLine {
   kind: ReferenceKind
 }
 
+const PROJECT_LABELS: Record<string, string> = {
+  'reverse-parking': '倒车入库',
+  'side-parking': '侧方停车',
+  'slope-start': '坡道定点停车和起步',
+  'curve-driving': '曲线行驶',
+  'right-angle': '直角转弯',
+  'subject3': '科目三道路驾驶',
+}
+
 function projectLabel(project: string) {
-  const labels: Record<string, string> = {
-    'reverse-parking': '倒车入库',
-    'side-parking': '侧方停车',
-    'slope-start': '坡道定点停车和起步',
-    'curve-driving': '曲线行驶',
-    'right-angle': '直角转弯',
-    'subject3': '科目三道路驾驶',
+  if (project.startsWith('transition:')) {
+    const [, from, to] = project.split(':')
+    return `连接道路 · ${PROJECT_LABELS[from] ?? from} → ${PROJECT_LABELS[to] ?? to}`
   }
-  return labels[project] ?? project
+  return PROJECT_LABELS[project] ?? project
 }
 
 function pathStats(samples: TrajectorySample[]) {
@@ -139,10 +149,12 @@ function PathMap({
   project,
   samples,
   infractions,
+  cursorIndex,
 }: {
   project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
+  cursorIndex: number
 }) {
   const width = 640
   const height = 310
@@ -183,7 +195,18 @@ function PathMap({
     height - (offsetY + (z - minZ) * scale),
   ] as const
 
+  const safeCursorIndex = Math.max(0, Math.min(cursorIndex, localSamples.length - 1))
+  const cursorSample = localSamples[safeCursorIndex]
+  const cursorScreen = mapPoint(cursorSample.x, cursorSample.z)
+  const cursorHeadingDegrees = toReplayHeading(
+    samples[safeCursorIndex].heading,
+    first.heading,
+  ) * 180 / Math.PI
   const points = localSamples.map(item => mapPoint(item.x, item.z).join(',')).join(' ')
+  const progressPoints = localSamples
+    .slice(0, safeCursorIndex + 1)
+    .map(item => mapPoint(item.x, item.z).join(','))
+    .join(' ')
   const start = mapPoint(localSamples[0].x, localSamples[0].z)
   const end = mapPoint(localSamples[localSamples.length - 1].x, localSamples[localSamples.length - 1].z)
 
@@ -200,6 +223,7 @@ function PathMap({
 
     <polyline points={points} className="replay-path-shadow" />
     <polyline points={points} className="replay-path" />
+    {safeCursorIndex > 0 && <polyline points={progressPoints} className="replay-path-progress" />}
 
     <line x1={start[0]} y1={start[1] - 8} x2={start[0]} y2={start[1] - 23} className="replay-start-heading" />
     <path d={`M ${start[0] - 4} ${start[1] - 20} L ${start[0]} ${start[1] - 27} L ${start[0] + 4} ${start[1] - 20} Z`} className="replay-start-heading-arrow" />
@@ -216,6 +240,16 @@ function PathMap({
       </g>
     })}
 
+    <g
+      className="replay-car-cursor"
+      transform={`translate(${cursorScreen[0]} ${cursorScreen[1]}) rotate(${cursorHeadingDegrees})`}
+      aria-label="当前复盘位置"
+    >
+      <circle r="10" className="replay-car-halo" />
+      <path d="M 0 -10 L 6 7 L 0 4 L -6 7 Z" className="replay-car-shape" />
+      <circle r="2.5" className="replay-car-center" />
+    </g>
+
     <g className="replay-orientation" transform="translate(18 18)">
       <rect x="0" y="0" width="100" height="45" rx="9" />
       <text x="10" y="18">↑ 初始车头</text>
@@ -231,6 +265,87 @@ function ReplayLegend() {
     <span><i className="replay-legend-dot error" />扣分位置</span>
     <span><i className="replay-legend-dot fatal" />不合格位置</span>
   </div>
+}
+
+function gearLabel(sample: TrajectorySample) {
+  if (sample.gear < 0) return 'R'
+  if (sample.gear === 0) return 'N'
+  if (sample.automatic) return 'D'
+  return String(sample.gear)
+}
+
+function steeringLabel(angle = 0) {
+  if (Math.abs(angle) < 0.03) return '回正'
+  return `${angle < 0 ? '左' : '右'} ${(Math.abs(angle) / (Math.PI * 2)).toFixed(2)} 圈`
+}
+
+function indicatorLabel(sample: TrajectorySample) {
+  if (sample.leftIndicator && sample.rightIndicator) return '双闪'
+  if (sample.leftIndicator) return '左转向'
+  if (sample.rightIndicator) return '右转向'
+  return '关闭'
+}
+
+function ProjectReplay({
+  project,
+  samples,
+  infractions,
+}: {
+  project: string
+  samples: TrajectorySample[]
+  infractions: ReplayInfraction[]
+}) {
+  const [cursorIndex, setCursorIndex] = useState(samples.length - 1)
+
+  useEffect(() => {
+    setCursorIndex(samples.length - 1)
+  }, [project, samples.length])
+
+  const safeCursorIndex = Math.max(0, Math.min(cursorIndex, samples.length - 1))
+  const current = samples[safeCursorIndex]
+  const stats = pathStats(samples)
+  const projectElapsed = current.t - samples[0].t
+
+  return <article className="replay-project">
+    <div className="replay-project-title">
+      <strong>{projectLabel(project)}</strong>
+      <div>
+        <span>{stats.distance >= 1000 ? `${(stats.distance / 1000).toFixed(2)} km` : `${Math.round(stats.distance)} m`}</span>
+        <span>最高 {Math.round(stats.maxSpeed)} km/h</span>
+        <span>{Math.round(stats.duration)} s</span>
+      </div>
+    </div>
+
+    <PathMap
+      project={project}
+      samples={samples}
+      infractions={infractions}
+      cursorIndex={safeCursorIndex}
+    />
+
+    <div className="replay-scrubber">
+      <div className="replay-scrubber-head">
+        <strong>时间复盘</strong>
+        <span>{projectElapsed.toFixed(1)}s / {stats.duration.toFixed(1)}s</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={Math.max(0, samples.length - 1)}
+        step={1}
+        value={safeCursorIndex}
+        onChange={event => setCursorIndex(Number(event.target.value))}
+        aria-label={`${projectLabel(project)}复盘时间轴`}
+      />
+      <div className="replay-live-readout">
+        <span><b>{(Math.abs(current.speed) * 3.6).toFixed(1)}</b><small>km/h</small></span>
+        <span><b>{gearLabel(current)}</b><small>挡位</small></span>
+        <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
+        <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
+        <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
+      </div>
+    </div>
+  </article>
 }
 
 export function ExamReplay({
@@ -258,18 +373,12 @@ export function ExamReplay({
         const projectSamples = samples.filter(item => item.project === project)
         if (projectSamples.length < 2) return null
         const projectInfractions = infractions.filter(item => item.project === project)
-        const stats = pathStats(projectSamples)
-        return <article className="replay-project" key={project}>
-          <div className="replay-project-title">
-            <strong>{projectLabel(project)}</strong>
-            <div>
-              <span>{stats.distance >= 1000 ? `${(stats.distance / 1000).toFixed(2)} km` : `${Math.round(stats.distance)} m`}</span>
-              <span>最高 {Math.round(stats.maxSpeed)} km/h</span>
-              <span>{Math.round(stats.duration)} s</span>
-            </div>
-          </div>
-          <PathMap project={project} samples={projectSamples} infractions={projectInfractions} />
-        </article>
+        return <ProjectReplay
+          key={project}
+          project={project}
+          samples={projectSamples}
+          infractions={projectInfractions}
+        />
       })}
     </div>
 
