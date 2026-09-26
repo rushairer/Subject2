@@ -7,7 +7,7 @@ import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './s
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
 import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
-import { subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
+import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
@@ -408,6 +408,9 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       ? subject2ExamLocalVehicle('slope-start', v)
       : v
     const slopeBeforeStep = session.examId === 'slope-start' ? getSlopePose(slopeVehicleBefore.z) : { y: 0, pitch: 0, grade: 0 }
+    const slopeGradeHeading = continuousExam && session.examId === 'slope-start'
+      ? SUBJECT2_EXAM_PLACEMENTS['slope-start'].heading
+      : 0
     const physics = stepVehiclePhysics(v, {
       throttle,
       brake,
@@ -419,6 +422,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     }, dt, {
       automatic,
       grade: slopeBeforeStep.grade,
+      gradeHeading: slopeGradeHeading,
     })
     if (physics.stalled) {
       stallCount.current += 1

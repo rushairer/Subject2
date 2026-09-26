@@ -18,6 +18,8 @@ All driving, exam, camera, and route code must use the same vehicle-local frame:
 
 Use `src/sim/vehicleFrame.ts` helpers instead of duplicating trigonometric frame formulas in exam logic. Every named left/right route event needs a regression test proving the actual geometry turns the same way.
 
+Slope physics must treat `grade` as a magnitude along an explicit world-space uphill heading. Gravity must be projected onto the vehicle forward axis; never assume uphill is always world `-Z`. Rotated course placements must pass their placement heading into `stepVehiclePhysics`.
+
 Every Subject 2 project state machine must also have deterministic regression coverage for its canonical successful flow and its major fatal/penalty transitions. A course is not considered direction-safe merely because its rendered geometry looks correct.
 
 PR validation must run `npm test` and `npm run build` before merging course-state changes into `main`.

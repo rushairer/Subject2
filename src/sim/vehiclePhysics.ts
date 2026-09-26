@@ -29,6 +29,8 @@ export interface PhysicsInput {
 export interface PhysicsOptions {
   automatic: boolean
   grade: number
+  /** World-space heading of the uphill direction for the supplied grade. */
+  gradeHeading?: number
 }
 
 const gearRatioFactor: Record<number, number> = {
@@ -47,13 +49,27 @@ const coupledRpmPerMps: Record<number, number> = {
   5: 205,
 }
 
+export function longitudinalGravityAcceleration(
+  heading: number,
+  grade: number,
+  gradeHeading = 0,
+) {
+  if (Math.abs(grade) <= 0.001) return 0
+  const vehicleForward = forwardFromHeading(heading)
+  const uphillForward = forwardFromHeading(gradeHeading)
+  const uphillAlignment =
+    vehicleForward.x * uphillForward.x +
+    vehicleForward.z * uphillForward.z
+  return -grade * 9.81 * uphillAlignment
+}
+
 export function stepVehiclePhysics(
   vehicle: PhysicsVehicle,
   input: PhysicsInput,
   dt: number,
   options: PhysicsOptions,
 ) {
-  const { automatic, grade } = options
+  const { automatic, grade, gradeHeading = 0 } = options
   vehicle.throttle = input.throttle
   vehicle.brake = input.brake
   vehicle.clutch = automatic ? 0 : input.clutch
@@ -150,8 +166,12 @@ export function stepVehiclePhysics(
     }
   }
 
-  if (!vehicle.handbrake && input.brake < 0.05 && Math.abs(grade) > 0.001) {
-    vehicle.speed -= grade * 9.81 * dt
+  if (!vehicle.handbrake && input.brake < 0.05) {
+    vehicle.speed += longitudinalGravityAcceleration(
+      vehicle.heading,
+      grade,
+      gradeHeading,
+    ) * dt
   }
 
   const braking = input.brake * 9.4 + (vehicle.handbrake ? 12.5 : 0)
