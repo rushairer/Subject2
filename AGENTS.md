@@ -39,6 +39,25 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Connection-road driving must not activate the next project's penalties before the vehicle reaches that project's entry envelope.
 - Continuous-exam trajectory/infraction samples should be stored in the active project's local frame so existing replay geometry remains meaningful.
 
+## Continuous session lifecycle and input
+
+- `src/session/examProgress.ts` owns atomic project identity, entry and completion transitions. Never split these into independently reset effects: stale completion can skip the next course.
+- Completion and entry callbacks must identify their project and ignore stale callbacks from an earlier project.
+- Do not key-remount `DrivingWorld` or the cockpit when the active project changes. Preserve held controls, vehicle state, camera selection and session-wide counters (including unique engine-stall IDs).
+- Reset only the project judges and their completion latch, before judging the first frame of a new course. Keep project judging disabled during connection-road navigation; generic driving rules still apply there.
+- Use `src/input/drivingKeyboard.ts` for normalized physical keys and first-press detection. Toggle controls must not repeat while held.
+- Keyboard listeners must not depend on the selected camera mode. On window blur, hidden document or unmount, release held keyboard controls, observation flags and the horn.
+
+## Results require actual completion
+
+`src/session/sessionResult.ts` is the shared outcome assessor for the result page and persisted history.
+
+- A high score alone never establishes a pass: the standalone project or final project of the continuous exam must be completed.
+- Preserve the measured score when ending early, but label the outcome incomplete rather than fabricating a penalty or awarding a pass.
+- Fatal infractions and scores below the threshold remain failures, even when a completion event arrives on the same frame.
+- Manual and automatic termination must share one exactly-once guard, preventing duplicate history records.
+- Old history records lack completion evidence. Keep optional fields compatible; do not invent completion for legacy records.
+
 ## User-facing replay coordinate convention
 
 Driving replay must never expose raw world X/Z as if screen-left/screen-right were vehicle-left/vehicle-right. Replay maps must transform every trajectory, infraction, and field reference into the vehicle's initial local frame:
