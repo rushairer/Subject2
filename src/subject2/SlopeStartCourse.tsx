@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -133,7 +134,9 @@ export function updateSlopeStart(
   if (
     runtime.entered &&
     wheelContactFootprints(vehicle).some(footprint =>
-      footprint.corners.some(point => Math.abs(point.x) >= SLOPE_GEOMETRY.roadHalf),
+      footprint.corners.some(point =>
+        Math.abs(point.x) >= SLOPE_GEOMETRY.roadHalf - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
+      ),
     )
   ) {
     infractions.push(subject2Infraction('slope-wheel-line'))
@@ -240,14 +243,14 @@ function Marking({ z, width, depth, color }: { z: number; width: number; depth: 
 export function SlopeStartCourse(): ReactElement {
   const terrain = useMemo(() => surfaceGeometry(24, -0.07), [])
   const road = useMemo(() => surfaceGeometry(SLOPE_START.roadWidth, 0), [])
-  const leftEdge = useMemo(() => surfaceGeometry(0.12, 0.025), [])
+  const leftEdge = useMemo(() => surfaceGeometry(SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, 0.025), [])
 
   return <group>
     <mesh geometry={terrain}><meshStandardMaterial color="#637657" roughness={1} /></mesh>
     <mesh geometry={road}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
 
-    <group position-x={-SLOPE_GEOMETRY.roadHalf + 0.06}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>
-    <group position-x={SLOPE_GEOMETRY.roadHalf - 0.06}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>
+    <group position-x={-SLOPE_GEOMETRY.roadHalf + SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>
+    <group position-x={SLOPE_GEOMETRY.roadHalf - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>
 
     <Marking z={SLOPE_GEOMETRY.stopLineZ} width={SLOPE_START.roadWidth} depth={SLOPE_START.stopLineWidth} color="#f5f5f2" />
     <Marking z={SLOPE_GEOMETRY.stopLineZ + SLOPE_START.controlOffset + SLOPE_START.stopLineWidth / 2} width={SLOPE_START.roadWidth} depth={0.08} color="#f3d34a" />
