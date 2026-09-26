@@ -19,6 +19,7 @@ const expectedRules = {
   gearDuration: { points: 10, fatal: false },
   speedFatal: { points: 100, fatal: true },
   speedMinor: { points: 10, fatal: false },
+  parkingBrakeMinor: { points: 10, fatal: false },
   path: { points: 100, fatal: true },
   yield: { points: 100, fatal: true },
   pullOverStop: { points: 100, fatal: true },
