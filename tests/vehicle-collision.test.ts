@@ -110,3 +110,22 @@ test('resolveRigidCircleObstacle pushes car out and stops velocity', () => {
   const recheck = checkVehicleCircleCollision(vehicle, obstacle)
   assert.equal(recheck.colliding, false)
 })
+
+test('pedestrian obstacle collides at front bumper perimeter without hood penetration', () => {
+  const halfLength = TRAINING_CAR.lengthMeters / 2
+  const pedRadius = 0.35
+  const vehicle = { x: 0, z: 0, heading: 0, speed: 2.0 }
+
+  // Pedestrian obstacle slightly overlapping front bumper: distance from bumper is < 0.02m
+  const obstacleTouching = { x: 0, z: -(halfLength + pedRadius - 0.02), radius: pedRadius }
+  const outcome = resolveRigidCircleObstacle(vehicle, obstacleTouching)
+  assert.equal(outcome.collided, true)
+  assert.equal(vehicle.speed, 0)
+  // Vehicle pushed back by minimal penetration (< 0.06m), stopping right at bumper boundary
+  assert.ok(vehicle.z > 0.01 && vehicle.z < 0.06)
+
+  // Re-checking after push-back should show clear separation
+  const recheck = checkVehicleCircleCollision(vehicle, obstacleTouching)
+  assert.equal(recheck.colliding, false)
+})
+

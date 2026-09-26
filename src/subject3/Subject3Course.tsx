@@ -51,7 +51,6 @@ import {
   createSubject3TrafficState,
   crossingPedestrianMotion,
   resolveSubject3VehicleCollision,
-  subject3TrafficCollision,
   subject3VehicleCollision,
   type Subject3TrafficState,
 } from './subject3Traffic'
@@ -1138,10 +1137,13 @@ function Pedestrian({
   const pedX = pose.x + pose.rightX * lateral
   const pedZ = pose.z + pose.rightZ * lateral
 
+  const hasCollided = useRef(false)
+
   useFrame(() => {
     if (!player || !onInfraction) return
     const outcome = resolveRigidCircleObstacle(player.current, { x: pedX, z: pedZ, radius: 0.35 })
-    if (outcome.collided) {
+    if (outcome.collided && !hasCollided.current) {
+      hasCollided.current = true
       handleVehicleCollision(player, 'subject3-collision-pedestrian', onInfraction, audioContext, audioState, outcome.impactSpeed)
     }
   })
@@ -1287,22 +1289,6 @@ function handleVehicleCollision(
   ))
 }
 
-function checkVehicleCollision(
-  player: MutableRefObject<Subject3Vehicle>,
-  x: number,
-  z: number,
-  id: string,
-  onInfraction: (item: Subject3Infraction) => void,
-  radius = 2.6,
-  audioContext?: AudioContext | null,
-  audioState?: VehicleAudioState,
-) {
-  if (subject3TrafficCollision(player.current, { x, z }, radius)) {
-    const outcome = resolveRigidCircleObstacle(player.current, { x, z, radius: radius * 0.45 })
-    handleVehicleCollision(player, id, onInfraction, audioContext, audioState, outcome.impactSpeed)
-  }
-}
-
 function MovingTrafficCar({
   player,
   onInfraction,
@@ -1430,6 +1416,8 @@ function CrossingPedestrian({
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
   const triggered = useRef(false)
+  const isStopped = useRef(false)
+  const hasCollided = useRef(false)
   const walkAngle = useRef(0)
 
   useEffect(() => () => {
@@ -1444,7 +1432,7 @@ function CrossingPedestrian({
     ) {
       triggered.current = true
     }
-    if (triggered.current) {
+    if (triggered.current && !isStopped.current) {
       elapsed.current += delta
       if (elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS) {
         walkAngle.current += delta * 7.5
@@ -1463,12 +1451,19 @@ function CrossingPedestrian({
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + Math.PI / 2
     }
     if (triggered.current) {
-      checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45, audioContext, audioState)
+      const outcome = resolveRigidCircleObstacle(player.current, { x: world.x, z: world.z, radius: 0.35 })
+      if (outcome.collided) {
+        isStopped.current = true
+        if (!hasCollided.current) {
+          hasCollided.current = true
+          handleVehicleCollision(player, 'subject3-collision-pedestrian', onInfraction, audioContext, audioState, outcome.impactSpeed)
+        }
+      }
     }
   })
 
   return <group ref={group}>
-    <ArticulatedPedestrian color="#3f75a2" walkAngle={walkAngle.current} />
+    <ArticulatedPedestrian color="#3f75a2" walkAngle={isStopped.current ? 0 : walkAngle.current} />
   </group>
 }
 
