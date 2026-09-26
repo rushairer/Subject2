@@ -1,9 +1,14 @@
 import type { ReactElement } from 'react'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import {
+  SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
+  subject2LineRect,
+} from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 import {
+  footprintIntersectsAxisAlignedRect,
   footprintTouchesOutsideRectUnion,
   wheelContactFootprints,
   type AxisAlignedRect,
@@ -120,10 +125,47 @@ function allowedRoadRects(): readonly AxisAlignedRect[] {
   ]
 }
 
+function boundaryLineRects(): readonly AxisAlignedRect[] {
+  const g = SIDE_PARKING_GEOMETRY
+  const line = SUBJECT2_BOUNDARY_LINE_WIDTH_METERS
+  const laneCenterZ = (g.laneStartZ + g.laneEndZ) / 2
+  const laneLength = g.laneStartZ - g.laneEndZ
+  return [
+    subject2LineRect(-g.laneHalf, laneCenterZ, line, laneLength),
+    subject2LineRect(
+      g.laneHalf,
+      (g.bayHalfLength + g.laneStartZ) / 2,
+      line,
+      g.laneStartZ - g.bayHalfLength,
+    ),
+    subject2LineRect(
+      g.laneHalf,
+      (g.laneEndZ - g.bayHalfLength) / 2,
+      line,
+      -g.bayHalfLength - g.laneEndZ,
+    ),
+    subject2LineRect(
+      (g.bayMouthX + g.bayBackX) / 2,
+      g.bayHalfLength,
+      SIDE_PARKING.bayWidth,
+      line,
+    ),
+    subject2LineRect(
+      (g.bayMouthX + g.bayBackX) / 2,
+      -g.bayHalfLength,
+      SIDE_PARKING.bayWidth,
+      line,
+    ),
+    subject2LineRect(g.bayBackX, 0, line, SIDE_PARKING.bayLength),
+  ]
+}
+
 function wheelTouchesBoundary(vehicle: SideParkingVehicle) {
   const legalRects = allowedRoadRects()
+  const lineRects = boundaryLineRects()
   return wheelContactFootprints(vehicle).some(footprint =>
-    footprintTouchesOutsideRectUnion(footprint, legalRects),
+    footprintTouchesOutsideRectUnion(footprint, legalRects, 0) ||
+    lineRects.some(rect => footprintIntersectsAxisAlignedRect(footprint, rect)),
   )
 }
 
@@ -264,13 +306,13 @@ export function SideParkingCourse(): ReactElement {
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
 
-    <Line x={-g.laneHalf} z={laneCenterZ} width={0.12} depth={laneLength} />
-    <Line x={g.laneHalf} z={(g.bayHalfLength + g.laneStartZ) / 2} width={0.12} depth={g.laneStartZ - g.bayHalfLength} />
-    <Line x={g.laneHalf} z={(g.laneEndZ - g.bayHalfLength) / 2} width={0.12} depth={-g.bayHalfLength - g.laneEndZ} />
+    <Line x={-g.laneHalf} z={laneCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={laneLength} />
+    <Line x={g.laneHalf} z={(g.bayHalfLength + g.laneStartZ) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.laneStartZ - g.bayHalfLength} />
+    <Line x={g.laneHalf} z={(g.laneEndZ - g.bayHalfLength) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={-g.bayHalfLength - g.laneEndZ} />
 
-    <Line x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={0.12} />
-    <Line x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={0.12} />
-    <Line x={g.bayBackX} z={0} width={0.12} depth={SIDE_PARKING.bayLength} />
+    <Line x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <Line x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <Line x={g.bayBackX} z={0} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={SIDE_PARKING.bayLength} />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
       <planeGeometry args={[45, 40]} />
