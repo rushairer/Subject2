@@ -22,6 +22,7 @@ import { readRacingWheelControls } from './input/racingWheel'
 import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult } from './session/sessionResult'
+import { supportsWebGL2 } from './sim/webglSupport'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -569,9 +570,10 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   </>
 }
 
-function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void }) {
+function Driving({ session, candidate, onDone, onExit }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
   const combinedExam = session.examId === 'subject2-exam'
   const automatic = candidate.licenseType === 'C2'
+  const [webglAvailable, setWebglAvailable] = useState(() => supportsWebGL2())
   const examSequence: ExamId[] = subject2ExamSequence(automatic)
   const [progress, setProgress] = useState(() => createExamProgress<ExamId>(combinedExam ? examSequence[0] : session.examId))
   const activeExamId = progress.project
@@ -710,6 +712,19 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     setProgress(current => advanceExamProgress(current, examSequence))
   }, [activeIndex, combinedExam, examSequence, infractions, finishSession, projectComplete, score])
 
+  if (!webglAvailable) return <div className="driving-shell webgl-fallback">
+    <section className="webgl-fallback-card" role="alert">
+      <div className="eyebrow">3D RENDERER UNAVAILABLE</div>
+      <h1>当前浏览器无法启动 3D 驾驶场景</h1>
+      <p>未能创建 WebGL2 图形上下文。请确认浏览器支持 WebGL2，并尝试开启硬件加速或解除企业/远程环境的图形限制。</p>
+      <div className="webgl-fallback-actions">
+        <button className="ghost-btn" onClick={() => setWebglAvailable(supportsWebGL2())}>重新检测</button>
+        <button className="primary" onClick={onExit}>返回训练中心</button>
+      </div>
+      <small>不会记录成绩，也不会把本次启动失败计为考试未完成。</small>
+    </section>
+  </div>
+
   return <div className="driving-shell">
     <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
     <div className="hud">
@@ -764,7 +779,7 @@ export default function App() {
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
   if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} onSwitchCandidate={() => setPhase('profile')} />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory, completed) => {
+  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
