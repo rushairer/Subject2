@@ -205,6 +205,20 @@ function clipPolygonToRect(
   return result
 }
 
+export function footprintIntersectsAxisAlignedRect(
+  footprint: WheelContactFootprint,
+  rect: AxisAlignedRect,
+  touchToleranceMeters = 1e-6,
+) {
+  const expanded = {
+    minX: rect.minX - touchToleranceMeters,
+    maxX: rect.maxX + touchToleranceMeters,
+    minZ: rect.minZ - touchToleranceMeters,
+    maxZ: rect.maxZ + touchToleranceMeters,
+  }
+  return polygonArea(clipPolygonToRect(footprint.corners, expanded)) > 1e-12
+}
+
 function uniqueSorted(values: number[]) {
   return [...new Set(values)].sort((a, b) => a - b)
 }
