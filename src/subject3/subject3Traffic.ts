@@ -1,7 +1,18 @@
+import { convexPolygonsIntersect } from '../sim/planarGeometry'
+import {
+  orientedRectangleFootprint,
+  vehicleBodyFootprint,
+  type VehicleBodyPose,
+} from '../sim/vehicleFootprint'
 import {
   CENTER_LINE_OFFSET,
   RIGHT_EDGE_OFFSET,
 } from './subject3Route'
+
+export const SUBJECT3_TRAFFIC_CAR = {
+  lengthMeters: 4.25,
+  widthMeters: 1.78,
+} as const
 
 export const SUBJECT3_OVERTAKE_TARGET_PROGRESS = 2140
 export const SUBJECT3_OVERTAKE_TARGET_LATERAL = 0
@@ -51,4 +62,18 @@ export function subject3TrafficCollision(
   radiusMeters = 2.6,
 ) {
   return Math.hypot(player.x - actor.x, player.z - actor.z) < radiusMeters
+}
+
+export function subject3VehicleCollision(
+  player: VehicleBodyPose,
+  actor: VehicleBodyPose,
+) {
+  return convexPolygonsIntersect(
+    vehicleBodyFootprint(player),
+    orientedRectangleFootprint(
+      actor,
+      SUBJECT3_TRAFFIC_CAR.lengthMeters,
+      SUBJECT3_TRAFFIC_CAR.widthMeters,
+    ),
+  )
 }
