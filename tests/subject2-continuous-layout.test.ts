@@ -14,6 +14,7 @@ import {
 import {
   SUBJECT2_C1_SEQUENCE,
   SUBJECT2_EXAM_PLACEMENTS,
+  subject2ExamDistanceToStart,
   subject2ExamLocalPose,
   subject2ExamLocalVehicle,
   subject2ExamTransitions,
@@ -58,6 +59,23 @@ test('continuous layout starts with a forward-facing reverse-parking entry', () 
   near(start.x, 0)
   near(start.z, 20)
   near(start.heading, 0)
+})
+
+test('continuous entry distance is zero at the canonical project start', () => {
+  for (const project of SUBJECT2_C1_SEQUENCE) {
+    const start = subject2ExamWorldStartPose(project)
+    near(subject2ExamDistanceToStart(project, start), 0)
+  }
+})
+
+test('continuous entry distance matches each transition endpoint distance', () => {
+  for (const transition of subject2ExamTransitions(false)) {
+    const expected = Math.hypot(
+      transition.end.x - transition.start.x,
+      transition.end.z - transition.start.z,
+    )
+    near(subject2ExamDistanceToStart(transition.to, transition.start), expected, 1e-8)
+  }
 })
 
 test('continuous C1 transitions connect each project exit to the next project entry', () => {
