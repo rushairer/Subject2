@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'
@@ -42,6 +43,41 @@ function buildCenterline(): Point[] {
 }
 
 export const CURVE_CENTERLINE = buildCenterline()
+
+function extendRoadCenterline(points: readonly Point[]) {
+  const first = points[0]
+  const second = points[1]
+  const previous = points[points.length - 2]
+  const last = points[points.length - 1]
+  const startDx = second.x - first.x
+  const startDz = second.z - first.z
+  const startLength = Math.hypot(startDx, startDz) || 1
+  const endDx = last.x - previous.x
+  const endDz = last.z - previous.z
+  const endLength = Math.hypot(endDx, endDz) || 1
+  const extension = TRAINING_CAR.lengthMeters / 2 + 0.5
+  const steps = 8
+
+  const result: Point[] = []
+  for (let i = steps; i >= 1; i--) {
+    const distance = extension * (i / steps)
+    result.push({
+      x: first.x - startDx / startLength * distance,
+      z: first.z - startDz / startLength * distance,
+    })
+  }
+  result.push(...points)
+  for (let i = 1; i <= steps; i++) {
+    const distance = extension * (i / steps)
+    result.push({
+      x: last.x + endDx / endLength * distance,
+      z: last.z + endDz / endLength * distance,
+    })
+  }
+  return result
+}
+
+export const CURVE_ROAD_CENTERLINE = extendRoadCenterline(CURVE_CENTERLINE)
 export const CURVE_START = CURVE_CENTERLINE[0]
 export const CURVE_FINISH = CURVE_CENTERLINE[CURVE_CENTERLINE.length - 1]
 
@@ -139,7 +175,8 @@ export function updateCurveDriving(
     if (
       wheelContactFootprints(vehicle).some(footprint =>
         wheelContactSamplePoints(footprint).some(point =>
-          nearestWheelDistance(point.x, point.z) >= halfRoad,
+          nearestWheelDistance(point.x, point.z) >=
+            halfRoad - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2,
         ),
       )
     ) {
@@ -172,8 +209,13 @@ export function updateCurveDriving(
 
 function nearestWheelDistance(x: number, z: number) {
   let best = Number.POSITIVE_INFINITY
-  for (let i = 0; i < CURVE_CENTERLINE.length - 1; i++) {
-    best = Math.min(best, distanceToSegment(x, z, CURVE_CENTERLINE[i], CURVE_CENTERLINE[i + 1]))
+  for (let i = 0; i < CURVE_ROAD_CENTERLINE.length - 1; i++) {
+    best = Math.min(best, distanceToSegment(
+      x,
+      z,
+      CURVE_ROAD_CENTERLINE[i],
+      CURVE_ROAD_CENTERLINE[i + 1],
+    ))
   }
   return best
 }
@@ -207,10 +249,10 @@ function ribbonGeometry(points: Point[], width: number, offset = 0) {
 }
 
 export function CurveDrivingCourse(): ReactElement {
-  const road = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, CURVE_DRIVING.roadWidth), [])
+  const road = useMemo(() => ribbonGeometry(CURVE_ROAD_CENTERLINE, CURVE_DRIVING.roadWidth), [])
   // ribbonGeometry uses the route-right normal, so positive offset is right.
-  const rightEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, CURVE_DRIVING.roadWidth / 2), [])
-  const leftEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, -CURVE_DRIVING.roadWidth / 2), [])
+  const rightEdge = useMemo(() => ribbonGeometry(CURVE_ROAD_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, CURVE_DRIVING.roadWidth / 2), [])
+  const leftEdge = useMemo(() => ribbonGeometry(CURVE_ROAD_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, -CURVE_DRIVING.roadWidth / 2), [])
 
   return <group>
     <mesh geometry={road} position-y={0.01}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>

@@ -47,6 +47,8 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 - Shared wheel geometry used by rendering and judging must come from the same helper rather than duplicated formulas.
 - Body-out rules and wheel-line rules are different concepts. Do not substitute body corners for wheel contact unless the rule explicitly evaluates the body.
 - Add regression coverage at the exact safe/contact boundary whenever a line-contact algorithm changes.
+- `src/subject2/courseMarkings.ts` owns the painted Subject 2 boundary-line width. Visual markings and line-contact judging must use the same value.
+- For a painted boundary, contact starts at the physical paint region, not at an abstract road-edge centerline. L-shaped courses must model only lines that are actually painted; do not shrink rectangle unions and create artificial internal seams.
 
 ## Single source of truth for Subject 2 start poses
 

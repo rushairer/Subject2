@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -264,16 +265,16 @@ export function ReverseParkingCourse(): ReactElement {
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
 
-    <GroundLine x={-g.laneHalf} z={0} width={0.12} depth={g.laneEndZ * 2} />
-    <GroundLine x={g.laneHalf} z={(g.bayHalf + g.laneEndZ) / 2} width={0.12} depth={g.laneEndZ - g.bayHalf} />
-    <GroundLine x={g.laneHalf} z={-(g.bayHalf + g.laneEndZ) / 2} width={0.12} depth={g.laneEndZ - g.bayHalf} />
+    <GroundLine x={-g.laneHalf} z={0} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.laneEndZ * 2} />
+    <GroundLine x={g.laneHalf} z={(g.bayHalf + g.laneEndZ) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.laneEndZ - g.bayHalf} />
+    <GroundLine x={g.laneHalf} z={-(g.bayHalf + g.laneEndZ) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.laneEndZ - g.bayHalf} />
 
-    <GroundLine x={0} z={g.startControlZ} width={REVERSE_PARKING.laneWidth} depth={0.12} />
-    <GroundLine x={0} z={g.oppositeControlZ} width={REVERSE_PARKING.laneWidth} depth={0.12} />
+    <GroundLine x={0} z={g.startControlZ} width={REVERSE_PARKING.laneWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <GroundLine x={0} z={g.oppositeControlZ} width={REVERSE_PARKING.laneWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
 
-    <GroundLine x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalf} width={REVERSE_PARKING.bayLength} depth={0.12} />
-    <GroundLine x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalf} width={REVERSE_PARKING.bayLength} depth={0.12} />
-    <GroundLine x={g.bayBackX} z={0} width={0.12} depth={REVERSE_PARKING.bayWidth} />
+    <GroundLine x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalf} width={REVERSE_PARKING.bayLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <GroundLine x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalf} width={REVERSE_PARKING.bayLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <GroundLine x={g.bayBackX} z={0} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={REVERSE_PARKING.bayWidth} />
 
     {[
       [g.bayMouthX + 0.35, g.bayHalf + 0.45],
