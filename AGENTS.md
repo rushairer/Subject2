@@ -93,6 +93,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 named maneuver geometry
+
+- Named turn events must agree with the actual route geometry. Left-turn events must exit on the route's left-turn heading, right-turn events on the right-turn heading, and the u-turn event must reverse travel direction rather than approximate it with unrelated corners.
+- Subject 3 turn completion requires the vehicle to finish aligned with the route heading within the shared `DRIVING_RULES.subject3.maneuverHeadingToleranceRadians`; do not hard-code per-event heading tolerances.
+- Intersection turns must capture both left- and right-side observation before the maneuver begins.
+- During the meeting event, the full vehicle body must remain on its own side of the road center line. Judge body geometry, not only the vehicle center.
+- Any change to the route tail must preserve event mileage unless the event table and all dependent tests are intentionally migrated together.
+
 ## Subject 3 parking and night-light completion
 
 - Pull-over is not complete merely because the vehicle stopped once inside the event window. Completion requires the configured stable-stop duration, neutral gear, and parking brake.
