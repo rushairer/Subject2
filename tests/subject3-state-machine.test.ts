@@ -70,8 +70,8 @@ function hasInfraction(
   return result.infractions.some(item => item.id.endsWith(suffix))
 }
 
-test('moving without a seatbelt is immediately fatal', () => {
-  const result = updateSubject3(vehicleAt(80, 0, {
+test('moving without a seatbelt is immediately fatal and recorded only once', () => {
+  let result = updateSubject3(vehicleAt(80, 0, {
     speed: 1,
     seatbelt: false,
   }), createSubject3Runtime(), false, false, 0.1)
@@ -83,6 +83,17 @@ test('moving without a seatbelt is immediately fatal', () => {
   assert.equal(
     result.infractions.find(item => item.id === 'subject3-seatbelt')?.fatal,
     true,
+  )
+  assert.equal(result.runtime.seatbeltRecorded, true)
+
+  result = updateSubject3(vehicleAt(82, 0, {
+    speed: 1,
+    seatbelt: false,
+  }), result.runtime, false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-seatbelt'),
+    false,
   )
 })
 
@@ -96,6 +107,83 @@ test('being stationary before fastening the seatbelt is not penalized yet', () =
     result.infractions.some(item => item.id === 'subject3-seatbelt'),
     false,
   )
+})
+
+test('Subject 3 route overspeed keeps the existing 50km/h and 1.2s grace behavior', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('straight-1')]
+  let runtime = runtimeFor('straight-1')
+  const speed = 51 / 3.6
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    speed,
+    lookBack: true,
+  }), runtime, false, false, 0.7)
+  runtime = result.runtime
+  assert.equal(result.infractions.some(item => item.id === 'speed-control'), false)
+
+  result = updateSubject3(vehicleAt(event.start + 2, 0, {
+    speed,
+    lookBack: true,
+  }), runtime, false, false, 0.6)
+  runtime = result.runtime
+
+  const speedInfraction = result.infractions.find(item => item.id === 'speed-control')
+  assert.ok(speedInfraction)
+  assert.equal(speedInfraction.points, 10)
+  assert.equal(speedInfraction.fatal, false)
+  assert.equal(runtime.routeOverspeedRecorded, true)
+
+  result = updateSubject3(vehicleAt(event.start + 3, 0, {
+    speed,
+    lookBack: true,
+  }), runtime, false, false, 0.5)
+
+  assert.equal(result.infractions.some(item => item.id === 'speed-control'), false)
+})
+
+test('Subject 3 parking-brake penalty remains exam-only after moving into the state machine', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('straight-1')]
+  const vehicle = vehicleAt(event.start + 1, 0, {
+    speed: 1,
+    handbrake: true,
+    lookBack: true,
+  })
+
+  const practice = updateSubject3(
+    vehicle,
+    runtimeFor('straight-1'),
+    false,
+    false,
+    0.1,
+    createSubject3TrafficState(),
+    false,
+  )
+  assert.equal(practice.infractions.some(item => item.id === 'parking-brake'), false)
+
+  let exam = updateSubject3(
+    vehicle,
+    runtimeFor('straight-1'),
+    false,
+    false,
+    0.1,
+    createSubject3TrafficState(),
+    true,
+  )
+  assert.equal(exam.infractions.some(item => item.id === 'parking-brake'), true)
+  assert.equal(exam.infractions.find(item => item.id === 'parking-brake')?.points, 10)
+  assert.equal(exam.infractions.find(item => item.id === 'parking-brake')?.fatal, false)
+  assert.equal(exam.runtime.parkingBrakeRecorded, true)
+
+  exam = updateSubject3(
+    vehicle,
+    exam.runtime,
+    false,
+    false,
+    0.1,
+    createSubject3TrafficState(),
+    true,
+  )
+  assert.equal(exam.infractions.some(item => item.id === 'parking-brake'), false)
 })
 
 test('legal Subject 3 start advances to the next event with no penalty', () => {
