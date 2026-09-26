@@ -84,6 +84,7 @@ export interface Subject3Runtime {
   stopSeen: boolean
   pullOverStopSeconds: number
   pullOverStopGap: number | null
+  pullOverSecuredStopSeen: boolean
   completed: boolean
   progress: number
 }
@@ -110,6 +111,7 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.stopSeen = false
   runtime.pullOverStopSeconds = 0
   runtime.pullOverStopGap = null
+  runtime.pullOverSecuredStopSeen = false
 }
 
 export function createSubject3Runtime(): Subject3Runtime {
@@ -137,6 +139,7 @@ export function createSubject3Runtime(): Subject3Runtime {
     stopSeen: false,
     pullOverStopSeconds: 0,
     pullOverStopGap: null,
+    pullOverSecuredStopSeen: false,
     completed: false,
     progress: 0,
   }
@@ -270,8 +273,8 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 100, true)
     requireSignalLead(event, runtime, 'right', add)
     requireObservation(event, runtime, 'right', add)
-    if (!runtime.stopSeen || runtime.pullOverStopGap == null) {
-      add('stop', '未在靠边停车项目区域内完成停车', 100, true)
+    if (!runtime.pullOverSecuredStopSeen || runtime.pullOverStopGap == null) {
+      add('stop', '未在靠边停车项目区域内完成稳定停车并完成驻车操作', 100, true)
     } else if (runtime.pullOverStopGap < 0) {
       add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 100, true)
     } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.warningMaxGapMeters) {
@@ -405,6 +408,7 @@ export function updateSubject3(
       vehicle.handbrake &&
       vehicle.gear === 0
     ) {
+      runtime.pullOverSecuredStopSeen = true
       infractions.push(...evaluateEvent(event, runtime, automatic, night))
       runtime.completed = true
       return { runtime, infractions, status: instructionFor(runtime) }
