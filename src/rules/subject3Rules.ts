@@ -12,6 +12,7 @@ export const SUBJECT3_RULE_LIMITS = {
   overtakeRequiredLateralMeters: 2.0,
   overtakeReturnLateralThresholdMeters: -1.25,
   routeCompletionRemainingMeters: 35,
+  trafficCollisionRadiusMeters: 2.6,
   pullOver: {
     idealMaxGapMeters: 0.30,
     warningMaxGapMeters: 0.50,
@@ -40,6 +41,7 @@ export const SUBJECT3_INFRACTION_RULES = {
   roadBoundary: { points: 100, fatal: true },
   nightLightsOff: { points: 100, fatal: true },
   nightStartOperation: { points: 10, fatal: false },
+  collision: { points: 100, fatal: true },
 } as const satisfies Record<string, Subject3InfractionRule>
 
 export type Subject3InfractionRuleId = keyof typeof SUBJECT3_INFRACTION_RULES
