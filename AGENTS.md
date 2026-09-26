@@ -18,6 +18,8 @@ All driving, exam, camera, and route code must use the same vehicle-local frame:
 
 Use `src/sim/vehicleFrame.ts` helpers instead of duplicating trigonometric frame formulas in exam logic. Every named left/right route event needs a regression test proving the actual geometry turns the same way.
 
+Every Subject 2 project state machine must also have deterministic regression coverage for its canonical successful flow and its major fatal/penalty transitions. A course is not considered direction-safe merely because its rendered geometry looks correct.
+
 ## Single source of truth for training-car geometry
 
 `src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
