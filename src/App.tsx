@@ -23,6 +23,7 @@ import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDriv
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
+import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -574,6 +575,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const combinedExam = session.examId === 'subject2-exam'
   const automatic = candidate.licenseType === 'C2'
   const [webglAvailable, setWebglAvailable] = useState(() => supportsWebGL2())
+  const [rendererFailed, setRendererFailed] = useState(false)
   const examSequence: ExamId[] = subject2ExamSequence(automatic)
   const [progress, setProgress] = useState(() => createExamProgress<ExamId>(combinedExam ? examSequence[0] : session.examId))
   const activeExamId = progress.project
@@ -712,13 +714,18 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     setProgress(current => advanceExamProgress(current, examSequence))
   }, [activeIndex, combinedExam, examSequence, infractions, finishSession, projectComplete, score])
 
-  if (!webglAvailable) return <div className="driving-shell webgl-fallback">
+  if (!webglAvailable || rendererFailed) return <div className="driving-shell webgl-fallback">
     <section className="webgl-fallback-card" role="alert">
       <div className="eyebrow">3D RENDERER UNAVAILABLE</div>
-      <h1>当前浏览器无法启动 3D 驾驶场景</h1>
-      <p>未能创建 WebGL2 图形上下文。请确认浏览器支持 WebGL2，并尝试开启硬件加速或解除企业/远程环境的图形限制。</p>
+      <h1>{rendererFailed ? '3D 渲染器初始化失败' : '当前浏览器无法启动 3D 驾驶场景'}</h1>
+      <p>{rendererFailed
+        ? 'WebGL2 预检已通过，但 Three.js 未能创建渲染器。请尝试开启硬件加速、更新显卡驱动，或退出受限的远程/企业图形环境后重试。'
+        : '未能创建 WebGL2 图形上下文。请确认浏览器支持 WebGL2，并尝试开启硬件加速或解除企业/远程环境的图形限制。'}</p>
       <div className="webgl-fallback-actions">
-        <button className="ghost-btn" onClick={() => setWebglAvailable(supportsWebGL2())}>重新检测</button>
+        <button className="ghost-btn" onClick={() => {
+          setRendererFailed(false)
+          setWebglAvailable(supportsWebGL2())
+        }}>重新检测</button>
         <button className="primary" onClick={onExit}>返回训练中心</button>
       </div>
       <small>不会记录成绩，也不会把本次启动失败计为考试未完成。</small>
@@ -726,7 +733,9 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   </div>
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
+    <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
+    </DrivingCanvasBoundary>
     <div className="hud">
       <div className="hud-top">
         <div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
