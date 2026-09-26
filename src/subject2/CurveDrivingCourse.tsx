@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { worldPointFromVehicle } from '../sim/vehicleFrame'
+import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'
 
 export const CURVE_DRIVING = {
   radius: 7.5,
@@ -49,6 +49,7 @@ export interface CurveVehicle {
   x: number
   z: number
   heading: number
+  steering?: number
   speed: number
   engineOn: boolean
 }
@@ -102,19 +103,6 @@ function nearestProgress(x: number, z: number) {
   return { distance: best, index: bestIndex }
 }
 
-function wheelPoints(vehicle: CurveVehicle) {
-  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
-  const front = TRAINING_CAR.frontAxleFromCenterMeters
-  const rear = TRAINING_CAR.rearAxleFromCenterMeters
-  return [
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, front, -halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, halfTrack),
-    worldPointFromVehicle(vehicle.x, vehicle.z, vehicle.heading, -rear, -halfTrack),
-  ].map(point => [point.x, point.z] as const)
-
-}
-
 function status(runtime: CurveRuntime) {
   if (runtime.completed) return '曲线行驶项目完成，可结束查看本项目成绩'
   if (!runtime.started) return '曲线行驶：一挡低速前进进入 S 弯，保持车轮不触轧两侧边线'
@@ -148,7 +136,13 @@ export function updateCurveDriving(
   if (runtime.started) runtime.progressIndex = Math.max(runtime.progressIndex, nearest.index)
 
   if (runtime.started) {
-    if (wheelPoints(vehicle).some(([x, z]) => nearestWheelDistance(x, z) >= halfRoad)) {
+    if (
+      wheelContactFootprints(vehicle).some(footprint =>
+        wheelContactSamplePoints(footprint).some(point =>
+          nearestWheelDistance(point.x, point.z) >= halfRoad,
+        ),
+      )
+    ) {
       infractions.push(subject2Infraction('curve-wheel-line'))
     }
 
