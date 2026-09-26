@@ -13,6 +13,7 @@ import {
   SUBJECT2_C1_SEQUENCE,
   SUBJECT2_EXAM_PLACEMENTS,
   subject2ExamLocalPose,
+  subject2ExamLocalVehicle,
   subject2ExamTransitions,
   subject2ExamWorldExitPose,
   subject2ExamWorldStartPose,
@@ -126,4 +127,26 @@ test('right-angle judging activates once the vehicle reaches the canonical entry
   assert.equal(result.runtime.entered, true)
   assert.equal(result.runtime.phase, 'approach')
   assert.equal(result.infractions.length, 0)
+})
+
+
+test('continuous local vehicle conversion preserves drivetrain state', () => {
+  const worldStart = subject2ExamWorldStartPose('reverse-parking')
+  const worldVehicle = {
+    ...worldStart,
+    speed: 1.25,
+    gear: 1,
+    steering: 0.18,
+    engineOn: true,
+    handbrake: false,
+  }
+
+  const local = subject2ExamLocalVehicle('reverse-parking', worldVehicle)
+
+  nearPose(local, SUBJECT2_START_POSES['reverse-parking'], 1e-8)
+  assert.equal(local.speed, worldVehicle.speed)
+  assert.equal(local.gear, worldVehicle.gear)
+  assert.equal(local.steering, worldVehicle.steering)
+  assert.equal(local.engineOn, worldVehicle.engineOn)
+  assert.equal(local.handbrake, worldVehicle.handbrake)
 })
