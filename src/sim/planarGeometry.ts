@@ -87,6 +87,60 @@ export function clipPolygonToRect(
   return result
 }
 
+function polygonAxes(points: readonly XZVector[]) {
+  const axes: XZVector[] = []
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const edgeX = b.x - a.x
+    const edgeZ = b.z - a.z
+    const length = Math.hypot(edgeX, edgeZ)
+    if (length <= 1e-12) continue
+    axes.push({
+      x: -edgeZ / length,
+      z: edgeX / length,
+    })
+  }
+  return axes
+}
+
+function projectPolygon(
+  polygon: readonly XZVector[],
+  axis: XZVector,
+) {
+  let min = Infinity
+  let max = -Infinity
+  for (const point of polygon) {
+    const value = point.x * axis.x + point.z * axis.z
+    min = Math.min(min, value)
+    max = Math.max(max, value)
+  }
+  return { min, max }
+}
+
+/**
+ * Separating-axis test for convex polygons. Exact edge/vertex contact counts
+ * as intersection so rendered vehicle contact cannot slip through judging.
+ */
+export function convexPolygonsIntersect(
+  a: readonly XZVector[],
+  b: readonly XZVector[],
+  touchToleranceMeters = 1e-6,
+) {
+  if (a.length < 3 || b.length < 3) return false
+  for (const axis of [...polygonAxes(a), ...polygonAxes(b)]) {
+    const pa = projectPolygon(a, axis)
+    const pb = projectPolygon(b, axis)
+    if (
+      pa.max < pb.min - touchToleranceMeters ||
+      pb.max < pa.min - touchToleranceMeters
+    ) {
+      return false
+    }
+  }
+  return true
+}
+
 export function polygonIntersectsAxisAlignedRect(
   polygon: readonly XZVector[],
   rect: AxisAlignedRect,
