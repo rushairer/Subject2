@@ -1,4 +1,7 @@
-import { convexPolygonsIntersect } from '../sim/planarGeometry'
+import {
+  convexPolygonPenetration,
+  convexPolygonsIntersect,
+} from '../sim/planarGeometry'
 import {
   orientedRectangleFootprint,
   vehicleBodyFootprint,
@@ -77,3 +80,34 @@ export function subject3VehicleCollision(
     ),
   )
 }
+
+/**
+ * Resolves vehicle collision between player and a traffic car by pushing the player back
+ * along the contact normal and stopping velocity to prevent penetration.
+ */
+export function resolveSubject3VehicleCollision(
+  player: { x: number; z: number; heading: number; speed: number },
+  actor: VehicleBodyPose,
+): { collided: boolean; impactSpeed: number } {
+  const result = convexPolygonPenetration(
+    vehicleBodyFootprint(player),
+    orientedRectangleFootprint(
+      actor,
+      SUBJECT3_TRAFFIC_CAR.lengthMeters,
+      SUBJECT3_TRAFFIC_CAR.widthMeters,
+    ),
+  )
+
+  if (!result.intersecting) {
+    return { collided: false, impactSpeed: 0 }
+  }
+
+  const impactSpeed = Math.abs(player.speed)
+  const pushBack = result.penetration + 0.02
+  player.x += result.normal.x * pushBack
+  player.z += result.normal.z * pushBack
+  player.speed = 0
+
+  return { collided: true, impactSpeed }
+}
+

@@ -4,6 +4,7 @@ import {
   SUBJECT3_EVENTS,
   SUBJECT3_ROUTE_LENGTH,
   SUBJECT3_SEGMENTS,
+  actorRoutePose,
   poseAtRouteDistance,
   projectToSubject3Route,
 } from '../src/subject3/subject3Route'
@@ -101,5 +102,21 @@ test('every route segment is axis-aligned and has a normalized right vector', ()
     const dz = segment.b.z - segment.a.z
     assert.ok(dx === 0 || dz === 0, 'current exam route segments must remain axis-aligned')
     near(Math.hypot(segment.rightX, segment.rightZ), 1)
+  }
+})
+
+test('actorRoutePose is spatially continuous across corner junctions without teleportation', () => {
+  // Test across the 700m corner junction with lateral = -8.75 (oncoming lane)
+  const lateral = -8.75
+  const step = 0.1 // 10cm step
+  for (let d = 680; d <= 720; d += step) {
+    const p1 = actorRoutePose(d, lateral)
+    const p2 = actorRoutePose(d + step, lateral)
+    const dist = Math.hypot(p2.x - p1.x, p2.z - p1.z)
+    // Moving 10cm along the route should not cause a multi-meter teleportation jump
+    assert.ok(
+      dist < 0.25,
+      `Teleportation jump detected at distance ${d}: step distance ${dist} > 0.25m`,
+    )
   }
 })

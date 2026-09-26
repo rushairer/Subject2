@@ -1,4 +1,8 @@
-import { rightFromHeading } from '../sim/vehicleFrame'
+import {
+  forwardFromHeading,
+  normalizeHeadingDelta,
+  rightFromHeading,
+} from '../sim/vehicleFrame'
 
 export type Point = { x: number; z: number }
 
@@ -159,6 +163,107 @@ export function poseAtRouteDistance(distance: number) {
     heading: segment.heading,
     rightX: segment.rightX,
     rightZ: segment.rightZ,
+  }
+}
+
+export interface ActorRoutePose {
+  x: number
+  z: number
+  heading: number
+}
+
+/**
+ * Calculates a continuous, smooth world pose for dynamic traffic actors at a given
+ * route progress distance and lateral offset.
+ *
+ * For straight road portions, this follows the segment heading and lateral offset.
+ * Near 90-degree corner junctions, it uses a C1-continuous cubic Bézier arc to smoothly
+ * transition the vehicle's position and yaw, eliminating the discontinuous teleportation jumps
+ * and abrupt heading snaps between segments.
+ */
+export function actorRoutePose(distance: number, lateral: number): ActorRoutePose {
+  const clamped = Math.max(0, Math.min(SUBJECT3_ROUTE_LENGTH, distance))
+  let segIndex = SUBJECT3_SEGMENTS.findIndex(item => clamped <= item.startDistance + item.length)
+  if (segIndex === -1) segIndex = SUBJECT3_SEGMENTS.length - 1
+  const seg = SUBJECT3_SEGMENTS[segIndex]
+
+  const R = 14 // Corner blend radius in meters
+
+  const distFromEnd = (seg.startDistance + seg.length) - clamped
+  const distFromStart = clamped - seg.startDistance
+
+  let segA: RouteSegment | null = null
+  let segB: RouteSegment | null = null
+  let u = 0
+
+  if (distFromEnd < R && segIndex < SUBJECT3_SEGMENTS.length - 1) {
+    segA = seg
+    segB = SUBJECT3_SEGMENTS[segIndex + 1]
+    const junctionDist = seg.startDistance + seg.length
+    u = (clamped - (junctionDist - R)) / (2 * R)
+  } else if (distFromStart < R && segIndex > 0) {
+    segA = SUBJECT3_SEGMENTS[segIndex - 1]
+    segB = seg
+    const junctionDist = seg.startDistance
+    u = (clamped - (junctionDist - R)) / (2 * R)
+  }
+
+  if (segA && segB) {
+    const forwardA = forwardFromHeading(segA.heading)
+    const rightA = rightFromHeading(segA.heading)
+    const forwardB = forwardFromHeading(segB.heading)
+    const rightB = rightFromHeading(segB.heading)
+    const corner = segA.b
+
+    // Start point on incoming lane
+    const p0 = {
+      x: corner.x - forwardA.x * R + rightA.x * lateral,
+      z: corner.z - forwardA.z * R + rightA.z * lateral,
+    }
+
+    // End point on outgoing lane
+    const p3 = {
+      x: corner.x + forwardB.x * R + rightB.x * lateral,
+      z: corner.z + forwardB.z * R + rightB.z * lateral,
+    }
+
+    // Tangent control points ensuring C1 continuity
+    const handleLength = R * 0.75
+    const p1 = {
+      x: p0.x + forwardA.x * handleLength,
+      z: p0.z + forwardA.z * handleLength,
+    }
+    const p2 = {
+      x: p3.x - forwardB.x * handleLength,
+      z: p3.z - forwardB.z * handleLength,
+    }
+
+    // Cubic Bézier evaluation
+    const invU = 1 - u
+    const b0 = invU * invU * invU
+    const b1 = 3 * invU * invU * u
+    const b2 = 3 * invU * u * u
+    const b3 = u * u * u
+
+    const x = b0 * p0.x + b1 * p1.x + b2 * p2.x + b3 * p3.x
+    const z = b0 * p0.z + b1 * p1.z + b2 * p2.z + b3 * p3.z
+
+    // Smooth Hermite angular interpolation for heading
+    const smoothU = u * u * (3 - 2 * u)
+    const headingDelta = normalizeHeadingDelta(segB.heading - segA.heading)
+    const heading = normalizeHeadingDelta(segA.heading + headingDelta * smoothU)
+
+    return { x, z, heading }
+  }
+
+  // Straight segment calculation
+  const t = Math.max(0, Math.min(1, (clamped - seg.startDistance) / seg.length))
+  const cx = seg.a.x + (seg.b.x - seg.a.x) * t
+  const cz = seg.a.z + (seg.b.z - seg.a.z) * t
+  return {
+    x: cx + seg.rightX * lateral,
+    z: cz + seg.rightZ * lateral,
+    heading: seg.heading,
   }
 }
 

@@ -141,6 +141,77 @@ export function convexPolygonsIntersect(
   return true
 }
 
+export interface PolygonPenetrationResult {
+  intersecting: boolean
+  penetration: number
+  normal: XZVector
+}
+
+/**
+ * Calculates penetration depth and separation normal (pointing from B to A)
+ * between two intersecting convex polygons using SAT.
+ */
+export function convexPolygonPenetration(
+  a: readonly XZVector[],
+  b: readonly XZVector[],
+  touchToleranceMeters = 1e-6,
+): PolygonPenetrationResult {
+  if (a.length < 3 || b.length < 3) {
+    return { intersecting: false, penetration: 0, normal: { x: 0, z: 0 } }
+  }
+
+  let minOverlap = Infinity
+  let bestAxis: XZVector = { x: 0, z: 0 }
+
+  for (const axis of [...polygonAxes(a), ...polygonAxes(b)]) {
+    const pa = projectPolygon(a, axis)
+    const pb = projectPolygon(b, axis)
+    if (
+      pa.max < pb.min - touchToleranceMeters ||
+      pb.max < pa.min - touchToleranceMeters
+    ) {
+      return { intersecting: false, penetration: 0, normal: { x: 0, z: 0 } }
+    }
+
+    const overlap = Math.min(pa.max - pb.min, pb.max - pa.min)
+    if (overlap < minOverlap) {
+      minOverlap = overlap
+      bestAxis = axis
+    }
+  }
+
+  let centerAx = 0
+  let centerAz = 0
+  for (const p of a) {
+    centerAx += p.x
+    centerAz += p.z
+  }
+  centerAx /= a.length
+  centerAz /= a.length
+
+  let centerBx = 0
+  let centerBz = 0
+  for (const p of b) {
+    centerBx += p.x
+    centerBz += p.z
+  }
+  centerBx /= b.length
+  centerBz /= b.length
+
+  const dirX = centerAx - centerBx
+  const dirZ = centerAz - centerBz
+  const sign = dirX * bestAxis.x + dirZ * bestAxis.z < 0 ? -1 : 1
+
+  return {
+    intersecting: true,
+    penetration: Math.max(0, minOverlap),
+    normal: {
+      x: bestAxis.x * sign,
+      z: bestAxis.z * sign,
+    },
+  }
+}
+
 export function polygonIntersectsAxisAlignedRect(
   polygon: readonly XZVector[],
   rect: AxisAlignedRect,
