@@ -115,6 +115,14 @@ export function subject2ExamWorldStartPose(project: Subject2ProjectId): CoursePo
   return localPoseToWorld(SUBJECT2_START_POSES[project], SUBJECT2_EXAM_PLACEMENTS[project])
 }
 
+export function subject2ExamDistanceToStart(
+  project: Subject2ProjectId,
+  worldPoint: { x: number; z: number },
+) {
+  const start = subject2ExamWorldStartPose(project)
+  return Math.hypot(worldPoint.x - start.x, worldPoint.z - start.z)
+}
+
 export function subject2ExamWorldExitPose(project: Subject2ProjectId): CoursePose {
   return localPoseToWorld(SUBJECT2_LOCAL_EXIT_POSES[project], SUBJECT2_EXAM_PLACEMENTS[project])
 }
