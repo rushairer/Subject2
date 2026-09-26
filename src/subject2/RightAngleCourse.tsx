@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -103,9 +104,11 @@ export function updateRightAngle(
   vehicle: RightAngleVehicle,
   previous: RightAngleRuntime,
   dt: number,
+  profile: Subject2RuleProfile = SUBJECT2_NATIONAL_RULE_PROFILE,
 ): { runtime: RightAngleRuntime; infractions: RightAngleInfraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: RightAngleInfraction[] = []
+  const rules = profile.limits.rightAngle
   if (runtime.completed) return { runtime, infractions, status: status(runtime) }
 
   const stopped = Math.abs(vehicle.speed) < 0.035
@@ -153,7 +156,7 @@ export function updateRightAngle(
 
   if (runtime.entered && !['complete'].includes(runtime.phase) && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
-    if (runtime.stopSeconds > RIGHT_ANGLE.stopLimitSeconds && !runtime.stopPenaltyLatched) {
+    if (runtime.stopSeconds > rules.stopLimitSeconds && !runtime.stopPenaltyLatched) {
       runtime.stopPenaltySequence += 1
       infractions.push(subject2Infraction('right-angle-stop', runtime.stopPenaltySequence))
       runtime.stopPenaltyLatched = true
