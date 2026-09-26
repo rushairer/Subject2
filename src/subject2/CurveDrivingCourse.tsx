@@ -133,12 +133,17 @@ export function updateCurveDriving(
   const movingReverse = vehicle.speed < -0.08
   const stopped = Math.abs(vehicle.speed) < 0.035
   const nearest = nearestProgress(vehicle.x, vehicle.z)
+  const halfRoad = CURVE_DRIVING.roadWidth / 2
 
-  if (!runtime.started && movingForward && nearest.index <= 8) runtime.started = true
+  if (
+    !runtime.started &&
+    movingForward &&
+    nearest.index <= 8 &&
+    nearest.distance <= halfRoad
+  ) runtime.started = true
   if (runtime.started) runtime.progressIndex = Math.max(runtime.progressIndex, nearest.index)
 
   if (runtime.started) {
-    const halfRoad = CURVE_DRIVING.roadWidth / 2
     if (wheelPoints(vehicle).some(([x, z]) => nearestWheelDistance(x, z) >= halfRoad)) {
       infractions.push({
         id: 'curve-wheel-line',
