@@ -505,13 +505,24 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       }
     }
 
-    const limit = session.examId === 'subject3' ? 50 : 12
-    if (Math.abs(v.speed) * 3.6 > limit) {
-      speedTimer.current += dt
-      if (speedTimer.current > 1.2) onInfraction({ id: 'speed-control', title: '训练区域速度控制不当', points: 10 })
-    } else speedTimer.current = 0
-    if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
-    if (Math.abs(v.speed) > .25 && !v.seatbelt) onInfraction({ id: 'seatbelt-not-fastened', title: '起步或行驶时未按规定使用安全带', points: 100, fatal: true })
+    if (session.examId !== 'subject3') {
+      if (Math.abs(v.speed) * 3.6 > 12) {
+        speedTimer.current += dt
+        if (speedTimer.current > 1.2) {
+          onInfraction({ id: 'speed-control', title: '训练区域速度控制不当', points: 10 })
+        }
+      } else {
+        speedTimer.current = 0
+      }
+      if (session.mode === 'exam' && Math.abs(v.speed) > .25 && v.handbrake) {
+        onInfraction({ id: 'parking-brake', title: '未松驻车制动器起步', points: 10 })
+      }
+      if (Math.abs(v.speed) > .25 && !v.seatbelt) {
+        onInfraction({ id: 'seatbelt-not-fastened', title: '起步或行驶时未按规定使用安全带', points: 100, fatal: true })
+      }
+    } else {
+      speedTimer.current = 0
+    }
     if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start', 'subject3'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
@@ -550,6 +561,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
           session.time === 'night',
           dt,
           subject3Traffic.current,
+          session.mode === 'exam',
         )
         subject3Runtime.current = update.runtime
         projectUpdate = update

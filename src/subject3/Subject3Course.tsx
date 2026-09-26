@@ -113,6 +113,10 @@ export interface Subject3Runtime {
   pullOverSecuredStopSeen: boolean
   crosswalkConflictSeen: boolean
   crosswalkYieldStopSeen: boolean
+  routeOverspeedSeconds: number
+  routeOverspeedRecorded: boolean
+  parkingBrakeRecorded: boolean
+  seatbeltRecorded: boolean
   completed: boolean
   progress: number
 }
@@ -192,6 +196,10 @@ export function createSubject3Runtime(): Subject3Runtime {
     pullOverSecuredStopSeen: false,
     crosswalkConflictSeen: false,
     crosswalkYieldStopSeen: false,
+    routeOverspeedSeconds: 0,
+    routeOverspeedRecorded: false,
+    parkingBrakeRecorded: false,
+    seatbeltRecorded: false,
     completed: false,
     progress: 0,
   }
@@ -469,6 +477,7 @@ export function updateSubject3(
   night: boolean,
   dt: number,
   traffic: Readonly<Subject3TrafficState> = createSubject3TrafficState(),
+  examMode = true,
 ): { runtime: Subject3Runtime; infractions: Subject3Infraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: Subject3Infraction[] = []
@@ -495,17 +504,56 @@ export function updateSubject3(
     ))
   }
 
-  if (Math.abs(vehicle.speed) > 0.2 && !vehicle.seatbelt) {
+  const speedMps = Math.abs(vehicle.speed)
+  const speedKmh = speedMps * 3.6
+
+  if (speedKmh > DRIVING_RULES.subject3.routeSpeedLimitKmh) {
+    runtime.routeOverspeedSeconds += dt
+    if (
+      !runtime.routeOverspeedRecorded &&
+      runtime.routeOverspeedSeconds > DRIVING_RULES.subject3.routeOverspeedGraceSeconds
+    ) {
+      infractions.push(subject3Infraction(
+        'speed-control',
+        '训练区域速度控制不当',
+        'speedMinor',
+      ))
+      runtime.routeOverspeedRecorded = true
+    }
+  } else {
+    runtime.routeOverspeedSeconds = 0
+  }
+
+  if (
+    examMode &&
+    !runtime.parkingBrakeRecorded &&
+    speedMps > DRIVING_RULES.subject3.parkingBrakeMovingThresholdMps &&
+    vehicle.handbrake
+  ) {
+    infractions.push(subject3Infraction(
+      'parking-brake',
+      '未松驻车制动器起步',
+      'parkingBrakeMinor',
+    ))
+    runtime.parkingBrakeRecorded = true
+  }
+
+  if (
+    !runtime.seatbeltRecorded &&
+    speedMps > 0.2 &&
+    !vehicle.seatbelt
+  ) {
     infractions.push(subject3Infraction(
       'subject3-seatbelt',
       '科目三道路驾驶过程中未按规定使用安全带',
       'seatbelt',
     ))
+    runtime.seatbeltRecorded = true
   }
 
-  if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
+  if (!runtime.started && speedMps > 0.2) runtime.started = true
 
-  if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
+  if (night && speedMps > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {
     infractions.push(subject3Infraction(
       'subject3-night-lights-off',
       '夜间道路驾驶时未开启前照灯',
