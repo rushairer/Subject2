@@ -67,6 +67,89 @@ export const SUBJECT3_SEGMENTS = buildSegments()
 export const SUBJECT3_ROUTE_LENGTH = SUBJECT3_SEGMENTS.reduce((sum, segment) => sum + segment.length, 0)
 export const SUBJECT3_START = SUBJECT3_ROUTE[0]
 
+export interface Subject3RoadRect {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+}
+
+function segmentRoadRect(segment: RouteSegment, paddingMeters = 0): Subject3RoadRect {
+  const forwardX = (segment.b.x - segment.a.x) / segment.length
+  const forwardZ = (segment.b.z - segment.a.z) / segment.length
+  const halfExtraLength = 0.5
+  const start = {
+    x: segment.a.x - forwardX * halfExtraLength,
+    z: segment.a.z - forwardZ * halfExtraLength,
+  }
+  const end = {
+    x: segment.b.x + forwardX * halfExtraLength,
+    z: segment.b.z + forwardZ * halfExtraLength,
+  }
+  const points = [
+    {
+      x: start.x + segment.rightX * RIGHT_EDGE_OFFSET,
+      z: start.z + segment.rightZ * RIGHT_EDGE_OFFSET,
+    },
+    {
+      x: start.x + segment.rightX * LEFT_EDGE_OFFSET,
+      z: start.z + segment.rightZ * LEFT_EDGE_OFFSET,
+    },
+    {
+      x: end.x + segment.rightX * RIGHT_EDGE_OFFSET,
+      z: end.z + segment.rightZ * RIGHT_EDGE_OFFSET,
+    },
+    {
+      x: end.x + segment.rightX * LEFT_EDGE_OFFSET,
+      z: end.z + segment.rightZ * LEFT_EDGE_OFFSET,
+    },
+  ]
+  return {
+    minX: Math.min(...points.map(point => point.x)) - paddingMeters,
+    maxX: Math.max(...points.map(point => point.x)) + paddingMeters,
+    minZ: Math.min(...points.map(point => point.z)) - paddingMeters,
+    maxZ: Math.max(...points.map(point => point.z)) + paddingMeters,
+  }
+}
+
+function cornerRoadRect(point: Point, paddingMeters = 0): Subject3RoadRect {
+  const half = 10 + paddingMeters
+  return {
+    minX: point.x - half,
+    maxX: point.x + half,
+    minZ: point.z - half,
+    maxZ: point.z + half,
+  }
+}
+
+export function subject3RoadRectsNearProgress(
+  progress: number,
+  paddingMeters = 0,
+): readonly Subject3RoadRect[] {
+  const clamped = Math.max(0, Math.min(SUBJECT3_ROUTE_LENGTH, progress))
+  const segmentIndex = Math.max(
+    0,
+    SUBJECT3_SEGMENTS.findIndex(
+      segment => clamped <= segment.startDistance + segment.length,
+    ),
+  )
+  const segmentStart = Math.max(0, segmentIndex - 1)
+  const segmentEnd = Math.min(SUBJECT3_SEGMENTS.length - 1, segmentIndex + 1)
+  const rects: Subject3RoadRect[] = []
+
+  for (let index = segmentStart; index <= segmentEnd; index++) {
+    rects.push(segmentRoadRect(SUBJECT3_SEGMENTS[index], paddingMeters))
+  }
+
+  const pointStart = Math.max(1, segmentStart)
+  const pointEnd = Math.min(SUBJECT3_ROUTE.length - 2, segmentEnd + 1)
+  for (let index = pointStart; index <= pointEnd; index++) {
+    rects.push(cornerRoadRect(SUBJECT3_ROUTE[index], paddingMeters))
+  }
+
+  return rects
+}
+
 export function poseAtRouteDistance(distance: number) {
   const clamped = Math.max(0, Math.min(SUBJECT3_ROUTE_LENGTH, distance))
   const segment = SUBJECT3_SEGMENTS.find(item => clamped <= item.startDistance + item.length) ?? SUBJECT3_SEGMENTS[SUBJECT3_SEGMENTS.length - 1]
