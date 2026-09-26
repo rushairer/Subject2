@@ -20,6 +20,10 @@ const bayMouthX = laneHalf
 const bayBackX = bayMouthX + SIDE_PARKING.bayWidth
 const laneStartZ = bayHalfLength + SIDE_PARKING.frontEdgeLength + 2.5
 const laneEndZ = -bayHalfLength - SIDE_PARKING.rearEdgeLength - 2.5
+// Finish while the whole vehicle is still inside the modeled exit lane.
+// The old laneEndZ + 0.8 threshold forced the front of a legal exiting car
+// beyond laneEndZ before completion, causing a false line-contact penalty.
+const exitCompleteZ = laneEndZ + SIDE_PARKING.carLength / 2 + 0.2
 
 export const SIDE_PARKING_GEOMETRY = {
   laneHalf,
@@ -28,6 +32,7 @@ export const SIDE_PARKING_GEOMETRY = {
   bayBackX,
   laneStartZ,
   laneEndZ,
+  exitCompleteZ,
 } as const
 
 export type SideParkingPhase = 'approach' | 'reverse' | 'parked' | 'exit' | 'complete'
@@ -204,7 +209,7 @@ export function updateSideParking(
     runtime.phase = 'exit'
   }
 
-  if (runtime.phase === 'exit' && vehicle.z < SIDE_PARKING_GEOMETRY.laneEndZ + 0.8 && Math.abs(vehicle.x) < SIDE_PARKING_GEOMETRY.laneHalf) {
+  if (runtime.phase === 'exit' && vehicle.z < SIDE_PARKING_GEOMETRY.exitCompleteZ && Math.abs(vehicle.x) < SIDE_PARKING_GEOMETRY.laneHalf) {
     runtime.phase = 'complete'
     runtime.completed = true
   }
