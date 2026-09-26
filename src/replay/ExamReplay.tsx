@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { CURVE_CENTERLINE, CURVE_DRIVING } from '../subject2/CurveDrivingCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
@@ -290,23 +290,43 @@ function ProjectReplay({
   project,
   samples,
   infractions,
+  focusTime,
+  focusToken,
 }: {
   project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
+  focusTime?: number
+  focusToken?: number
 }) {
   const [cursorIndex, setCursorIndex] = useState(samples.length - 1)
+  const articleRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     setCursorIndex(samples.length - 1)
   }, [project, samples.length])
+
+  useEffect(() => {
+    if (focusTime == null || focusToken == null) return
+    let nearestIndex = 0
+    let nearestDistance = Number.POSITIVE_INFINITY
+    samples.forEach((sample, index) => {
+      const distance = Math.abs(sample.t - focusTime)
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearestIndex = index
+      }
+    })
+    setCursorIndex(nearestIndex)
+    articleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [focusTime, focusToken, samples])
 
   const safeCursorIndex = Math.max(0, Math.min(cursorIndex, samples.length - 1))
   const current = samples[safeCursorIndex]
   const stats = pathStats(samples)
   const projectElapsed = current.t - samples[0].t
 
-  return <article className="replay-project">
+  return <article className="replay-project" ref={articleRef}>
     <div className="replay-project-title">
       <strong>{projectLabel(project)}</strong>
       <div>
@@ -358,6 +378,11 @@ export function ExamReplay({
   if (samples.length < 2) return null
 
   const projects = Array.from(new Set(samples.map(item => item.project)))
+  const [focusRequest, setFocusRequest] = useState<{
+    project: string
+    t: number
+    token: number
+  } | null>(null)
 
   return <section className="replay-section">
     <div className="replay-heading">
@@ -378,6 +403,8 @@ export function ExamReplay({
           project={project}
           samples={projectSamples}
           infractions={projectInfractions}
+          focusTime={focusRequest?.project === project ? focusRequest.t : undefined}
+          focusToken={focusRequest?.project === project ? focusRequest.token : undefined}
         />
       })}
     </div>
@@ -388,14 +415,33 @@ export function ExamReplay({
         ? <p>本次没有扣分事件。</p>
         : [...infractions]
             .sort((a, b) => (a.t ?? 0) - (b.t ?? 0))
-            .map(item => <div className="replay-event" key={item.id + String(item.t)}>
-              <time>{item.t != null ? `${item.t.toFixed(1)}s` : '--'}</time>
-              <div>
-                <strong>{item.title}</strong>
-                <span>{item.project ? projectLabel(item.project) : '驾驶过程'}</span>
-              </div>
-              <b>{item.fatal ? '不合格' : `-${item.points}`}</b>
-            </div>)}
+            .map(item => {
+              const canFocus =
+                item.t != null &&
+                item.project != null &&
+                projects.includes(item.project)
+              return <button
+                type="button"
+                className={`replay-event${canFocus ? ' interactive' : ''}`}
+                key={item.id + String(item.t)}
+                disabled={!canFocus}
+                onClick={() => {
+                  if (!canFocus) return
+                  setFocusRequest(previous => ({
+                    project: item.project!,
+                    t: item.t!,
+                    token: (previous?.token ?? 0) + 1,
+                  }))
+                }}
+              >
+                <time>{item.t != null ? `${item.t.toFixed(1)}s` : '--'}</time>
+                <span className="replay-event-copy">
+                  <strong>{item.title}</strong>
+                  <span>{item.project ? projectLabel(item.project) : '驾驶过程'}</span>
+                </span>
+                <b>{item.fatal ? '不合格' : `-${item.points}`}</b>
+              </button>
+            })}
     </div>
   </section>
 }
