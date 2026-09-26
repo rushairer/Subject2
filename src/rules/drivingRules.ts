@@ -10,6 +10,7 @@ export const DRIVING_RULES = {
     rearAxleFromCenterMeters: TRAINING_CAR.rearAxleFromCenterMeters,
   },
   manualTransmission: {
+    highestForwardGear: 5,
     idleRpm: 820,
     stallRpm: 560,
     stallDelaySeconds: 0.42,
@@ -26,6 +27,10 @@ export const DRIVING_RULES = {
     laneChangeTargetLateralMeters: -2.0,
     overtakeTargetLateralMeters: -2.0,
     overtakeReturnLateralMeters: -1.25,
+    gear: {
+      minimumRequiredGear: 4,
+      minimumHighGearSeconds: 5,
+    },
     pullOver: {
       idealMaxGapMeters: 0.30,
       warningMaxGapMeters: 0.50,
