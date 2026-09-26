@@ -10,6 +10,8 @@ import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
 import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
+import { DrivingLighting } from './cockpit/DrivingLighting'
+import { DRIVER_EYE } from './cockpit/mirrorLayout'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
 import { createSubject3TrafficState } from './subject3/subject3Traffic'
 import { NightLightTest } from './subject3/NightLightTest'
@@ -157,7 +159,7 @@ function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
   const [age, setAge] = useState(savedCandidate?.age ?? 18)
   const [licenseType, setLicenseType] = useState<LicenseType>(savedCandidate?.licenseType ?? 'C1')
   return <main className="shell centered"><section className="hero-card">
-    <div className="eyebrow">SUBJECT2 · 中国大陆驾考 3D 模拟训练</div>
+    <div className="eyebrow">中国大陆驾考 · 三维模拟训练</div>
     <h1>建立考生档案</h1>
     <p className="lead">档案用于当前浏览器内的训练与模拟考试成绩单。</p>
     <form className="profile-form" onSubmit={e => {
@@ -188,7 +190,7 @@ function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate,
     [candidate.name],
   )
   return <main className="shell menu-shell">
-    <header className="topbar"><div><div className="eyebrow">SUBJECT2 DRIVING LAB</div><h1>{candidate.name}，选择训练任务</h1></div><div className="candidate-actions"><div className="candidate-pill">{candidate.licenseType} · {candidate.gender} · {candidate.age} 岁</div><button className="ghost-btn" onClick={onSwitchCandidate}>切换考生</button></div></header>
+    <header className="topbar"><div><div className="eyebrow">驾驶训练中心</div><h1>{candidate.name}，选择训练任务</h1></div><div className="candidate-actions"><div className="candidate-pill">{candidate.licenseType} · {candidate.gender} · {candidate.age} 岁</div><button className="ghost-btn" onClick={onSwitchCandidate}>切换考生</button></div></header>
     <section className="toolbar">
       <div className="segmented"><button className={mode === 'practice' ? 'active' : ''} onClick={() => setMode('practice')}>训练模式</button><button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}>考试模式</button></div>
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
@@ -454,12 +456,12 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const vehicleCenter = new THREE.Vector3(v.x, roadPose.y + 0.9, v.z)
 
     if (cameraMode === 'first') {
-      const driverRightOffset = -0.43
-      const driverForwardOffset = -0.18
+      const driverRightOffset = DRIVER_EYE.right
+      const driverForwardOffset = DRIVER_EYE.forward
       const driver = worldPointFromVehicle(v.x, v.z, v.heading, driverForwardOffset, driverRightOffset)
       camera.position.set(
         driver.x,
-        roadPose.y + 1.36,
+        roadPose.y + DRIVER_EYE.height,
         driver.z,
       )
       camera.rotation.set(roadPose.pitch - 0.015, -v.heading + cameraYaw.current, 0)
@@ -482,12 +484,13 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     } else if (cameraMode === 'third') {
       const chase = vehicleCenter.clone()
         .add(forward.clone().multiplyScalar(-6.2))
-      chase.y = roadPose.y + 3.0
+        .add(right.clone().multiplyScalar(-3.0))
+      chase.y = roadPose.y + 2.8
       camera.position.copy(chase)
       camera.up.set(0, 1, 0)
       camera.lookAt(vehicleCenter.clone().add(forward.clone().multiplyScalar(0.8)))
-      if (perspectiveCamera.fov !== 58) {
-        perspectiveCamera.fov = 58
+      if (perspectiveCamera.fov !== 52) {
+        perspectiveCamera.fov = 52
         perspectiveCamera.updateProjectionMatrix()
       }
     } else {
@@ -586,11 +589,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
 
   const night = session.time === 'night'
   return <>
-    <color attach="background" args={[night ? '#07101d' : '#8fb8d2']} />
-    <fog attach="fog" args={[night ? '#07101d' : '#b5cbd5', 38, 185]} />
-    <ambientLight intensity={night ? .2 : 1.2} />
-    <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
-    <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
+    <fog attach="fog" args={[night ? '#142034' : '#c7d5d9', 65, 260]} />
+    <DrivingLighting vehicle={vehicle} night={night} />
     {continuousExam ? <Subject2ExamCourse automatic={automatic} activeProject={session.examId as Subject2ProjectId} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} traffic={subject3Traffic} onInfraction={onInfraction} /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
@@ -760,7 +760,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
 
   return <div className="driving-shell">
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
     </DrivingCanvasBoundary>
     <div className="hud">
       <div className="hud-top">
@@ -798,7 +798,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         </div>
         <b>{Math.abs(display.steeringWheelAngle) < 0.03 ? '方向盘正' : `${display.steeringWheelAngle < 0 ? '左' : '右'} ${(Math.abs(display.steeringWheelAngle) / (Math.PI * 2)).toFixed(2)} 圈`}</b>
       </div>
-      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>km/h</span></div><div className="gear">{display.gear === -1 ? 'R' : display.gear === 0 ? 'N' : automatic ? 'D' : display.gear}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>ENGINE</span><span className={display.handbrake ? 'warn' : ''}>P</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>HORN</span><span className={display.seatbelt ? 'on' : 'warn'}>BELT</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
+      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>公里/时</span></div><div className="gear">{display.gear === -1 ? '倒挡' : display.gear === 0 ? '空挡' : automatic ? '前进' : `${display.gear} 挡`}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span><span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>

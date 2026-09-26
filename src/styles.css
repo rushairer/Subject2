@@ -8,3 +8,8 @@
 .webgl-fallback-actions{display:flex;justify-content:center;gap:10px;margin-top:24px}
 .webgl-fallback-actions .ghost-btn,.webgl-fallback-actions .primary{min-width:132px}
 @media(max-width:520px){.webgl-fallback{padding:14px}.webgl-fallback-card{padding:24px 20px}.webgl-fallback-actions{flex-direction:column}.webgl-fallback-actions .ghost-btn,.webgl-fallback-actions .primary{width:100%}}
+
+/* Chinese instrument labels need space beyond the old one-letter lamps. */
+.cluster .gear{font-size:26px;white-space:nowrap;min-width:64px}
+.cluster .lamps{gap:8px;flex-wrap:wrap;justify-content:center;max-width:430px}
+.cluster .lamps span{font-size:10px;white-space:nowrap}
