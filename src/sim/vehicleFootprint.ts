@@ -14,39 +14,51 @@ export type VehicleBodyFootprint = readonly [
   XZVector,
 ]
 
-export function vehicleBodyFootprint(
-  vehicle: VehicleBodyPose,
+export function orientedRectangleFootprint(
+  pose: VehicleBodyPose,
+  lengthMeters: number,
+  widthMeters: number,
 ): VehicleBodyFootprint {
-  const halfLength = TRAINING_CAR.lengthMeters / 2
-  const halfWidth = TRAINING_CAR.widthMeters / 2
+  const halfLength = lengthMeters / 2
+  const halfWidth = widthMeters / 2
   return [
     worldPointFromVehicle(
-      vehicle.x,
-      vehicle.z,
-      vehicle.heading,
+      pose.x,
+      pose.z,
+      pose.heading,
       halfLength,
       halfWidth,
     ),
     worldPointFromVehicle(
-      vehicle.x,
-      vehicle.z,
-      vehicle.heading,
+      pose.x,
+      pose.z,
+      pose.heading,
       halfLength,
       -halfWidth,
     ),
     worldPointFromVehicle(
-      vehicle.x,
-      vehicle.z,
-      vehicle.heading,
+      pose.x,
+      pose.z,
+      pose.heading,
       -halfLength,
       -halfWidth,
     ),
     worldPointFromVehicle(
-      vehicle.x,
-      vehicle.z,
-      vehicle.heading,
+      pose.x,
+      pose.z,
+      pose.heading,
       -halfLength,
       halfWidth,
     ),
   ]
+}
+
+export function vehicleBodyFootprint(
+  vehicle: VehicleBodyPose,
+): VehicleBodyFootprint {
+  return orientedRectangleFootprint(
+    vehicle,
+    TRAINING_CAR.lengthMeters,
+    TRAINING_CAR.widthMeters,
+  )
 }
