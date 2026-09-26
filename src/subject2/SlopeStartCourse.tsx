@@ -108,7 +108,7 @@ function exceedsMeasurement(value: number, limit: number, measurementEpsilon: nu
   return value > limit + measurementEpsilon
 }
 
-function status(runtime: SlopeRuntime, startLimitSeconds = SUBJECT2_RULE_LIMITS.slopeStart.startLimitSeconds) {
+function status(runtime: SlopeRuntime, startLimitSeconds: number = SUBJECT2_RULE_LIMITS.slopeStart.startLimitSeconds) {
   switch (runtime.phase) {
     case 'approach':
       return '坡道定点停车：保持右侧车身距边线 30cm 内，将前保险杠停在桩杆线上'
