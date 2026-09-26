@@ -103,6 +103,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Safety-belt failure is owned solely by the Subject 3 state machine for Subject 3 sessions; the generic Subject 2 safety check must exclude Subject 3 to avoid duplicate IDs/penalties.
 - Session-wide Subject 3 facts such as route overspeed, parking-brake violation and seatbelt violation must not be reset by per-event `resetEventStats`.
 
+## Subject 3 full-route completion
+
+- Subject 3 completion must come from successfully completing the final pull-over maneuver. Reaching a route-distance threshold alone must never set `runtime.completed`.
+- A jump to the physical route end must not skip unfinished events, award completion, or produce a passing session result.
+- The deterministic golden-route E2E must traverse every `SUBJECT3_EVENTS` entry in order for both C1 and C2, including manual gear sequencing for C1, live crosswalk yielding, actual target passing during overtake, the u-turn, and a secured final pull-over.
+- Per-event reset must clear maneuver-local state without clearing session-wide facts such as seatbelt/parking-brake/route-speed records.
+- If the final pull-over window is passed without a secured stop, keep the route incomplete; a fatal failure may end an exam, but it does not fabricate successful project completion.
+
 ## Subject 3 road and maneuver completion
 
 - Subject 3 road-boundary judging must use the full training-car body footprint, not the vehicle center alone.
