@@ -30,6 +30,7 @@ const expectedRules = {
   seatbelt: { points: 100, fatal: true },
   nightLightsOff: { points: 100, fatal: true },
   nightStartMinor: { points: 10, fatal: false },
+  lightTest: { points: 100, fatal: true },
   collision: { points: 100, fatal: true },
 } as const
 
@@ -93,4 +94,32 @@ test('App renderer loop no longer owns Subject 3 global penalties', () => {
 
   assert.doesNotMatch(source, /session\.examId === 'subject3' \? 50/)
   assert.match(source, /if \(session\.examId !== 'subject3'\)/)
+})
+
+
+test('simulated night-light failure severity comes from the Subject 3 matrix', () => {
+  assert.deepEqual(
+    subject3Infraction(
+      'subject3-light-test',
+      '模拟夜间灯光考试操作错误：测试提示',
+      'lightTest',
+    ),
+    {
+      id: 'subject3-light-test',
+      title: '模拟夜间灯光考试操作错误：测试提示',
+      points: 100,
+      fatal: true,
+    },
+  )
+
+  const source = readFileSync(
+    new URL('../src/App.tsx', import.meta.url),
+    'utf8',
+  )
+  const index = source.indexOf("'subject3-light-test'")
+  assert.ok(index >= 0)
+  const snippet = source.slice(index, index + 260)
+  assert.match(snippet, /'lightTest'/)
+  assert.doesNotMatch(snippet, /points:\s*\d/)
+  assert.doesNotMatch(snippet, /fatal:\s*(?:true|false)/)
 })
