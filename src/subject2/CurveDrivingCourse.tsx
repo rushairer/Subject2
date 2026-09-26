@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
+import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'
@@ -139,7 +140,8 @@ export function updateCurveDriving(
     if (
       wheelContactFootprints(vehicle).some(footprint =>
         wheelContactSamplePoints(footprint).some(point =>
-          nearestWheelDistance(point.x, point.z) >= halfRoad,
+          nearestWheelDistance(point.x, point.z) >=
+            halfRoad - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2,
         ),
       )
     ) {
@@ -209,8 +211,8 @@ function ribbonGeometry(points: Point[], width: number, offset = 0) {
 export function CurveDrivingCourse(): ReactElement {
   const road = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, CURVE_DRIVING.roadWidth), [])
   // ribbonGeometry uses the route-right normal, so positive offset is right.
-  const rightEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, CURVE_DRIVING.roadWidth / 2), [])
-  const leftEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, 0.12, -CURVE_DRIVING.roadWidth / 2), [])
+  const rightEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, CURVE_DRIVING.roadWidth / 2), [])
+  const leftEdge = useMemo(() => ribbonGeometry(CURVE_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, -CURVE_DRIVING.roadWidth / 2), [])
 
   return <group>
     <mesh geometry={road} position-y={0.01}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
