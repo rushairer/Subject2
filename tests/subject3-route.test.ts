@@ -20,6 +20,40 @@ test('Subject 3 route is longer than 3 km and every event lies inside it', () =>
   }
 })
 
+function normalizeAngle(angle: number) {
+  let value = angle
+  while (value > Math.PI) value -= Math.PI * 2
+  while (value < -Math.PI) value += Math.PI * 2
+  return value
+}
+
+function eventById(id: string) {
+  const event = SUBJECT3_EVENTS.find(item => item.id === id)
+  assert.ok(event, `missing Subject 3 event ${id}`)
+  return event
+}
+
+function routeHeadingDeltaForEvent(id: string) {
+  const event = eventById(id)
+  return normalizeAngle(
+    poseAtRouteDistance(event.end).heading -
+    poseAtRouteDistance(event.start).heading,
+  )
+}
+
+test('named Subject 3 turn events match their actual route direction', () => {
+  for (const id of ['left-turn-1', 'left-turn-2', 'left-turn-3']) {
+    near(routeHeadingDeltaForEvent(id), -Math.PI / 2)
+  }
+  near(routeHeadingDeltaForEvent('right-turn-1'), Math.PI / 2)
+})
+
+test('Subject 3 u-turn reverses travel direction and preserves total route length', () => {
+  const delta = routeHeadingDeltaForEvent('uturn')
+  near(Math.abs(delta), Math.PI)
+  near(SUBJECT3_ROUTE_LENGTH, 4420)
+})
+
 test('Subject 3 event windows are ordered and do not overlap', () => {
   for (let i = 1; i < SUBJECT3_EVENTS.length; i++) {
     const previous = SUBJECT3_EVENTS[i - 1]

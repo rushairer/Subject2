@@ -9,6 +9,7 @@ import {
 import { DRIVING_RULES } from '../src/rules/drivingRules'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
+  CENTER_LINE_OFFSET,
   RIGHT_EDGE_OFFSET,
   SUBJECT3_EVENTS,
   poseAtRouteDistance,
@@ -168,6 +169,160 @@ test('speed-sensitive slow zone penalizes exceeding the event allowance', () => 
 
   assert.equal(hasInfraction(result, 'speed'), true)
   assert.equal(result.infractions.find(item => item.id.endsWith('speed'))?.points, 10)
+})
+
+test('legal left and right turns require both-side observation and finish on the route heading', () => {
+  for (const [id, steering, indicator] of [
+    ['left-turn-1', -0.2, 'left'] as const,
+    ['right-turn-1', 0.2, 'right'] as const,
+  ]) {
+    const event = SUBJECT3_EVENTS[eventIndex(id)]
+    let runtime = runtimeFor(id)
+
+    let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+      steering,
+      leftIndicator: indicator === 'left',
+      rightIndicator: indicator === 'right',
+      leftSignalAge: indicator === 'left' ? 3.2 : 0,
+      rightSignalAge: indicator === 'right' ? 3.2 : 0,
+      lookLeft: true,
+      lookRight: true,
+    }), runtime, false, false, 0.1)
+    runtime = result.runtime
+
+    result = updateSubject3(vehicleAt(event.end + 1, 0, {
+      leftIndicator: indicator === 'left',
+      rightIndicator: indicator === 'right',
+      leftSignalAge: indicator === 'left' ? 4 : 0,
+      rightSignalAge: indicator === 'right' ? 4 : 0,
+      lookLeft: true,
+      lookRight: true,
+    }), runtime, false, false, 0.1)
+
+    assert.deepEqual(result.infractions, [], `${id} should complete legally`)
+  }
+})
+
+test('intersection turn fails if one traffic side was never observed', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('left-turn-1')]
+  let runtime = runtimeFor('left-turn-1')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+    lookRight: false,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+    lookRight: false,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'observation'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('observation'))?.fatal, true)
+})
+
+test('turn event fails when the vehicle reaches the event end with the wrong heading', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('right-turn-1')]
+  const startPose = poseAtRouteDistance(event.start + 1)
+  let runtime = runtimeFor('right-turn-1')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: 0.2,
+    rightIndicator: true,
+    rightSignalAge: 3.2,
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    heading: startPose.heading,
+    rightIndicator: true,
+    rightSignalAge: 4,
+    lookLeft: true,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'path'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('path'))?.fatal, true)
+})
+
+test('meeting fails if the vehicle body crosses the center line into opposing traffic', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('meeting')]
+  const lateral =
+    CENTER_LINE_OFFSET +
+    TRAINING_CAR.widthMeters / 2 -
+    0.02
+  let runtime = runtimeFor('meeting')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, lateral), runtime, false, false, 0.1)
+  runtime = result.runtime
+  result = updateSubject3(vehicleAt(event.end + 1, lateral), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'opposite-lane'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('opposite-lane'))?.fatal, true)
+})
+
+test('meeting remains legal when the full body stays on its own side of the center line', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('meeting')]
+  const lateral =
+    CENTER_LINE_OFFSET +
+    TRAINING_CAR.widthMeters / 2 +
+    0.02
+  let runtime = runtimeFor('meeting')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, lateral), runtime, false, false, 0.1)
+  runtime = result.runtime
+  result = updateSubject3(vehicleAt(event.end + 1, lateral), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'opposite-lane'), false)
+})
+
+test('u-turn must actually reverse the route heading', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('uturn')]
+  let runtime = runtimeFor('uturn')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'path'), false)
+
+  runtime = runtimeFor('uturn')
+  result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: -0.2,
+    leftIndicator: true,
+    leftSignalAge: 3.2,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  const startHeading = poseAtRouteDistance(event.start + 1).heading
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    heading: startHeading,
+    leftIndicator: true,
+    leftSignalAge: 4,
+    lookLeft: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'path'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('path'))?.fatal, true)
 })
 
 test('lane change requires an actual move into the requested left lane', () => {

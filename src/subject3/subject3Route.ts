@@ -16,9 +16,7 @@ export const SUBJECT3_ROUTE: Point[] = [
   { x: 0, z: -1880 },
   { x: 0, z: -2230 },
   { x: -70, z: -2230 },
-  { x: -70, z: -2120 },
-  { x: 250, z: -2120 },
-  { x: 250, z: -2450 },
+  { x: -70, z: -1470 },
 ]
 
 export const LANE_WIDTH = 3.5
