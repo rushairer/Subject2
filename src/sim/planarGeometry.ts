@@ -183,6 +183,22 @@ export function polygonTouchesOutsideRectUnion(
   const totalArea = polygonArea(polygon)
   if (totalArea <= 0 || legalRects.length === 0) return true
 
+  // Fast-path exact containment in one convex rectangle. Besides avoiding
+  // unnecessary clipping work, this prevents floating-point seam noise when
+  // overlapping route rectangles subdivide a body that is already wholly
+  // inside a single legal road rectangle.
+  const coordinateTolerance = 1e-10
+  if (legalRects.some(rect =>
+    polygon.every(point =>
+      point.x >= rect.minX - coordinateTolerance &&
+      point.x <= rect.maxX + coordinateTolerance &&
+      point.z >= rect.minZ - coordinateTolerance &&
+      point.z <= rect.maxZ + coordinateTolerance
+    )
+  )) {
+    return false
+  }
+
   const xs = uniqueSorted(legalRects.flatMap(rect => [rect.minX, rect.maxX]))
   const zs = uniqueSorted(legalRects.flatMap(rect => [rect.minZ, rect.maxZ]))
 
@@ -209,5 +225,10 @@ export function polygonTouchesOutsideRectUnion(
     }
   }
 
-  return coveredArea < totalArea - 1e-10
+  // Clipping a polygon across many internal rectangle seams accumulates
+  // tiny floating-point area error. Keep the tolerance many orders of
+  // magnitude below any physically meaningful tire/body overlap while
+  // scaling it with polygon area.
+  const areaTolerance = Math.max(1e-9, totalArea * 1e-9)
+  return coveredArea < totalArea - areaTolerance
 }
