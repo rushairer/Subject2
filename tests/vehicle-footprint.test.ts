@@ -12,6 +12,8 @@ import {
   createReverseParkingRuntime,
   updateReverseParking,
 } from '../src/subject2/ReverseParkingCourse'
+import { DRIVING_RULES } from '../src/rules/drivingRules'
+import { subject3RoadRectsNearProgress } from '../src/subject3/subject3Route'
 
 const near = (actual: number, expected: number, epsilon = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`)
@@ -114,6 +116,25 @@ test('body tangent to the legal rectangle boundary is not treated as body-out', 
 
   assert.equal(
     polygonTouchesOutsideRectUnion(footprint, wideRoad, 0),
+    false,
+  )
+})
+
+
+test('rotated vehicle fully inside a Subject 3 road segment is not rejected at an internal union seam', () => {
+  const pose = {
+    x: 307.049,
+    z: -1240.297,
+    heading: 1.604,
+  }
+  const footprint = vehicleBodyFootprint(pose)
+  const legal = subject3RoadRectsNearProgress(
+    2267,
+    DRIVING_RULES.subject3.roadBoundaryToleranceMeters,
+  )
+
+  assert.equal(
+    polygonTouchesOutsideRectUnion(footprint, legal, 0),
     false,
   )
 })
