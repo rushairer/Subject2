@@ -489,6 +489,15 @@ export function updateSubject3(
     })
   }
 
+  if (Math.abs(vehicle.speed) > 0.2 && !vehicle.seatbelt) {
+    infractions.push({
+      id: 'subject3-seatbelt',
+      title: '科目三道路驾驶过程中未按规定使用安全带',
+      points: 100,
+      fatal: true,
+    })
+  }
+
   if (!runtime.started && Math.abs(vehicle.speed) > 0.2) runtime.started = true
 
   if (night && Math.abs(vehicle.speed) > 0.2 && !vehicle.lowBeam && !vehicle.highBeam) {

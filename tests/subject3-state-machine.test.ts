@@ -70,6 +70,34 @@ function hasInfraction(
   return result.infractions.some(item => item.id.endsWith(suffix))
 }
 
+test('moving without a seatbelt is immediately fatal', () => {
+  const result = updateSubject3(vehicleAt(80, 0, {
+    speed: 1,
+    seatbelt: false,
+  }), createSubject3Runtime(), false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-seatbelt'),
+    true,
+  )
+  assert.equal(
+    result.infractions.find(item => item.id === 'subject3-seatbelt')?.fatal,
+    true,
+  )
+})
+
+test('being stationary before fastening the seatbelt is not penalized yet', () => {
+  const result = updateSubject3(vehicleAt(20, 0, {
+    speed: 0,
+    seatbelt: false,
+  }), createSubject3Runtime(), false, false, 0.1)
+
+  assert.equal(
+    result.infractions.some(item => item.id === 'subject3-seatbelt'),
+    false,
+  )
+})
+
 test('legal Subject 3 start advances to the next event with no penalty', () => {
   const event = SUBJECT3_EVENTS[eventIndex('start')]
   let runtime = runtimeFor('start')
