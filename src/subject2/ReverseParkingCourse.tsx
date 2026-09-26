@@ -132,7 +132,7 @@ function bodyOutsideProject(vehicle: ReverseParkingVehicle) {
   return carCorners(vehicle).some(([x, z]) => !pointInAllowedArea(x, z))
 }
 
-function statusFor(runtime: ReverseParkingRuntime, timeLimitSeconds = SUBJECT2_RULE_LIMITS.reverseParking.timeLimitSeconds) {
+function statusFor(runtime: ReverseParkingRuntime, timeLimitSeconds: number = SUBJECT2_RULE_LIMITS.reverseParking.timeLimitSeconds) {
   const seconds = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${timeLimitSeconds}s` : ''
   switch (runtime.phase) {
     case 'approach': return '驶过起始端控制线后停车，挂 R 挡开始第一次倒库'
