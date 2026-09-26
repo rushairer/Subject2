@@ -604,6 +604,10 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
         gear: v.gear,
         heading: replayVehicle.heading,
         project: activeExamId,
+        steeringWheelAngle: v.steeringWheelAngle,
+        leftIndicator: v.leftIndicator || v.hazard,
+        rightIndicator: v.rightIndicator || v.hazard,
+        handbrake: v.handbrake,
       })
     }
   }
