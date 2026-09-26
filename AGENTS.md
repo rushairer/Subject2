@@ -46,6 +46,8 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 - Front tire headings must follow Ackermann left/right steering angles; rear tires follow the body heading.
 - Shared wheel geometry used by rendering and judging must come from the same helper rather than duplicated formulas.
 - Body-out rules and wheel-line rules are different concepts. Do not substitute body corners for wheel contact unless the rule explicitly evaluates the body.
+- `src/sim/vehicleFootprint.ts` owns the full rectangular body footprint. For concave/L-shaped legal regions, body containment must use exact polygon coverage through `src/sim/planarGeometry.ts`; checking only the four body corners can miss an edge crossing a forbidden notch.
+- `src/sim/planarGeometry.ts` owns reusable polygon/axis-aligned-rectangle intersection and rectangle-union coverage. Do not duplicate clipping math in individual courses.
 - Add regression coverage at the exact safe/contact boundary whenever a line-contact algorithm changes.
 - `src/subject2/courseMarkings.ts` owns the painted Subject 2 boundary-line width. Visual markings and line-contact judging must use the same value.
 - For a painted boundary, contact starts at the physical paint region, not at an abstract road-edge centerline. L-shaped courses must model only lines that are actually painted; do not shrink rectangle unions and create artificial internal seams.
