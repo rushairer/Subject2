@@ -90,9 +90,49 @@ function targetWorld(progress: number, lateral: number) {
   }
 }
 
-test('C2 physical vehicle can follow the full Subject 3 route and complete every judge', () => {
+function manualGearState(progress: number, elapsed: number) {
+  const gearEvent = SUBJECT3_EVENTS.find(event => event.id === 'gear')
+  assert.ok(gearEvent)
+
+  if (elapsed < 3.3) {
+    return { gear: 1, clutch: 1 }
+  }
+  if (elapsed < 4.3) {
+    return {
+      gear: 1,
+      clutch: DRIVING_RULES.manualTransmission.biteClutchPosition,
+    }
+  }
+  if (progress < gearEvent.start) {
+    return { gear: 1, clutch: 0 }
+  }
+  if (progress < gearEvent.start + 5) {
+    return { gear: 2, clutch: 1 }
+  }
+  if (progress < gearEvent.start + 40) {
+    return { gear: 2, clutch: 0 }
+  }
+  if (progress < gearEvent.start + 45) {
+    return { gear: 3, clutch: 1 }
+  }
+  if (progress < gearEvent.start + 80) {
+    return { gear: 3, clutch: 0 }
+  }
+  if (progress < gearEvent.start + 85) {
+    return { gear: 4, clutch: 1 }
+  }
+  if (progress < gearEvent.end + 10) {
+    return { gear: 4, clutch: 0 }
+  }
+  if (progress < gearEvent.end + 15) {
+    return { gear: 3, clutch: 1 }
+  }
+  return { gear: 3, clutch: 0 }
+}
+
+function runPhysicalSubject3Route(automatic: boolean) {
   const dt = 0.05
-  const maxFrames = 15_000
+  const maxFrames = automatic ? 15_000 : 30_000
   const start = poseAtRouteDistance(0)
   const vehicle: IntegratedVehicle = {
     x: start.x,
@@ -103,10 +143,10 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     steeringWheelAngle: 0,
     throttle: 0,
     brake: 0,
-    clutch: 0,
+    clutch: automatic ? 0 : 1,
     gear: 1,
     engineOn: true,
-    engineRpm: 900,
+    engineRpm: DRIVING_RULES.manualTransmission.idleRpm,
     stallTimer: 0,
     handbrake: true,
     leftIndicator: false,
@@ -128,6 +168,7 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
   let lastEventIndex = runtime.eventIndex
   let maxAbsoluteLateral = 0
   let elapsed = 0
+  let stallEvents = 0
 
   const targetPose = poseAtRouteDistance(SUBJECT3_OVERTAKE_TARGET_PROGRESS)
   const overtakeTarget = {
@@ -155,18 +196,35 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
       ? vehicle.rightSignalAge + dt
       : 0
 
-    if (waitingForStart) {
-      vehicle.handbrake = true
-      vehicle.gear = 1
-    } else if (
-      stoppingForPullOver &&
-      Math.abs(vehicle.speed) < 0.05
-    ) {
-      vehicle.handbrake = true
-      vehicle.gear = 0
+    let clutch = 0
+    if (automatic) {
+      if (waitingForStart) {
+        vehicle.handbrake = true
+        vehicle.gear = 1
+      } else if (
+        stoppingForPullOver &&
+        Math.abs(vehicle.speed) < 0.05
+      ) {
+        vehicle.handbrake = true
+        vehicle.gear = 0
+      } else {
+        vehicle.handbrake = false
+        vehicle.gear = 1
+      }
     } else {
-      vehicle.handbrake = false
-      vehicle.gear = 1
+      const manual = manualGearState(before.progress, elapsed)
+      vehicle.gear = manual.gear
+      clutch = manual.clutch
+      vehicle.handbrake = waitingForStart
+
+      if (stoppingForPullOver) {
+        clutch = 1
+        vehicle.handbrake = false
+        if (Math.abs(vehicle.speed) < 0.05) {
+          vehicle.gear = 0
+          vehicle.handbrake = true
+        }
+      }
     }
 
     const lookAheadProgress = Math.min(
@@ -192,15 +250,19 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     const maxSteeringWheelAngle =
       DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
 
-    stepVehiclePhysics(
+    const physics = stepVehiclePhysics(
       vehicle,
       {
         throttle:
           waitingForStart || stoppingForPullOver
             ? 0
-            : 0.75,
+            : automatic
+              ? 0.75
+              : elapsed < 4.3
+                ? 0.45
+                : 0.85,
         brake: stoppingForPullOver ? 1 : 0,
-        clutch: 0,
+        clutch,
         steer: 0,
         steeringWheelTarget:
           (desiredRoadWheelAngle /
@@ -209,9 +271,16 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
       },
       dt,
       {
-        automatic: true,
+        automatic,
         grade: 0,
       },
+    )
+    if (physics.stalled) stallEvents += 1
+
+    assert.equal(
+      vehicle.engineOn,
+      true,
+      `${automatic ? 'C2' : 'C1'} engine stalled near ${before.progress.toFixed(1)}m`,
     )
 
     if (
@@ -221,6 +290,7 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
       vehicle.speed = 0
       vehicle.gear = 0
       vehicle.handbrake = true
+      if (!automatic) vehicle.clutch = 1
     }
 
     const projection = projectToSubject3Route(
@@ -248,7 +318,7 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     const result = updateSubject3(
       vehicle,
       runtime,
-      true,
+      automatic,
       false,
       dt,
       traffic,
@@ -259,8 +329,9 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     assert.deepEqual(
       result.infractions,
       [],
-      `unexpected Subject 3 infraction near ${projection.progress.toFixed(1)}m ` +
+      `unexpected ${automatic ? 'C2' : 'C1'} Subject 3 infraction near ${projection.progress.toFixed(1)}m ` +
         `lateral=${projection.lateral.toFixed(3)} heading=${vehicle.heading.toFixed(3)} ` +
+        `gear=${vehicle.gear} clutch=${vehicle.clutch.toFixed(2)} rpm=${vehicle.engineRpm.toFixed(0)} ` +
         `x=${vehicle.x.toFixed(3)} z=${vehicle.z.toFixed(3)} ` +
         `targetLateral=${desiredLateral(before.progress).toFixed(3)} ` +
         `event=${SUBJECT3_EVENTS[runtime.eventIndex]?.id ?? 'done'}: ` +
@@ -282,6 +353,7 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     elapsed += dt
   }
 
+  assert.equal(stallEvents, 0)
   assert.equal(runtime.completed, true)
   assert.equal(runtime.pullOverSecuredStopSeen, true)
   assert.deepEqual(
@@ -305,4 +377,10 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
   })
   assert.equal(result.status, 'passed')
   assert.equal(result.passed, true)
-})
+}
+
+for (const automatic of [false, true]) {
+  test(`${automatic ? 'C2' : 'C1'} physical vehicle can follow the full Subject 3 route and complete every judge`, () => {
+    runPhysicalSubject3Route(automatic)
+  })
+}
