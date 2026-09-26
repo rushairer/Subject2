@@ -122,7 +122,7 @@ function centerInsideBay(vehicle: SideParkingVehicle) {
   return vehicle.x > g.bayMouthX && vehicle.x < g.bayBackX && Math.abs(vehicle.z) < g.bayHalfLength
 }
 
-function status(runtime: SideParkingRuntime, timeLimitSeconds = SUBJECT2_RULE_LIMITS.sideParking.timeLimitSeconds) {
+function status(runtime: SideParkingRuntime, timeLimitSeconds: number = SUBJECT2_RULE_LIMITS.sideParking.timeLimitSeconds) {
   const timer = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${timeLimitSeconds}s` : ''
   switch (runtime.phase) {
     case 'approach': return '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
