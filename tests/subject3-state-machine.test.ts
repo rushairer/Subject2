@@ -322,6 +322,81 @@ test('overtake must finish back in the original lane after starting the return',
   assert.equal(result.infractions.find(item => item.id.endsWith('return-path'))?.fatal, true)
 })
 
+test('brief pull-over stop does not count as a completed parking maneuver', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('pull-over')]
+  let runtime = runtimeFor('pull-over')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: 0.2,
+    rightIndicator: true,
+    rightSignalAge: 3.2,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 30, 0.55, {
+    speed: 0,
+    gear: 0,
+    handbrake: true,
+    rightIndicator: true,
+    rightSignalAge: 4,
+    lookRight: true,
+  }), runtime, false, false, 0.2)
+  runtime = result.runtime
+  assert.equal(runtime.pullOverSecuredStopSeen, false)
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    speed: 1.5,
+    gear: 1,
+    handbrake: false,
+    rightIndicator: true,
+    rightSignalAge: 5,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'stop'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('stop'))?.fatal, true)
+})
+
+test('stable stop without neutral and parking brake is still an incomplete pull-over', () => {
+  const event = SUBJECT3_EVENTS[eventIndex('pull-over')]
+  let runtime = runtimeFor('pull-over')
+
+  let result = updateSubject3(vehicleAt(event.start + 1, 0, {
+    steering: 0.2,
+    rightIndicator: true,
+    rightSignalAge: 3.2,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+  runtime = result.runtime
+
+  result = updateSubject3(vehicleAt(event.start + 30, 0.55, {
+    speed: 0,
+    gear: 1,
+    handbrake: false,
+    rightIndicator: true,
+    rightSignalAge: 4,
+    lookRight: true,
+  }), runtime, false, false, 1.0)
+  runtime = result.runtime
+
+  assert.equal(runtime.pullOverStopSeconds >= DRIVING_RULES.subject3.pullOver.stableStopSeconds, true)
+  assert.equal(runtime.pullOverSecuredStopSeen, false)
+  assert.equal(runtime.completed, false)
+
+  result = updateSubject3(vehicleAt(event.end + 1, 0, {
+    speed: 1.5,
+    gear: 1,
+    handbrake: false,
+    rightIndicator: true,
+    rightSignalAge: 5,
+    lookRight: true,
+  }), runtime, false, false, 0.1)
+
+  assert.equal(hasInfraction(result, 'stop'), true)
+  assert.equal(result.infractions.find(item => item.id.endsWith('stop'))?.fatal, true)
+})
+
 test('pull-over records the 30-50cm band and completes only after a stable secured stop', () => {
   const event = SUBJECT3_EVENTS[eventIndex('pull-over')]
   let runtime = runtimeFor('pull-over')

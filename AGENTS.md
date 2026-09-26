@@ -93,6 +93,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 parking and night-light completion
+
+- Pull-over is not complete merely because the vehicle stopped once inside the event window. Completion requires the configured stable-stop duration, neutral gear, and parking brake.
+- Passing the pull-over event end without a secured stable stop must remain a fatal incomplete maneuver, even if an earlier brief stop was observed.
+- Night-light "flash" prompts must validate a real high-beam state followed by a return to low beam. Counting key presses is not sufficient.
+- Each night-light prompt starts with a fresh attempt state so a previous prompt cannot satisfy the next one.
+- Keep night-light answer evaluation in `src/subject3/nightLightExam.ts` so it stays deterministic and unit-testable outside React timers.
+
 ## User-facing replay coordinate convention
 
 Driving replay must never expose raw world X/Z as if screen-left/screen-right were vehicle-left/vehicle-right. Replay maps must transform every trajectory, infraction, and field reference into the vehicle's initial local frame:
