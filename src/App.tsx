@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking } from './subject2/ReverseParkingCourse'
 import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from './subject2/SideParkingCourse'
@@ -19,6 +19,9 @@ import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
+import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
+import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
+import { assessSessionResult } from './session/sessionResult'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -191,7 +194,7 @@ function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate,
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
         {recentHistory.map(item => <div className="recent-result" key={item.id}>
-          <div><strong>{examTitle(item.examId as ExamId)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}</span></div>
+          <div><strong>{examTitle(item.examId as ExamId)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
           <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
         </div>)}
       </div>
@@ -235,15 +238,15 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLocked, cameraMode, onCameraModeChange, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
-  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, controlsLocked: boolean,
+function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean,
   cameraMode: CameraMode,
-  onCameraModeChange: (mode: CameraMode) => void,
+  onCycleCameraMode: () => void,
   onInfraction: (i: Infraction) => void, onTick: () => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
 }) {
-  const keys = useRef<Record<string, boolean>>({})
+  const keys = useRef<DrivingKeys>({})
   const cameraYaw = useRef(0)
   const { camera } = useThree()
   const speedTimer = useRef(0)
@@ -253,21 +256,13 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
   const curveRuntime = useRef(createCurveRuntime())
   const slopeRuntime = useRef(createSlopeRuntime())
   const subject3Runtime = useRef(createSubject3Runtime())
+  const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
   const lastProjectStatus = useRef('')
   const completionLatched = useRef(false)
   const audioContext = useRef<AudioContext | null>(null)
   const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
   const stallCount = useRef(0)
-
-  const cycleCameraMode = () => {
-    const next: CameraMode =
-      cameraMode === 'first' ? 'second'
-        : cameraMode === 'second' ? 'third'
-          : cameraMode === 'third' ? 'top'
-            : 'first'
-    onCameraModeChange(next)
-  }
 
   const startHorn = () => {
     if (hornNodes.current) return
@@ -300,11 +295,34 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
   }
 
   useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase()
-      keys.current[k] = true
+    const syncLook = () => {
+      const { yaw, ...look } = drivingLook(keys.current)
+      cameraYaw.current = yaw
+      Object.assign(vehicle.current, look)
+    }
+    const releaseAll = () => {
+      clearDrivingKeys(keys.current)
+      syncLook()
       const v = vehicle.current
-      if (e.code === 'Space') { e.preventDefault(); v.handbrake = !v.handbrake }
+      v.throttle = 0
+      v.brake = 0
+      v.clutch = 0
+      v.horn = false
+      stopHorn()
+    }
+    const down = (e: KeyboardEvent) => {
+      if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return
+      const target = e.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
+      const k = drivingKey(e)
+      if (!k) return
+      if (k === 'space' && target instanceof HTMLElement && target.closest('button')) return
+      e.preventDefault()
+      const firstPress = pressDrivingKey(keys.current, k, e.repeat)
+      syncLook()
+      if (!firstPress) return
+      const v = vehicle.current
+      if (k === 'space') v.handbrake = !v.handbrake
       if (k === 'i') {
         v.engineOn = !v.engineOn
         v.engineRpm = v.engineOn ? DRIVING_RULES.manualTransmission.idleRpm : 0
@@ -321,31 +339,47 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
       if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
       if (k === 'b') { v.horn = true; startHorn() }
       if (k === 't') v.seatbelt = !v.seatbelt
-      if (k === 'z') { cameraYaw.current = .62; v.lookLeft = true }
-      if (k === 'x') { cameraYaw.current = -.62; v.lookRight = true }
-      if (k === 'f') { cameraYaw.current = Math.PI; v.lookBack = true }
-      if (k === 'm' && !e.repeat) cycleCameraMode()
+      if (k === 'm') onCycleCameraMode()
     }
     const up = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase()
-      keys.current[k] = false
-      if (['z','x','f'].includes(k)) cameraYaw.current = 0
-      if (k === 'z') vehicle.current.lookLeft = false
-      if (k === 'x') vehicle.current.lookRight = false
-      if (k === 'f') vehicle.current.lookBack = false
+      const k = drivingKey(e)
+      if (!k) return
+      releaseDrivingKey(keys.current, k)
+      syncLook()
       if (k === 'b') { vehicle.current.horn = false; stopHorn() }
     }
-    addEventListener('keydown', down); addEventListener('keyup', up)
+    const visibilityChanged = () => {
+      if (document.hidden) releaseAll()
+    }
+    addEventListener('keydown', down)
+    addEventListener('keyup', up)
+    addEventListener('blur', releaseAll)
+    document.addEventListener('visibilitychange', visibilityChanged)
     return () => {
       removeEventListener('keydown', down)
       removeEventListener('keyup', up)
-      stopHorn()
+      removeEventListener('blur', releaseAll)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+      releaseAll()
       void audioContext.current?.close()
       audioContext.current = null
     }
-  }, [automatic, cameraMode, onCameraModeChange, vehicle])
+  }, [automatic, onCycleCameraMode, vehicle])
 
   useFrame((_, rawDt) => {
+    // Keep the world, cockpit, input and session counters mounted across courses.
+    // Reset only project judges, before the first frame of the new project.
+    if (runtimeProject.current !== session.examId) {
+      runtimeProject.current = session.examId
+      reverseParkingRuntime.current = createReverseParkingRuntime()
+      sideParkingRuntime.current = createSideParkingRuntime()
+      rightAngleRuntime.current = createRightAngleRuntime()
+      curveRuntime.current = createCurveRuntime()
+      slopeRuntime.current = createSlopeRuntime()
+      subject3Runtime.current = createSubject3Runtime()
+      lastProjectStatus.current = ''
+      completionLatched.current = false
+    }
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
     const wheel = readRacingWheelControls()
@@ -474,36 +508,38 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     let projectCompleted = false
-    if (session.examId === 'reverse-parking') {
-      const update = updateReverseParking(judgedVehicle, reverseParkingRuntime.current, dt)
-      reverseParkingRuntime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
-    } else if (session.examId === 'side-parking') {
-      const update = updateSideParking(judgedVehicle, sideParkingRuntime.current, dt)
-      sideParkingRuntime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
-    } else if (session.examId === 'right-angle') {
-      const update = updateRightAngle(judgedVehicle, rightAngleRuntime.current, dt)
-      rightAngleRuntime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
-    } else if (session.examId === 'curve-driving') {
-      const update = updateCurveDriving(judgedVehicle, curveRuntime.current, dt)
-      curveRuntime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
-    } else if (session.examId === 'slope-start') {
-      const update = updateSlopeStart(judgedVehicle, slopeRuntime.current, dt)
-      slopeRuntime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
-    } else if (session.examId === 'subject3') {
-      const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night', dt)
-      subject3Runtime.current = update.runtime
-      projectUpdate = update
-      projectCompleted = update.runtime.completed
+    if (projectJudgingEnabled) {
+      if (session.examId === 'reverse-parking') {
+        const update = updateReverseParking(judgedVehicle, reverseParkingRuntime.current, dt)
+        reverseParkingRuntime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      } else if (session.examId === 'side-parking') {
+        const update = updateSideParking(judgedVehicle, sideParkingRuntime.current, dt)
+        sideParkingRuntime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      } else if (session.examId === 'right-angle') {
+        const update = updateRightAngle(judgedVehicle, rightAngleRuntime.current, dt)
+        rightAngleRuntime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      } else if (session.examId === 'curve-driving') {
+        const update = updateCurveDriving(judgedVehicle, curveRuntime.current, dt)
+        curveRuntime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      } else if (session.examId === 'slope-start') {
+        const update = updateSlopeStart(judgedVehicle, slopeRuntime.current, dt)
+        slopeRuntime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      } else if (session.examId === 'subject3') {
+        const update = updateSubject3(v, subject3Runtime.current, automatic, session.time === 'night', dt)
+        subject3Runtime.current = update.runtime
+        projectUpdate = update
+        projectCompleted = update.runtime.completed
+      }
     }
     if (projectUpdate) {
       projectUpdate.infractions.forEach(onInfraction)
@@ -533,12 +569,16 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLoc
   </>
 }
 
-function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[]) => void }) {
+function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void }) {
   const combinedExam = session.examId === 'subject2-exam'
   const automatic = candidate.licenseType === 'C2'
   const examSequence: ExamId[] = subject2ExamSequence(automatic)
-  const [activeExamId, setActiveExamId] = useState<ExamId>(combinedExam ? examSequence[0] : session.examId)
+  const [progress, setProgress] = useState(() => createExamProgress<ExamId>(combinedExam ? examSequence[0] : session.examId))
+  const activeExamId = progress.project
   const activeIndex = combinedExam ? examSequence.indexOf(activeExamId) : 0
+  const projectComplete = progress.completed
+  const activeEntryReached = progress.entered
+  const sessionComplete = isExamComplete(progress, combinedExam ? examSequence : undefined)
   const effectiveSession: Session = { ...session, examId: activeExamId }
   const combinedStartPose = combinedExam
     ? subject2ExamWorldStartPose(examSequence[0] as Subject2ProjectId)
@@ -547,10 +587,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const [display, setDisplay] = useState(() => initialVehicle(activeExamId, combinedStartPose))
   const [infractions, setInfractions] = useState<Infraction[]>([])
   const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
-  const [projectComplete, setProjectComplete] = useState(false)
-  const [activeEntryReached, setActiveEntryReached] = useState(!combinedExam || activeIndex === 0)
   const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
+  const cycleCameraMode = useCallback(() => setCameraMode(mode =>
+    mode === 'first' ? 'second'
+      : mode === 'second' ? 'third'
+        : mode === 'third' ? 'top'
+          : 'first'
+  ), [])
   const finishLatched = useRef(false)
   const lastUi = useRef(0)
   const sessionStartedAt = useRef(performance.now())
@@ -586,10 +630,8 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       setDisplay({ ...vehicle.current })
     }
     setProjectStatus(initialProjectStatus(activeExamId))
-    setProjectComplete(false)
-    setActiveEntryReached(!combinedExam || activeIndex === 0)
     setLightTestDone(!(activeExamId === 'subject3' && session.time === 'day'))
-  }, [activeExamId, activeIndex, combinedExam, session.time])
+  }, [activeExamId, combinedExam, session.time])
 
   const tick = () => {
     const now = performance.now()
@@ -618,6 +660,11 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     }
   }
   const score = Math.max(0, 100 - infractions.reduce((s, i) => s + i.points, 0))
+  const finishSession = useCallback(() => {
+    if (finishLatched.current) return
+    finishLatched.current = true
+    onDone(score, infractions, trajectory.current, sessionComplete)
+  }, [infractions, onDone, score, sessionComplete])
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
@@ -628,17 +675,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
 
   useEffect(() => {
     if (!combinedExam || activeEntryReached) return
-    if (activeEntryDistance <= 6) setActiveEntryReached(true)
-  }, [activeEntryDistance, activeEntryReached, combinedExam])
+    if (activeEntryDistance <= 6) setProgress(current => enterExamProject(current, activeExamId))
+  }, [activeEntryDistance, activeEntryReached, activeExamId, combinedExam])
 
   useEffect(() => {
     if (session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
     const passLine = activeExamId === 'subject3' ? 90 : 80
-    if (infractions.some(i => i.fatal) || score < passLine) {
-      finishLatched.current = true
-      onDone(score, infractions, trajectory.current)
-    }
-  }, [activeExamId, infractions, onDone, score, session.mode])
+    if (infractions.some(i => i.fatal) || score < passLine) finishSession()
+  }, [activeExamId, infractions, finishSession, score, session.mode])
 
   useEffect(() => {
     if (activeExamId !== 'subject3' || !lightTestDone || !projectStatus || typeof window === 'undefined' || !('speechSynthesis' in window)) return
@@ -653,36 +697,29 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
 
   useEffect(() => {
     if (activeExamId !== 'subject3' || !projectComplete || finishLatched.current) return
-    finishLatched.current = true
-    onDone(score, infractions, trajectory.current)
-  }, [activeExamId, infractions, onDone, projectComplete, score])
+    finishSession()
+  }, [activeExamId, finishSession, projectComplete])
 
   useEffect(() => {
     if (!combinedExam || !projectComplete || finishLatched.current) return
     if (infractions.some(item => item.fatal) || score < 80) return
     if (activeIndex >= examSequence.length - 1) {
-      finishLatched.current = true
-      onDone(score, infractions, trajectory.current)
+      finishSession()
       return
     }
-    setActiveExamId(examSequence[activeIndex + 1])
-  }, [activeIndex, combinedExam, examSequence, infractions, onDone, projectComplete, score])
+    setProgress(current => advanceExamProgress(current, examSequence))
+  }, [activeIndex, combinedExam, examSequence, infractions, finishSession, projectComplete, score])
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCameraModeChange={setCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
     <div className="hud">
       <div className="hud-top">
         <div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
-          <button className="view-btn" onClick={() => setCameraMode(mode =>
-            mode === 'first' ? 'second'
-              : mode === 'second' ? 'third'
-                : mode === 'third' ? 'top'
-                  : 'first'
-          )}>
+          <button className="view-btn" onClick={cycleCameraMode}>
             M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
           </button>
-          <button className="finish-btn" onClick={() => onDone(score, infractions, trajectory.current)}>结束并生成成绩</button>
+          <button className="finish-btn" onClick={finishSession}>结束并查看结果</button>
         </div>
       </div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
@@ -706,12 +743,12 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   </div>
 }
 
-function Result({ candidate, session, score, infractions, trajectory, onBack }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], trajectory: TrajectorySample[], onBack: () => void }) {
-  const passLine = session.examId === 'subject3' ? 90 : 80
-  const passed = score >= passLine && !infractions.some(i => i.fatal)
+function Result({ candidate, session, score, infractions, trajectory, completed, onBack }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean, onBack: () => void }) {
+  const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
   return <main className="shell centered"><section className="result-card">
-    <div className="eyebrow">模拟考试成绩单</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{passed ? '合格' : '未合格'}</span></div>
-    <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{session.examId}</span><span>合格线 {passLine}</span></div>
+    <div className="eyebrow">模拟考试成绩单</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{status === 'incomplete' ? '未完成' : passed ? '合格' : '未合格'}</span></div>
+    {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
+    <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{examTitle(session.examId)}</span><span>合格线 {passLine}</span></div>
     <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>{i.fatal ? '不合格' : `-${i.points}`}</b></div>)}</div>
     <ExamReplay samples={trajectory} infractions={infractions} />
     <button className="primary" onClick={onBack}>返回训练中心</button><p className="disclaimer">成绩仅用于模拟训练，不具有真实机动车驾驶人考试效力。</p>
@@ -722,13 +759,13 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('profile')
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[] } | null>(null)
+  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
 
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
   if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} onSwitchCandidate={() => setPhase('profile')} />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory) => {
-    const passLine = session.examId === 'subject3' ? 90 : 80
+  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onDone={(score, infractions, trajectory, completed) => {
+    const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       createdAt: Date.now(),
@@ -737,12 +774,14 @@ export default function App() {
       examId: session.examId,
       mode: session.mode,
       score,
-      passed: score >= passLine && !infractions.some(item => item.fatal),
+      passed: outcome.passed,
+      status: outcome.status,
+      completed,
       infractionCount: infractions.length,
     })
-    setResult({ score, infractions, trajectory: [...trajectory] })
+    setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')
   }} />
-  if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} trajectory={result.trajectory} onBack={() => setPhase('menu')} />
+  if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} trajectory={result.trajectory} completed={result.completed} onBack={() => setPhase('menu')} />
   return null
 }
