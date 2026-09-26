@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -121,8 +122,8 @@ function centerInsideBay(vehicle: SideParkingVehicle) {
   return vehicle.x > g.bayMouthX && vehicle.x < g.bayBackX && Math.abs(vehicle.z) < g.bayHalfLength
 }
 
-function status(runtime: SideParkingRuntime) {
-  const timer = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${SIDE_PARKING.timeLimitSeconds}s` : ''
+function status(runtime: SideParkingRuntime, timeLimitSeconds = SUBJECT2_RULE_LIMITS.sideParking.timeLimitSeconds) {
+  const timer = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${timeLimitSeconds}s` : ''
   switch (runtime.phase) {
     case 'approach': return '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
     case 'reverse': return '倒车入侧方库：结合右后视镜观察库角与车身' + timer
@@ -136,10 +137,12 @@ export function updateSideParking(
   vehicle: SideParkingVehicle,
   previous: SideParkingRuntime,
   dt: number,
+  profile: Subject2RuleProfile = SUBJECT2_NATIONAL_RULE_PROFILE,
 ): { runtime: SideParkingRuntime; infractions: SideParkingInfraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: SideParkingInfraction[] = []
-  if (runtime.completed) return { runtime, infractions, status: status(runtime) }
+  const rules = profile.limits.sideParking
+  if (runtime.completed) return { runtime, infractions, status: status(runtime, rules.timeLimitSeconds) }
 
   const movingReverse = vehicle.speed < -0.08
   const movingForward = vehicle.speed > 0.08
@@ -159,7 +162,7 @@ export function updateSideParking(
 
   if (runtime.started && runtime.phase !== 'complete') {
     runtime.elapsed += dt
-    if (runtime.elapsed > SIDE_PARKING.timeLimitSeconds) {
+    if (runtime.elapsed > rules.timeLimitSeconds) {
       infractions.push(subject2Infraction('side-parking-timeout'))
     }
   }
@@ -175,7 +178,7 @@ export function updateSideParking(
 
   if (runtime.phase === 'reverse' && stopped && inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.sideParking.parkedHoldSeconds) {
+    if (runtime.parkedHoldSeconds >= rules.parkedHoldSeconds) {
       runtime.phase = 'parked'
       runtime.parkedHoldSeconds = 0
       runtime.stopSeconds = 0
@@ -183,7 +186,7 @@ export function updateSideParking(
     }
   } else if (runtime.phase === 'reverse' && stopped && centerInsideBay(vehicle) && !inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.sideParking.bodyOutAfterStopHoldSeconds) {
+    if (runtime.parkedHoldSeconds >= rules.bodyOutAfterStopHoldSeconds) {
       infractions.push(subject2Infraction('side-parking-body-out-after-stop'))
     }
   } else {
@@ -208,7 +211,7 @@ export function updateSideParking(
   const mayPenalizeStop = runtime.started && !['parked', 'complete'].includes(runtime.phase) && !(runtime.phase === 'reverse' && inBay)
   if (mayPenalizeStop && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
-    if (runtime.stopSeconds > SIDE_PARKING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
+    if (runtime.stopSeconds > rules.stopLimitSeconds && !runtime.stopPenaltyLatched) {
       infractions.push(subject2Infraction('side-parking-stop', Math.floor(runtime.elapsed * 10)))
       runtime.stopPenaltyLatched = true
     }
@@ -217,7 +220,7 @@ export function updateSideParking(
     runtime.stopPenaltyLatched = false
   }
 
-  return { runtime, infractions, status: status(runtime) }
+  return { runtime, infractions, status: status(runtime, rules.timeLimitSeconds) }
 }
 
 function Line({ x, z, width, depth }: { x: number; z: number; width: number; depth: number }) {
