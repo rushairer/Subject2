@@ -202,70 +202,82 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     ))
 
   if (event.kind === 'start') {
-    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '起步前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 10)
+    if (night && !runtime.hornSeen && false) add('night', '夜间起步操作不完整', 'nightStartOperation')
   }
 
-  if (event.kind === 'straight' && runtime.eventMaxSteering > 0.5) {
-    add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 100, true)
+  if (event.kind === 'straight' && runtime.eventMaxSteering > SUBJECT3_RULE_LIMITS.straightMaxSteering) {
+    add('direction', '直线行驶方向控制不稳，车辆行驶状态明显异常', 'straightDirection')
   }
 
-  if (event.kind === 'gear' && !automatic && runtime.eventMaxGear < 3) {
-    add('gear', '加减挡位项目未完成合理挡位变化', 10)
+  if (event.kind === 'gear' && !automatic && runtime.eventMaxGear < SUBJECT3_RULE_LIMITS.manualMinimumGear) {
+    add('gear', '加减挡位项目未完成合理挡位变化', 'gear')
   }
 
   if ((event.kind === 'slow' || event.kind === 'meeting' || event.kind === 'left-turn' || event.kind === 'right-turn' || event.kind === 'uturn' || event.kind === 'pull-over') &&
-      event.speedLimit && runtime.eventMaxSpeed > event.speedLimit + 3) {
-    add('speed', `${event.title}时未按道路情景合理减速`, 10)
+      event.speedLimit && runtime.eventMaxSpeed > event.speedLimit + SUBJECT3_RULE_LIMITS.speedAllowanceKmh) {
+    add('speed', `${event.title}时未按道路情景合理减速`, 'speed')
   }
 
   if (event.kind === 'left-turn') {
-    if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '左转弯前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
   }
   if (event.kind === 'right-turn') {
-    if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 100, true)
+    if (!runtime.rightSignalSeen) add('signal', '右转弯前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'right', add)
     requireObservation(event, runtime, 'right', add)
   }
   if (event.kind === 'uturn') {
-    if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '掉头前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
   }
 
   if (event.kind === 'lane-change') {
-    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (runtime.minLateral > -2.0) add('path', '未完成指令要求的变更车道动作', 100, true)
+    if (runtime.minLateral > -SUBJECT3_RULE_LIMITS.laneChangeRequiredLateralMeters) add('path', '未完成指令要求的变更车道动作', 'path')
   }
 
   if (event.kind === 'overtake') {
-    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 100, true)
-    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 100, true)
+    if (!runtime.leftSignalSeen) add('left-signal', '超车前未正确使用左转向灯', 'signal')
+    if (!runtime.rightSignalSeen) add('right-signal', '超车后返回原车道前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (runtime.rightSignalLeadAtManeuver < DRIVING_RULES.subject3.signalLeadSeconds) add('right-signal-lead', '超车返回原车道前右转向灯开启不足 3 秒', 100, true)
-    if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 10)
-    if (runtime.minLateral > -2.0) add('path', '未完成有效的超车车道变化', 100, true)
+    if (runtime.rightSignalLeadAtManeuver < SUBJECT3_RULE_LIMITS.signalLeadSeconds) add(
+      'right-signal-lead',
+      `超车返回原车道前右转向灯开启不足 ${SUBJECT3_RULE_LIMITS.signalLeadSeconds} 秒`,
+      'signalLead',
+    )
+    if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 'observation')
+    if (runtime.minLateral > -SUBJECT3_RULE_LIMITS.overtakeRequiredLateralMeters) add('path', '未完成有效的超车车道变化', 'path')
   }
 
   if (event.kind === 'pull-over') {
-    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 100, true)
+    if (!runtime.rightSignalSeen) add('signal', '靠边停车前未正确使用右转向灯', 'signal')
     requireSignalLead(event, runtime, 'right', add)
     requireObservation(event, runtime, 'right', add)
     if (!runtime.stopSeen || runtime.pullOverStopGap == null) {
-      add('stop', '未在靠边停车项目区域内完成停车', 100, true)
+      add('stop', '未在靠边停车项目区域内完成停车', 'pullOverStop')
     } else if (runtime.pullOverStopGap < 0) {
-      add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 100, true)
-    } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.warningMaxGapMeters) {
-      add('distance-fail', '停车后车身距离道路右侧边缘线超过 50cm', 100, true)
-    } else if (runtime.pullOverStopGap > DRIVING_RULES.subject3.pullOver.idealMaxGapMeters) {
-      add('distance-10', '停车后车身距离道路右侧边缘线超过 30cm 但未超过 50cm', 10)
+      add('distance-cross-line', '靠边停车时车身越过道路右侧边缘线', 'pullOverCrossLine')
+    } else if (runtime.pullOverStopGap > SUBJECT3_RULE_LIMITS.pullOver.warningMaxGapMeters) {
+      add(
+        'distance-fail',
+        `停车后车身距离道路右侧边缘线超过 ${Math.round(SUBJECT3_RULE_LIMITS.pullOver.warningMaxGapMeters * 100)}cm`,
+        'pullOverDistanceFail',
+      )
+    } else if (runtime.pullOverStopGap > SUBJECT3_RULE_LIMITS.pullOver.idealMaxGapMeters) {
+      add(
+        'distance-10',
+        `停车后车身距离道路右侧边缘线超过 ${Math.round(SUBJECT3_RULE_LIMITS.pullOver.idealMaxGapMeters * 100)}cm 但未超过 ${Math.round(SUBJECT3_RULE_LIMITS.pullOver.warningMaxGapMeters * 100)}cm`,
+        'pullOverDistanceMinor',
+      )
     }
   }
 
