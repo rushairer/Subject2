@@ -259,7 +259,12 @@ test('C2 physical vehicle can follow the full Subject 3 route and complete every
     assert.deepEqual(
       result.infractions,
       [],
-      `unexpected Subject 3 infraction near ${projection.progress.toFixed(1)}m: ${result.infractions.map(item => item.id).join(', ')}`,
+      `unexpected Subject 3 infraction near ${projection.progress.toFixed(1)}m ` +
+        `lateral=${projection.lateral.toFixed(3)} heading=${vehicle.heading.toFixed(3)} ` +
+        `x=${vehicle.x.toFixed(3)} z=${vehicle.z.toFixed(3)} ` +
+        `targetLateral=${desiredLateral(before.progress).toFixed(3)} ` +
+        `event=${SUBJECT3_EVENTS[runtime.eventIndex]?.id ?? 'done'}: ` +
+        result.infractions.map(item => item.id).join(', '),
     )
 
     if (runtime.eventIndex !== lastEventIndex) {
