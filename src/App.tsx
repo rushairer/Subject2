@@ -633,15 +633,16 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     onDone(score, infractions, trajectory.current)
   }, [activeExamId, infractions, onDone, projectComplete, score])
 
-  const continueCombinedExam = () => {
-    if (!combinedExam) return
+  useEffect(() => {
+    if (!combinedExam || !projectComplete || finishLatched.current) return
+    if (infractions.some(item => item.fatal) || score < 80) return
     if (activeIndex >= examSequence.length - 1) {
       finishLatched.current = true
       onDone(score, infractions, trajectory.current)
       return
     }
     setActiveExamId(examSequence[activeIndex + 1])
-  }
+  }, [activeIndex, combinedExam, examSequence, infractions, onDone, projectComplete, score])
 
   return <div className="driving-shell">
     <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCameraModeChange={setCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
@@ -662,7 +663,6 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       </div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
-      {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，沿连接道路驶向下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '继续驶向下一项目' : '完成考试'}</button></div>}
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
