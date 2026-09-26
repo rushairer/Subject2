@@ -375,14 +375,15 @@ export function ExamReplay({
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
 }): ReactElement | null {
-  if (samples.length < 2) return null
-
-  const projects = Array.from(new Set(samples.map(item => item.project)))
   const [focusRequest, setFocusRequest] = useState<{
     project: string
     t: number
     token: number
   } | null>(null)
+
+  if (samples.length < 2) return null
+
+  const projects = Array.from(new Set(samples.map(item => item.project)))
 
   return <section className="replay-section">
     <div className="replay-heading">
