@@ -24,6 +24,7 @@ import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from
 import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
 import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
+import { createKeyboardSteeringState, resetKeyboardSteering, stepKeyboardSteer } from './input/keyboardSteering'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
@@ -253,6 +254,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   onProjectComplete: () => void
 }) {
   const keys = useRef<DrivingKeys>({})
+  const keyboardSteeringState = useRef(createKeyboardSteeringState())
   const cameraYaw = useRef(0)
   const { camera } = useThree()
   const speedTimer = useRef(0)
@@ -309,6 +311,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     }
     const releaseAll = () => {
       clearDrivingKeys(keys.current)
+      resetKeyboardSteering(keyboardSteeringState.current)
       syncLook()
       const v = vehicle.current
       v.throttle = 0
@@ -378,6 +381,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     // Reset only project judges, before the first frame of the new project.
     if (runtimeProject.current !== session.examId) {
       runtimeProject.current = session.examId
+      resetKeyboardSteering(keyboardSteeringState.current)
       reverseParkingRuntime.current = createReverseParkingRuntime()
       sideParkingRuntime.current = createSideParkingRuntime()
       rightAngleRuntime.current = createRightAngleRuntime()
@@ -399,7 +403,13 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         : keys.current['shift']
           ? DRIVING_RULES.manualTransmission.biteClutchPosition
           : 0
-    const keyboardSteer = (keys.current['d'] || keys.current['arrowright'] ? 1 : 0) - (keys.current['a'] || keys.current['arrowleft'] ? 1 : 0)
+    const keyboardSteer = stepKeyboardSteer(keyboardSteeringState.current, {
+      left: !controlsLocked && !wheel.deviceId && !!(keys.current['a'] || keys.current['arrowleft']),
+      right: !controlsLocked && !wheel.deviceId && !!(keys.current['d'] || keys.current['arrowright']),
+      currentAngle: v.steeringWheelAngle,
+      speed: v.speed,
+      dt,
+    })
 
     const throttle = controlsLocked ? 0 : wheel.deviceId ? wheel.throttle : keyboardThrottle
     const brake = controlsLocked ? 0 : wheel.deviceId ? wheel.brake : keyboardBrake
@@ -785,7 +795,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         }}
       />}
       {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
+      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 转向（短按微调/长按加速/松开回正/A+D居中）{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
