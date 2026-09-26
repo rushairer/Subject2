@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { ackermannFrontAngles } from '../sim/wheelContact'
 
 export interface CockpitVehicleState {
   speed: number
@@ -148,21 +149,6 @@ function SteeringColumn() {
 }
 
 
-function ackermannFrontAngles(virtualAngle: number) {
-  if (Math.abs(virtualAngle) < 0.0001) return { left: 0, right: 0 }
-
-  const wheelbase = TRAINING_CAR.wheelbaseMeters
-  const halfTrack = TRAINING_CAR.trackWidthMeters / 2
-  const sign = Math.sign(virtualAngle)
-  const radius = wheelbase / Math.tan(Math.abs(virtualAngle))
-  const inner = Math.atan(wheelbase / Math.max(0.15, radius - halfTrack))
-  const outer = Math.atan(wheelbase / (radius + halfTrack))
-
-  return sign > 0
-    ? { left: outer, right: inner }
-    : { left: -inner, right: -outer }
-}
-
 function RoadWheel({
   x,
   z,
@@ -178,7 +164,7 @@ function RoadWheel({
     <group rotation-z={Math.PI / 2}>
       <group ref={spinRef}>
         <mesh>
-          <cylinderGeometry args={[TRAINING_CAR.wheelRadiusMeters, TRAINING_CAR.wheelRadiusMeters, 0.19, 28]} />
+          <cylinderGeometry args={[TRAINING_CAR.wheelRadiusMeters, TRAINING_CAR.wheelRadiusMeters, TRAINING_CAR.tireWidthMeters, 28]} />
           <meshStandardMaterial color="#111315" roughness={0.86} />
         </mesh>
         <mesh position={[0, 0.101, 0]}>
