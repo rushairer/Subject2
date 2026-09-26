@@ -2,7 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { DRIVING_RULES } from '../rules/drivingRules'
+import { polygonTouchesOutsideRectUnion } from '../sim/planarGeometry'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import { vehicleBodyFootprint } from '../sim/vehicleFootprint'
 import { sceneYawFromHeading, worldPointFromVehicle } from '../sim/vehicleFrame'
 import {
   CENTER_LINE_OFFSET,
@@ -20,6 +22,7 @@ import {
   SUBJECT3_START,
   poseAtRouteDistance,
   projectToSubject3Route,
+  subject3RoadRectsNearProgress,
   type Point,
   type RouteSegment,
   type Subject3RouteEvent,
@@ -65,6 +68,7 @@ export interface Subject3Runtime {
   eventMaxGear: number
   minLateral: number
   maxLateral: number
+  lastLateral: number
   leftSignalSeen: boolean
   rightSignalSeen: boolean
   leftSignalLeadAtManeuver: number
@@ -90,6 +94,7 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.eventMaxGear = 0
   runtime.minLateral = 0
   runtime.maxLateral = 0
+  runtime.lastLateral = 0
   runtime.leftSignalSeen = false
   runtime.rightSignalSeen = false
   runtime.leftSignalLeadAtManeuver = 0
@@ -116,6 +121,7 @@ export function createSubject3Runtime(): Subject3Runtime {
     eventMaxGear: 0,
     minLateral: 0,
     maxLateral: 0,
+    lastLateral: 0,
     leftSignalSeen: false,
     rightSignalSeen: false,
     leftSignalLeadAtManeuver: 0,
@@ -234,7 +240,11 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     if (!runtime.leftSignalSeen) add('signal', '变更车道前未正确使用左转向灯', 100, true)
     requireSignalLead(event, runtime, 'left', add)
     requireObservation(event, runtime, 'left', add)
-    if (runtime.minLateral > -2.0) add('path', '未完成指令要求的变更车道动作', 100, true)
+    if (runtime.minLateral > DRIVING_RULES.subject3.laneChangeTargetLateralMeters) {
+      add('path', '未完成指令要求的变更车道动作', 100, true)
+    } else if (runtime.lastLateral > DRIVING_RULES.subject3.laneChangeTargetLateralMeters) {
+      add('completion', '变更车道项目结束时未保持在目标左侧车道', 100, true)
+    }
   }
 
   if (event.kind === 'overtake') {
@@ -244,7 +254,15 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     requireObservation(event, runtime, 'left', add)
     if (runtime.rightSignalLeadAtManeuver < DRIVING_RULES.subject3.signalLeadSeconds) add('right-signal-lead', '超车返回原车道前右转向灯开启不足 3 秒', 100, true)
     if (!runtime.rightObservedBeforeManeuver && !runtime.backObservedBeforeManeuver) add('right-observation', '超车返回原车道前未观察右侧/后方交通情况', 10)
-    if (runtime.minLateral > -2.0) add('path', '未完成有效的超车车道变化', 100, true)
+    if (runtime.minLateral > DRIVING_RULES.subject3.overtakeTargetLateralMeters) {
+      add('path', '未完成有效的超车车道变化', 100, true)
+    }
+    if (
+      !runtime.returnManeuverStarted ||
+      runtime.lastLateral <= DRIVING_RULES.subject3.overtakeReturnLateralMeters
+    ) {
+      add('return-path', '超车项目结束时未完成返回原车道', 100, true)
+    }
   }
 
   if (event.kind === 'pull-over') {
@@ -287,7 +305,17 @@ export function updateSubject3(
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
   runtime.progress = Math.max(runtime.progress, projection.progress)
 
-  if (projection.lateral > RIGHT_EDGE_OFFSET + 0.55 || projection.lateral < LEFT_EDGE_OFFSET - 0.55) {
+  const roadRects = subject3RoadRectsNearProgress(
+    projection.progress,
+    DRIVING_RULES.subject3.roadBoundaryToleranceMeters,
+  )
+  if (
+    polygonTouchesOutsideRectUnion(
+      vehicleBodyFootprint(vehicle),
+      roadRects,
+      0,
+    )
+  ) {
     infractions.push({
       id: 'subject3-road-boundary',
       title: '科目三道路驾驶中车辆驶出道路边界',
@@ -319,6 +347,7 @@ export function updateSubject3(
     runtime.eventMaxGear = Math.max(runtime.eventMaxGear, vehicle.gear > 0 ? vehicle.gear : 0)
     runtime.minLateral = Math.min(runtime.minLateral, projection.lateral)
     runtime.maxLateral = Math.max(runtime.maxLateral, projection.lateral)
+    runtime.lastLateral = projection.lateral
     runtime.leftSignalSeen ||= vehicle.leftIndicator
     runtime.rightSignalSeen ||= vehicle.rightIndicator
     runtime.hornSeen ||= vehicle.horn
@@ -348,7 +377,12 @@ export function updateSubject3(
       runtime.backObservedBeforeManeuver ||= vehicle.lookBack
     }
 
-    if (event.kind === 'overtake' && runtime.minLateral < -2 && !runtime.returnManeuverStarted && projection.lateral > -1.25) {
+    if (
+      event.kind === 'overtake' &&
+      runtime.minLateral < DRIVING_RULES.subject3.overtakeTargetLateralMeters &&
+      !runtime.returnManeuverStarted &&
+      projection.lateral > DRIVING_RULES.subject3.overtakeReturnLateralMeters
+    ) {
       runtime.returnManeuverStarted = true
       runtime.rightSignalLeadAtManeuver = vehicle.rightSignalAge
       runtime.rightObservedBeforeManeuver ||= vehicle.lookRight
