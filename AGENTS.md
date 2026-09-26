@@ -93,6 +93,14 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
 - Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
 
+## Subject 3 dynamic traffic state
+
+- Dynamic actors that materially affect exam rules must publish deterministic shared traffic state; rendering alone is not sufficient evidence for a rule judgment.
+- `src/subject3/subject3Traffic.ts` owns the dynamic crosswalk pedestrian path, rendered crosswalk progress, and whether that pedestrian is currently occupying the candidate's carriageway.
+- The crosswalk event requires a yield stop only if a live pedestrian conflict was actually observed during that event. Do not require unconditional stopping at every crosswalk.
+- A live pedestrian conflict is satisfied only by a real stopped-speed observation while the conflict is active; slowing down elsewhere in the event does not count.
+- Keep actor collision failure and rule-level yielding separate: a collision is always fatal, while successful yielding prevents the rule-level failure before contact occurs.
+
 ## Subject 3 straight-driving and gear judging
 
 - Straight-driving events must record at least one rear-traffic observation through the available look controls; direction stability and observation are separate judgments.
