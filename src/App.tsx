@@ -5,7 +5,9 @@ import { ReverseParkingCourse, createReverseParkingRuntime, updateReverseParking
 import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from './subject2/SideParkingCourse'
 import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
-import { subject2StartPose } from './subject2/courseStartPoses'
+import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
+import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
+import { subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
@@ -104,13 +106,17 @@ const initialProjectStatus = (examId: ExamId) => {
   return ''
 }
 
-const initialVehicle = (examId?: ExamId): Vehicle => {
+const initialVehicle = (
+  examId?: ExamId,
+  poseOverride?: { x: number; z: number; heading: number },
+): Vehicle => {
   const subject2Start = subject2StartPose(examId)
   const subject3 = examId === 'subject3'
+  const pose = poseOverride ?? subject2Start ?? (subject3 ? { ...SUBJECT3_START, heading: 0 } : { x: 0, z: 8, heading: 0 })
   return {
-    x: subject2Start?.x ?? (subject3 ? SUBJECT3_START.x : 0),
-    z: subject2Start?.z ?? (subject3 ? SUBJECT3_START.z : 8),
-    heading: subject2Start?.heading ?? 0,
+    x: pose.x,
+    z: pose.z,
+    heading: pose.heading,
     speed: 0,
     steering: 0,
     steeringWheelAngle: 0,
@@ -229,8 +235,8 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode, onCameraModeChange, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
-  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, controlsLocked: boolean,
+function DrivingWorld({ vehicle, session, automatic, continuousExam, controlsLocked, cameraMode, onCameraModeChange, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, controlsLocked: boolean,
   cameraMode: CameraMode,
   onCameraModeChange: (mode: CameraMode) => void,
   onInfraction: (i: Infraction) => void, onTick: () => void,
@@ -362,7 +368,10 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
         ? wheel.clutch
         : keyboardClutch
     const steer = controlsLocked || wheel.deviceId ? 0 : keyboardSteer
-    const slopeBeforeStep = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
+    const slopeVehicleBefore = continuousExam && session.examId === 'slope-start'
+      ? subject2ExamLocalVehicle('slope-start', v)
+      : v
+    const slopeBeforeStep = session.examId === 'slope-start' ? getSlopePose(slopeVehicleBefore.z) : { y: 0, pitch: 0, grade: 0 }
     const physics = stepVehiclePhysics(v, {
       throttle,
       brake,
@@ -386,7 +395,10 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
     v.leftSignalAge = v.leftIndicator ? v.leftSignalAge + dt : 0
     v.rightSignalAge = v.rightIndicator ? v.rightSignalAge + dt : 0
 
-    const roadPose = session.examId === 'slope-start' ? getSlopePose(v.z) : { y: 0, pitch: 0, grade: 0 }
+    const judgedVehicle = continuousExam
+      ? subject2ExamLocalVehicle(session.examId as Subject2ProjectId, v)
+      : v
+    const roadPose = session.examId === 'slope-start' ? getSlopePose(judgedVehicle.z) : { y: 0, pitch: 0, grade: 0 }
     if (carGroup.current) {
       carGroup.current.position.set(v.x, roadPose.y, v.z)
       carGroup.current.rotation.set(roadPose.pitch, -v.heading, 0)
@@ -463,27 +475,27 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     let projectCompleted = false
     if (session.examId === 'reverse-parking') {
-      const update = updateReverseParking(v, reverseParkingRuntime.current, dt)
+      const update = updateReverseParking(judgedVehicle, reverseParkingRuntime.current, dt)
       reverseParkingRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
     } else if (session.examId === 'side-parking') {
-      const update = updateSideParking(v, sideParkingRuntime.current, dt)
+      const update = updateSideParking(judgedVehicle, sideParkingRuntime.current, dt)
       sideParkingRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
     } else if (session.examId === 'right-angle') {
-      const update = updateRightAngle(v, rightAngleRuntime.current, dt)
+      const update = updateRightAngle(judgedVehicle, rightAngleRuntime.current, dt)
       rightAngleRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
     } else if (session.examId === 'curve-driving') {
-      const update = updateCurveDriving(v, curveRuntime.current, dt)
+      const update = updateCurveDriving(judgedVehicle, curveRuntime.current, dt)
       curveRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
     } else if (session.examId === 'slope-start') {
-      const update = updateSlopeStart(v, slopeRuntime.current, dt)
+      const update = updateSlopeStart(judgedVehicle, slopeRuntime.current, dt)
       slopeRuntime.current = update.runtime
       projectUpdate = update
       projectCompleted = update.runtime.completed
@@ -515,7 +527,7 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
     <ambientLight intensity={night ? .2 : 1.2} />
     <hemisphereLight intensity={night ? .12 : .65} groundColor="#59644f" />
     <directionalLight position={[25, 42, 18]} intensity={night ? .16 : 2.1} />
-    {session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
+    {continuousExam ? <Subject2ExamCourse automatic={automatic} /> : session.examId === 'reverse-parking' ? <ReverseParkingCourse /> : session.examId === 'side-parking' ? <SideParkingCourse /> : session.examId === 'right-angle' ? <RightAngleCourse /> : session.examId === 'curve-driving' ? <CurveDrivingCourse /> : session.examId === 'slope-start' ? <SlopeStartCourse /> : session.examId === 'subject3' ? <Subject3Course player={vehicle} onInfraction={onInfraction} /> : <Road />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
@@ -524,14 +536,15 @@ function DrivingWorld({ vehicle, session, automatic, controlsLocked, cameraMode,
 function Driving({ session, candidate, onDone }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[]) => void }) {
   const combinedExam = session.examId === 'subject2-exam'
   const automatic = candidate.licenseType === 'C2'
-  const examSequence: ExamId[] = candidate.licenseType === 'C1'
-    ? ['reverse-parking', 'slope-start', 'side-parking', 'curve-driving', 'right-angle']
-    : ['reverse-parking', 'side-parking', 'curve-driving', 'right-angle']
+  const examSequence: ExamId[] = subject2ExamSequence(automatic)
   const [activeExamId, setActiveExamId] = useState<ExamId>(combinedExam ? examSequence[0] : session.examId)
   const activeIndex = combinedExam ? examSequence.indexOf(activeExamId) : 0
   const effectiveSession: Session = { ...session, examId: activeExamId }
-  const vehicle = useRef(initialVehicle(activeExamId))
-  const [display, setDisplay] = useState(initialVehicle(activeExamId))
+  const combinedStartPose = combinedExam
+    ? subject2ExamWorldStartPose(examSequence[0] as Subject2ProjectId)
+    : undefined
+  const vehicle = useRef(initialVehicle(activeExamId, combinedStartPose))
+  const [display, setDisplay] = useState(() => initialVehicle(activeExamId, combinedStartPose))
   const [infractions, setInfractions] = useState<Infraction[]>([])
   const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
   const [projectComplete, setProjectComplete] = useState(false)
@@ -542,25 +555,34 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const sessionStartedAt = useRef(performance.now())
   const lastTrajectorySampleAt = useRef(0)
   const trajectory = useRef<TrajectorySample[]>([])
+  const activeReplayVehicle = () => combinedExam
+    ? subject2ExamLocalVehicle(activeExamId as Subject2ProjectId, vehicle.current)
+    : vehicle.current
   const addInfraction = (item: Infraction) => setInfractions(prev => {
     if (prev.some(x => x.id === item.id)) return prev
     const now = performance.now()
+    const replayVehicle = activeReplayVehicle()
     return [...prev, {
       ...item,
       t: (now - sessionStartedAt.current) / 1000,
-      x: vehicle.current.x,
-      z: vehicle.current.z,
+      x: replayVehicle.x,
+      z: replayVehicle.z,
       project: activeExamId,
     }]
   })
 
   useEffect(() => {
-    vehicle.current = initialVehicle(activeExamId)
-    setDisplay(initialVehicle(activeExamId))
+    if (!combinedExam) {
+      const resetVehicle = initialVehicle(activeExamId)
+      vehicle.current = resetVehicle
+      setDisplay(resetVehicle)
+    } else {
+      setDisplay({ ...vehicle.current })
+    }
     setProjectStatus(initialProjectStatus(activeExamId))
     setProjectComplete(false)
     setLightTestDone(!(activeExamId === 'subject3' && session.time === 'day'))
-  }, [activeExamId, session.time])
+  }, [activeExamId, combinedExam, session.time])
 
   const tick = () => {
     const now = performance.now()
@@ -571,13 +593,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
     if (now - lastTrajectorySampleAt.current > 180) {
       lastTrajectorySampleAt.current = now
       const v = vehicle.current
+      const replayVehicle = activeReplayVehicle()
       trajectory.current.push({
         t: (now - sessionStartedAt.current) / 1000,
-        x: v.x,
-        z: v.z,
+        x: replayVehicle.x,
+        z: replayVehicle.z,
         speed: v.speed,
         gear: v.gear,
-        heading: v.heading,
+        heading: replayVehicle.heading,
         project: activeExamId,
       })
     }
@@ -621,7 +644,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   }
 
   return <div className="driving-shell">
-    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCameraModeChange={setCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
+    <Canvas camera={{ fov: 68, near: .05, far: 500 }}><DrivingWorld key={activeExamId} vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCameraModeChange={setCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProjectComplete(true)} /></Canvas>
     <div className="hud">
       <div className="hud-top">
         <div className="status-chip">{candidate.name} · {combinedExam ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}` : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
@@ -639,7 +662,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       </div>
       {activeExamId === 'subject3' && !lightTestDone && <NightLightTest vehicle={vehicle} onPass={() => setLightTestDone(true)} onFail={(prompt) => { addInfraction({ id: 'subject3-light-test', title: `模拟夜间灯光考试操作错误：${prompt}`, points: 100, fatal: true }); setLightTestDone(true) }} />}
       {projectStatus && <div className="project-status">{projectStatus}</div>}
-      {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，准备进入下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '进入下一项目' : '完成考试'}</button></div>}
+      {combinedExam && projectComplete && <div className="project-transition"><div className="eyebrow">项目完成</div><h3>{examTitle(activeExamId)}</h3><p>{activeIndex < examSequence.length - 1 ? `当前总分 ${score}，沿连接道路驶向下一项目：${examTitle(examSequence[activeIndex + 1])}` : `全部 ${examSequence.length} 个项目已完成，生成科目二成绩单。`}</p><button className="primary" onClick={continueCombinedExam}>{activeIndex < examSequence.length - 1 ? '继续驶向下一项目' : '完成考试'}</button></div>}
       <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 油门 · S 刹车 · A/D 持续打轮，松开保持方向{automatic ? '' : ' · C 离合到底 · Shift 半联动'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
