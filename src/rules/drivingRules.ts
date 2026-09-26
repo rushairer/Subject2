@@ -1,5 +1,7 @@
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 
+const TRAINING_MANUAL_HIGHEST_FORWARD_GEAR = 5
+
 export const DRIVING_RULES = {
   steering: {
     wheelTurnsLockToLock: 2.7,
@@ -10,7 +12,7 @@ export const DRIVING_RULES = {
     rearAxleFromCenterMeters: TRAINING_CAR.rearAxleFromCenterMeters,
   },
   manualTransmission: {
-    highestForwardGear: 5,
+    highestForwardGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR,
     idleRpm: 820,
     stallRpm: 560,
     stallDelaySeconds: 0.42,
@@ -28,7 +30,7 @@ export const DRIVING_RULES = {
     overtakeTargetLateralMeters: -2.0,
     overtakeReturnLateralMeters: -1.25,
     gear: {
-      minimumRequiredGear: 4,
+      minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
     },
     pullOver: {
