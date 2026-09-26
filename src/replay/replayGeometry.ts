@@ -1,4 +1,4 @@
-import { forwardFromHeading, rightFromHeading } from '../sim/vehicleFrame'
+import { forwardFromHeading, normalizeHeadingDelta, rightFromHeading } from '../sim/vehicleFrame'
 
 export interface ReplayPoint {
   x: number
@@ -31,4 +31,13 @@ export function toReplayLocal(point: ReplayPoint, frame: ReplayFrame): ReplayPoi
     x: dx * right.x + dz * right.z,
     z: dx * forward.x + dz * forward.z,
   }
+}
+
+
+/**
+ * Converts a world heading into the same initial-driver-relative frame used
+ * by replay X/Z coordinates. Positive values remain right turns on screen.
+ */
+export function toReplayHeading(heading: number, frameHeading: number) {
+  return normalizeHeadingDelta(heading - frameHeading)
 }
