@@ -89,7 +89,8 @@ Standalone course geometry and judging remain defined in each course's **local f
 `src/rules/subject3Rules.ts` owns the Subject 3 pass score and penalty severity metadata.
 
 - `Subject3Course.tsx` may decide *when* a rule is violated and generate contextual titles/IDs, but must not hard-code penalty points or fatal flags.
-- Use `subject3Infraction(...)` for both event-level and global Subject 3 infractions, including road boundary, safety belt, lighting and traffic collisions.
+- Use `subject3Infraction(...)` for both event-level and global Subject 3 infractions, including road boundary, safety belt, lighting, simulated night-light-test failure and traffic collisions.
+- UI callbacks may detect a Subject 3 failure when the event originates outside the route state machine, but they must still source severity from `subject3Rules.ts`; never inline Subject 3 points/fatal flags in `App.tsx`.
 - `DRIVING_RULES.subject3` continues to own physical/behavioral thresholds such as signal lead time, lane targets, gear timing and stopping tolerances; do not duplicate those values in the scoring matrix.
 - Changes to scoring severity require an explicit rule-matrix edit and regression update.
 - `tests/subject3-rule-matrix.test.ts` guards the matrix and rejects inline severity literals in the state machine.
