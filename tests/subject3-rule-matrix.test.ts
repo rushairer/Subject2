@@ -83,3 +83,14 @@ test('Subject 3 pass line is sourced from the rule matrix', () => {
   assert.equal(passLineForExam('subject3'), SUBJECT3_RULE_LIMITS.passScore)
   assert.equal(passLineForExam('subject3'), 90)
 })
+
+
+test('App renderer loop no longer owns Subject 3 global penalties', () => {
+  const source = readFileSync(
+    new URL('../src/App.tsx', import.meta.url),
+    'utf8',
+  )
+
+  assert.doesNotMatch(source, /session\.examId === 'subject3' \? 50/)
+  assert.match(source, /if \(session\.examId !== 'subject3'\)/)
+})
