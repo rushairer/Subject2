@@ -22,6 +22,16 @@ Every Subject 2 project state machine must also have deterministic regression co
 
 PR validation must run `npm test` and `npm run build` before merging course-state changes into `main`.
 
+## Single source of truth for Subject 2 rules
+
+`src/rules/subject2Rules.ts` owns the Subject 2 pass line, scoring metadata, fatal/non-fatal classification, and judgment thresholds such as time limits, stop durations, positioning tolerances and rollback bands.
+
+- Course state machines may own geometry and phase transitions, but must not hard-code penalty points or fatal flags.
+- New or changed Subject 2 infractions must be added to `SUBJECT2_INFRACTION_RULES` and referenced through `subject2Infraction(...)`.
+- New or changed scoring/tolerance values must be added to `SUBJECT2_RULE_LIMITS`; do not duplicate them in course files or UI code.
+- Every rule-matrix entry must have deterministic state-machine regression coverage.
+- Refactors of the rule layer must preserve current behavior unless a rule change is explicitly intended and documented.
+
 ## Single source of truth for training-car geometry
 
 `src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
