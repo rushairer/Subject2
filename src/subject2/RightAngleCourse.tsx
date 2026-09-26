@@ -43,6 +43,7 @@ export interface RightAngleRuntime {
   entered: boolean
   stopSeconds: number
   stopPenaltyLatched: boolean
+  stopPenaltySequence: number
   turnSignalChecked: boolean
   signalCloseChecked: boolean
   completed: boolean
@@ -54,6 +55,7 @@ export function createRightAngleRuntime(): RightAngleRuntime {
     entered: false,
     stopSeconds: 0,
     stopPenaltyLatched: false,
+    stopPenaltySequence: 0,
     turnSignalChecked: false,
     signalCloseChecked: false,
     completed: false,
@@ -164,8 +166,9 @@ export function updateRightAngle(
   if (runtime.entered && !['complete'].includes(runtime.phase) && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
     if (runtime.stopSeconds > RIGHT_ANGLE.stopLimitSeconds && !runtime.stopPenaltyLatched) {
+      runtime.stopPenaltySequence += 1
       infractions.push({
-        id: `right-angle-stop-${Date.now()}`,
+        id: `right-angle-stop-${runtime.stopPenaltySequence}`,
         title: '直角转弯中途停车超过 2 秒',
         points: 5,
       })
