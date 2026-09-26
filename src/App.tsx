@@ -21,7 +21,7 @@ import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
 import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
-import { assessSessionResult } from './session/sessionResult'
+import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 
@@ -684,7 +684,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
 
   useEffect(() => {
     if (session.mode !== 'exam' || finishLatched.current || infractions.length === 0) return
-    const passLine = activeExamId === 'subject3' ? 90 : 80
+    const passLine = passLineForExam(activeExamId)
     if (infractions.some(i => i.fatal) || score < passLine) finishSession()
   }, [activeExamId, infractions, finishSession, score, session.mode])
 

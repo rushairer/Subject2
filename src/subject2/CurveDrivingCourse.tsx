@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
@@ -7,7 +8,7 @@ export const CURVE_DRIVING = {
   radius: 7.5,
   roadWidth: 3.5,
   arcDegrees: 135,
-  stopLimitSeconds: 2,
+  stopLimitSeconds: SUBJECT2_RULE_LIMITS.curveDriving.stopLimitSeconds,
   carLength: TRAINING_CAR.lengthMeters,
   trackWidth: TRAINING_CAR.trackWidthMeters,
 } as const
@@ -145,32 +146,18 @@ export function updateCurveDriving(
 
   if (runtime.started) {
     if (wheelPoints(vehicle).some(([x, z]) => nearestWheelDistance(x, z) >= halfRoad)) {
-      infractions.push({
-        id: 'curve-wheel-line',
-        title: '曲线行驶车轮触轧道路边缘线',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('curve-wheel-line'))
     }
 
     if (movingReverse && !runtime.reverseLatched) {
       runtime.reverseLatched = true
-      infractions.push({
-        id: 'curve-reverse',
-        title: '曲线行驶未按规定路线连续前进',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('curve-reverse'))
     }
 
     if (stopped && vehicle.engineOn) {
       runtime.stopSeconds += dt
       if (runtime.stopSeconds > CURVE_DRIVING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
-        infractions.push({
-          id: `curve-stop-${runtime.progressIndex}`,
-          title: '曲线行驶中途停车',
-          points: 5,
-        })
+        infractions.push(subject2Infraction('curve-stop', runtime.progressIndex))
         runtime.stopPenaltyLatched = true
       }
     } else if (!stopped) {

@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
@@ -13,7 +14,7 @@ export const SLOPE_START = {
   stopLineWidth: 0.3,
   controlOffset: 0.5,
   grade: 0.10,
-  startLimitSeconds: 30,
+  startLimitSeconds: SUBJECT2_RULE_LIMITS.slopeStart.startLimitSeconds,
 } as const
 
 export const SLOPE_GEOMETRY = {
@@ -102,10 +103,8 @@ function rightBodyGap(vehicle: SlopeVehicle) {
   return SLOPE_GEOMETRY.roadHalf - rightSide.x
 }
 
-const MEASUREMENT_EPSILON = 1e-6
-
 function exceedsMeasurement(value: number, limit: number) {
-  return value > limit + MEASUREMENT_EPSILON
+  return value > limit + SUBJECT2_RULE_LIMITS.slopeStart.measurementEpsilon
 }
 
 function status(runtime: SlopeRuntime) {
@@ -140,17 +139,12 @@ export function updateSlopeStart(
   if (!runtime.entered && movingForward && inCourseEntry) runtime.entered = true
 
   if (runtime.entered && wheelPoints(vehicle).some(([x]) => Math.abs(x) >= SLOPE_GEOMETRY.roadHalf)) {
-    infractions.push({
-      id: 'slope-wheel-line',
-      title: '坡道行驶中车轮触轧道路边缘线',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject2Infraction('slope-wheel-line'))
   }
 
   if (runtime.phase === 'approach' && runtime.entered && stopped) {
     runtime.stopHoldSeconds += dt
-    if (runtime.stopHoldSeconds >= 0.5) {
+    if (runtime.stopHoldSeconds >= SUBJECT2_RULE_LIMITS.slopeStart.stopHoldSeconds) {
       runtime.phase = 'stopped'
       runtime.stopCenterZ = vehicle.z
       runtime.startElapsed = 0
@@ -158,35 +152,17 @@ export function updateSlopeStart(
       if (!runtime.stopEvaluated) {
         runtime.stopEvaluated = true
         const longitudinalError = Math.abs(frontBumperZ(vehicle) - SLOPE_GEOMETRY.stopLineZ)
-        if (exceedsMeasurement(longitudinalError, 0.5)) {
-          infractions.push({
-            id: 'slope-stop-longitudinal-fail',
-            title: '定点停车后前保险杠距桩杆线前后偏差超过 50cm',
-            points: 100,
-            fatal: true,
-          })
-        } else if (exceedsMeasurement(longitudinalError, SLOPE_START.stopLineWidth / 2)) {
-          infractions.push({
-            id: 'slope-stop-longitudinal-10',
-            title: '定点停车后前保险杠未定于桩杆线，前后偏差不超过 50cm',
-            points: 10,
-          })
+        if (exceedsMeasurement(longitudinalError, SUBJECT2_RULE_LIMITS.slopeStart.stopLongitudinalFatalMeters)) {
+          infractions.push(subject2Infraction('slope-stop-longitudinal-fail'))
+        } else if (exceedsMeasurement(longitudinalError, SUBJECT2_RULE_LIMITS.slopeStart.stopLongitudinalMinorMeters)) {
+          infractions.push(subject2Infraction('slope-stop-longitudinal-10'))
         }
 
         const gap = rightBodyGap(vehicle)
-        if (exceedsMeasurement(gap, 0.5)) {
-          infractions.push({
-            id: 'slope-right-gap-fail',
-            title: '定点停车后车身距右侧道路边缘线超过 50cm',
-            points: 100,
-            fatal: true,
-          })
-        } else if (exceedsMeasurement(gap, 0.3)) {
-          infractions.push({
-            id: 'slope-right-gap-10',
-            title: '定点停车后车身距右侧道路边缘线超过 30cm 但未超过 50cm',
-            points: 10,
-          })
+        if (exceedsMeasurement(gap, SUBJECT2_RULE_LIMITS.slopeStart.rightGapFatalMeters)) {
+          infractions.push(subject2Infraction('slope-right-gap-fail'))
+        } else if (exceedsMeasurement(gap, SUBJECT2_RULE_LIMITS.slopeStart.rightGapMinorMeters)) {
+          infractions.push(subject2Infraction('slope-right-gap-10'))
         }
       }
     }
@@ -198,24 +174,15 @@ export function updateSlopeStart(
     runtime.startElapsed += dt
     runtime.maxRollback = Math.max(runtime.maxRollback, vehicle.z - runtime.stopCenterZ)
 
-    if (!runtime.parkingBrakeEvaluated && runtime.stopHoldSeconds + runtime.startElapsed > 1.2) {
+    if (!runtime.parkingBrakeEvaluated && runtime.stopHoldSeconds + runtime.startElapsed > SUBJECT2_RULE_LIMITS.slopeStart.parkingBrakeCheckSeconds) {
       runtime.parkingBrakeEvaluated = true
       if (!vehicle.handbrake) {
-        infractions.push({
-          id: 'slope-no-parking-brake',
-          title: '停车后未拉紧驻车制动器',
-          points: 10,
-        })
+        infractions.push(subject2Infraction('slope-no-parking-brake'))
       }
     }
 
     if (runtime.startElapsed > SLOPE_START.startLimitSeconds) {
-      infractions.push({
-        id: 'slope-start-timeout',
-        title: '坡道起步超过规定的 30 秒',
-        points: 100,
-        fatal: true,
-      })
+      infractions.push(subject2Infraction('slope-start-timeout'))
     }
 
     if (movingForward) {
@@ -225,21 +192,12 @@ export function updateSlopeStart(
 
   if (runtime.phase === 'starting') {
     runtime.maxRollback = Math.max(runtime.maxRollback, vehicle.z - runtime.stopCenterZ)
-    if (!runtime.rollbackEvaluated && vehicle.z < runtime.stopCenterZ - 0.35) {
+    if (!runtime.rollbackEvaluated && vehicle.z < runtime.stopCenterZ - SUBJECT2_RULE_LIMITS.slopeStart.rollbackEvaluateAfterForwardMeters) {
       runtime.rollbackEvaluated = true
-      if (exceedsMeasurement(runtime.maxRollback, 0.30)) {
-        infractions.push({
-          id: 'slope-rollback-fail',
-          title: '坡道起步车辆后溜距离超过 30cm',
-          points: 100,
-          fatal: true,
-        })
-      } else if (exceedsMeasurement(runtime.maxRollback, 0.02)) {
-        infractions.push({
-          id: 'slope-rollback-10',
-          title: '坡道起步车辆发生后溜，距离不超过 30cm',
-          points: 10,
-        })
+      if (exceedsMeasurement(runtime.maxRollback, SUBJECT2_RULE_LIMITS.slopeStart.rollbackFatalMeters)) {
+        infractions.push(subject2Infraction('slope-rollback-fail'))
+      } else if (exceedsMeasurement(runtime.maxRollback, SUBJECT2_RULE_LIMITS.slopeStart.rollbackMinimumMeters)) {
+        infractions.push(subject2Infraction('slope-rollback-10'))
       }
     }
 

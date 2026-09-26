@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
 
@@ -7,7 +8,7 @@ export const RIGHT_ANGLE = {
   carWidth: TRAINING_CAR.widthMeters,
   roadWidth: 3.6,
   legLength: 6.8,
-  stopLimitSeconds: 2,
+  stopLimitSeconds: SUBJECT2_RULE_LIMITS.rightAngle.stopLimitSeconds,
 } as const
 
 const half = RIGHT_ANGLE.roadWidth / 2
@@ -117,12 +118,7 @@ export function updateRightAngle(
   if (!runtime.entered && inEntryLane) runtime.entered = true
 
   if (runtime.entered && wheelPoints(vehicle).some(([x, z]) => !pointAllowed(x, z))) {
-    infractions.push({
-      id: 'right-angle-wheel-out',
-      title: '直角转弯车轮轧道路边缘线',
-      points: 100,
-      fatal: true,
-    })
+    infractions.push(subject2Infraction('right-angle-wheel-out'))
   }
 
   const enteringTurn =
@@ -133,11 +129,7 @@ export function updateRightAngle(
     if (!runtime.turnSignalChecked) {
       runtime.turnSignalChecked = true
       if (!vehicle.leftIndicator) {
-        infractions.push({
-          id: 'right-angle-no-signal',
-          title: '直角转弯前未使用或错误使用转向灯',
-          points: 10,
-        })
+        infractions.push(subject2Infraction('right-angle-no-signal'))
       }
     }
   }
@@ -150,11 +142,7 @@ export function updateRightAngle(
   if (runtime.phase === 'exit' && vehicle.x < -4.2 && !runtime.signalCloseChecked) {
     runtime.signalCloseChecked = true
     if (vehicle.leftIndicator) {
-      infractions.push({
-        id: 'right-angle-signal-not-cancelled',
-        title: '直角转弯后未关闭转向灯',
-        points: 10,
-      })
+      infractions.push(subject2Infraction('right-angle-signal-not-cancelled'))
     }
   }
 
@@ -167,11 +155,7 @@ export function updateRightAngle(
     runtime.stopSeconds += dt
     if (runtime.stopSeconds > RIGHT_ANGLE.stopLimitSeconds && !runtime.stopPenaltyLatched) {
       runtime.stopPenaltySequence += 1
-      infractions.push({
-        id: `right-angle-stop-${runtime.stopPenaltySequence}`,
-        title: '直角转弯中途停车超过 2 秒',
-        points: 5,
-      })
+      infractions.push(subject2Infraction('right-angle-stop', runtime.stopPenaltySequence))
       runtime.stopPenaltyLatched = true
     }
   } else if (!stopped) {
