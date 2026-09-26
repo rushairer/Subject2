@@ -8,7 +8,7 @@ import {
   turnDirection,
   worldPointFromVehicle,
 } from '../src/sim/vehicleFrame'
-import { toReplayLocal } from '../src/replay/replayGeometry'
+import { toReplayHeading, toReplayLocal } from '../src/replay/replayGeometry'
 import {
   SUBJECT3_EVENTS,
   SUBJECT3_SEGMENTS,
@@ -104,4 +104,15 @@ test('reverse-parking replay maps world +X to vehicle-left when heading is pi', 
   const local = toReplayLocal({ x: 1, z: 0 }, frame)
   near(local.x, -1)
   near(local.z, 0)
+})
+
+
+test('replay heading preserves right/left turn sign relative to the initial vehicle', () => {
+  near(toReplayHeading(Math.PI / 2, 0), Math.PI / 2)
+  near(toReplayHeading(-Math.PI / 2, 0), -Math.PI / 2)
+})
+
+test('replay heading normalizes wraparound without flipping turn direction', () => {
+  near(toReplayHeading(-Math.PI + 0.1, Math.PI - 0.1), 0.2)
+  near(toReplayHeading(Math.PI - 0.1, -Math.PI + 0.1), -0.2)
 })
