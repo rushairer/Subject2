@@ -556,9 +556,14 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
   const sessionStartedAt = useRef(performance.now())
   const lastTrajectorySampleAt = useRef(0)
   const trajectory = useRef<TrajectorySample[]>([])
-  const activeReplayVehicle = () => combinedExam
-    ? subject2ExamLocalVehicle(activeExamId as Subject2ProjectId, vehicle.current)
-    : vehicle.current
+  const replayProjectId =
+    combinedExam && activeIndex > 0 && !activeEntryReached
+      ? `transition:${examSequence[activeIndex - 1]}:${activeExamId}`
+      : activeExamId
+  const activeReplayVehicle = () =>
+    combinedExam && replayProjectId === activeExamId
+      ? subject2ExamLocalVehicle(activeExamId as Subject2ProjectId, vehicle.current)
+      : vehicle.current
   const addInfraction = (item: Infraction) => setInfractions(prev => {
     if (prev.some(x => x.id === item.id)) return prev
     const now = performance.now()
@@ -568,7 +573,7 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
       t: (now - sessionStartedAt.current) / 1000,
       x: replayVehicle.x,
       z: replayVehicle.z,
-      project: activeExamId,
+      project: replayProjectId,
     }]
   })
 
@@ -603,11 +608,12 @@ function Driving({ session, candidate, onDone }: { session: Session, candidate: 
         speed: v.speed,
         gear: v.gear,
         heading: replayVehicle.heading,
-        project: activeExamId,
+        project: replayProjectId,
         steeringWheelAngle: v.steeringWheelAngle,
         leftIndicator: v.leftIndicator || v.hazard,
         rightIndicator: v.rightIndicator || v.hazard,
         handbrake: v.handbrake,
+        automatic,
       })
     }
   }
