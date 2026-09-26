@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
+import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -125,9 +126,11 @@ export function updateCurveDriving(
   vehicle: CurveVehicle,
   previous: CurveRuntime,
   dt: number,
+  profile: Subject2RuleProfile = SUBJECT2_NATIONAL_RULE_PROFILE,
 ): { runtime: CurveRuntime; infractions: CurveInfraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: CurveInfraction[] = []
+  const rules = profile.limits.curveDriving
   if (runtime.completed) return { runtime, infractions, status: status(runtime) }
 
   const movingForward = vehicle.speed > 0.08
@@ -156,7 +159,7 @@ export function updateCurveDriving(
 
     if (stopped && vehicle.engineOn) {
       runtime.stopSeconds += dt
-      if (runtime.stopSeconds > CURVE_DRIVING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
+      if (runtime.stopSeconds > rules.stopLimitSeconds && !runtime.stopPenaltyLatched) {
         infractions.push(subject2Infraction('curve-stop', runtime.progressIndex))
         runtime.stopPenaltyLatched = true
       }

@@ -31,6 +31,8 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 - New or changed scoring/tolerance values must be added to `SUBJECT2_RULE_LIMITS`; do not duplicate them in course files or UI code.
 - Every rule-matrix entry must have deterministic state-machine regression coverage.
 - Refactors of the rule layer must preserve current behavior unless a rule change is explicitly intended and documented.
+- `src/rules/subject2RuleProfile.ts` is the only supported way to construct local/venue rule variants. Every override must carry a non-empty `sourceNote`; do not invent local thresholds.
+- The national profile remains the default for all judges and result assessment. A course/venue pack may inject a profile explicitly, but must never mutate `SUBJECT2_RULE_LIMITS` or fork the state machines.
 
 ## Single source of truth for training-car geometry
 

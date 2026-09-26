@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import { worldPointFromVehicle } from '../sim/vehicleFrame'
@@ -131,8 +132,8 @@ function bodyOutsideProject(vehicle: ReverseParkingVehicle) {
   return carCorners(vehicle).some(([x, z]) => !pointInAllowedArea(x, z))
 }
 
-function statusFor(runtime: ReverseParkingRuntime) {
-  const seconds = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${REVERSE_PARKING.timeLimitSeconds}s` : ''
+function statusFor(runtime: ReverseParkingRuntime, timeLimitSeconds: number = SUBJECT2_RULE_LIMITS.reverseParking.timeLimitSeconds) {
+  const seconds = runtime.started ? ` · ${Math.ceil(runtime.elapsed)} / ${timeLimitSeconds}s` : ''
   switch (runtime.phase) {
     case 'approach': return '驶过起始端控制线后停车，挂 R 挡开始第一次倒库'
     case 'first-reverse': return '第一次倒车入库：观察左后视镜与库角，车身完全入库后停车' + seconds
@@ -149,10 +150,12 @@ export function updateReverseParking(
   vehicle: ReverseParkingVehicle,
   previous: ReverseParkingRuntime,
   dt: number,
+  profile: Subject2RuleProfile = SUBJECT2_NATIONAL_RULE_PROFILE,
 ): ReverseParkingUpdate {
   const runtime = { ...previous }
   const infractions: ReverseParkingInfraction[] = []
-  if (runtime.completed) return { runtime, infractions, status: statusFor(runtime) }
+  const rules = profile.limits.reverseParking
+  if (runtime.completed) return { runtime, infractions, status: statusFor(runtime, rules.timeLimitSeconds) }
 
   const [frontA, frontB] = frontWheelZs(vehicle)
   if (frontA >= REVERSE_PARKING_GEOMETRY.startControlZ && frontB >= REVERSE_PARKING_GEOMETRY.startControlZ) {
@@ -176,7 +179,7 @@ export function updateReverseParking(
 
   if (runtime.started && runtime.phase !== 'complete') {
     runtime.elapsed += dt
-    if (runtime.elapsed > REVERSE_PARKING.timeLimitSeconds) {
+    if (runtime.elapsed > rules.timeLimitSeconds) {
       infractions.push(subject2Infraction('reverse-parking-timeout'))
     }
   }
@@ -189,7 +192,7 @@ export function updateReverseParking(
   const parkingPhase = runtime.phase === 'first-reverse' || runtime.phase === 'second-reverse'
   if (parkingPhase && stopped && inBay) {
     runtime.parkedHoldSeconds += dt
-    if (runtime.parkedHoldSeconds >= SUBJECT2_RULE_LIMITS.reverseParking.parkedHoldSeconds) {
+    if (runtime.parkedHoldSeconds >= rules.parkedHoldSeconds) {
       runtime.phase = runtime.phase === 'first-reverse' ? 'first-parked' : 'second-parked'
       runtime.parkedHoldSeconds = 0
       runtime.stopSeconds = 0
@@ -234,7 +237,7 @@ export function updateReverseParking(
 
   if (mayPenalizeStop && stopped && vehicle.engineOn) {
     runtime.stopSeconds += dt
-    if (runtime.stopSeconds > REVERSE_PARKING.stopLimitSeconds && !runtime.stopPenaltyLatched) {
+    if (runtime.stopSeconds > rules.stopLimitSeconds && !runtime.stopPenaltyLatched) {
       infractions.push(subject2Infraction('reverse-parking-stop', Math.floor(runtime.elapsed * 10)))
       runtime.stopPenaltyLatched = true
     }
@@ -243,7 +246,7 @@ export function updateReverseParking(
     runtime.stopPenaltyLatched = false
   }
 
-  return { runtime, infractions, status: statusFor(runtime) }
+  return { runtime, infractions, status: statusFor(runtime, rules.timeLimitSeconds) }
 }
 
 function GroundLine({ x, z, width, depth }: { x: number; z: number; width: number; depth: number }) {
