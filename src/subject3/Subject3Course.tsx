@@ -83,6 +83,8 @@ export interface Subject3Runtime {
   leftObservedBeforeManeuver: boolean
   rightObservedBeforeManeuver: boolean
   backObservedBeforeManeuver: boolean
+  leftObservedInEvent: boolean
+  rightObservedInEvent: boolean
   hornSeen: boolean
   stopSeen: boolean
   pullOverStopSeconds: number
@@ -113,6 +115,8 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.leftObservedBeforeManeuver = false
   runtime.rightObservedBeforeManeuver = false
   runtime.backObservedBeforeManeuver = false
+  runtime.leftObservedInEvent = false
+  runtime.rightObservedInEvent = false
   runtime.hornSeen = false
   runtime.stopSeen = false
   runtime.pullOverStopSeconds = 0
@@ -144,6 +148,8 @@ export function createSubject3Runtime(): Subject3Runtime {
     leftObservedBeforeManeuver: false,
     rightObservedBeforeManeuver: false,
     backObservedBeforeManeuver: false,
+    leftObservedInEvent: false,
+    rightObservedInEvent: false,
     hornSeen: false,
     stopSeen: false,
     pullOverStopSeconds: 0,
@@ -268,9 +274,30 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
     add('gear', '加减挡位项目未完成合理挡位变化', 10)
   }
 
-  if ((event.kind === 'slow' || event.kind === 'meeting' || event.kind === 'left-turn' || event.kind === 'right-turn' || event.kind === 'uturn' || event.kind === 'pull-over') &&
-      event.speedLimit && runtime.eventMaxSpeed > event.speedLimit + 3) {
-    add('speed', `${event.title}时未按道路情景合理减速`, 10)
+  if (
+    (event.kind === 'slow' || event.kind === 'meeting' || event.kind === 'left-turn' || event.kind === 'right-turn' || event.kind === 'uturn' || event.kind === 'pull-over') &&
+    event.speedLimit &&
+    runtime.eventMaxSpeed > event.speedLimit + 3
+  ) {
+    const fatalSpeed = event.kind === 'slow' || event.kind === 'left-turn' || event.kind === 'right-turn'
+    add(
+      'speed',
+      `${event.title}时未按道路情景合理减速`,
+      fatalSpeed ? 100 : 10,
+      fatalSpeed,
+    )
+  }
+
+  if (
+    event.kind === 'slow' &&
+    (!runtime.leftObservedInEvent || !runtime.rightObservedInEvent)
+  ) {
+    add(
+      'observation',
+      `${event.title}过程中未完整观察左、右方交通情况`,
+      100,
+      true,
+    )
   }
 
   if (event.kind === 'left-turn') {
@@ -422,6 +449,8 @@ export function updateSubject3(
     runtime.minBodyLateral = Math.min(runtime.minBodyLateral, minBodyLateral)
     runtime.leftSignalSeen ||= vehicle.leftIndicator
     runtime.rightSignalSeen ||= vehicle.rightIndicator
+    runtime.leftObservedInEvent ||= vehicle.lookLeft
+    runtime.rightObservedInEvent ||= vehicle.lookRight
     runtime.hornSeen ||= vehicle.horn
 
     const relevantLeft = event.kind === 'start' || event.kind === 'left-turn' || event.kind === 'lane-change' || event.kind === 'overtake' || event.kind === 'uturn'
