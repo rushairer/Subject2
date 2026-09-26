@@ -20,5 +20,4 @@ export const DRIVING_RULES = {
     stallThrottleThreshold: 0.16,
     stallSpeedThreshold: 0.62,
   },
-,
 } as const
