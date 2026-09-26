@@ -42,6 +42,7 @@ import {
   type Subject3RouteEvent,
 } from './subject3Route'
 import {
+  SUBJECT3_CROSSING_DURATION_SECONDS,
   SUBJECT3_CROSSWALK_PROGRESS,
   SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
   SUBJECT3_TRAFFIC_CAR,
@@ -709,7 +710,7 @@ function RoadSegmentMesh({ segment }: { segment: RouteSegment }) {
     position={[(segment.a.x + segment.b.x) / 2, 0, (segment.a.z + segment.b.z) / 2]}
     rotation-y={sceneYawFromHeading(segment.heading)}
   >
-    <mesh rotation-x={-Math.PI / 2} position={[ROAD_CENTER_OFFSET, -0.02, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[ROAD_CENTER_OFFSET, -0.02, 0]} receiveShadow>
       <planeGeometry args={[ROAD_WIDTH, segment.length + 1]} />
       <meshStandardMaterial color="#393e43" roughness={0.96} />
     </mesh>
@@ -793,12 +794,28 @@ function RouteSign({
     position={[signX, 0, signZ]}
     rotation-y={sceneYawFromHeading(pose.heading)}
   >
-    <mesh position={[0, 1.5, 0]}>
-      <cylinderGeometry args={[0.05, 0.06, 3, 8]} />
-      <meshStandardMaterial color="#7c858b" metalness={0.55} />
+    {/* Support pole mounted cleanly behind the sign board */}
+    <mesh position={[0, 1.4, -0.06]} castShadow>
+      <cylinderGeometry args={[0.045, 0.06, 2.8, 12]} />
+      <meshStandardMaterial color="#7c858b" metalness={0.6} roughness={0.35} />
     </mesh>
-    <mesh position={[0, 2.55, 0.02]}>
-      <planeGeometry args={[1.45, 0.85]} />
+    {/* Upper and lower mounting brackets connecting pole to sign back */}
+    <mesh position={[0, 2.75, -0.025]} castShadow>
+      <boxGeometry args={[0.24, 0.06, 0.08]} />
+      <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
+    </mesh>
+    <mesh position={[0, 2.35, -0.025]} castShadow>
+      <boxGeometry args={[0.24, 0.06, 0.08]} />
+      <meshStandardMaterial color="#4a5257" metalness={0.8} roughness={0.3} />
+    </mesh>
+    {/* Protective backboard and border frame */}
+    <mesh position={[0, 2.55, 0.015]} castShadow receiveShadow>
+      <boxGeometry args={[1.50, 0.90, 0.03]} />
+      <meshStandardMaterial color="#353b40" metalness={0.5} roughness={0.4} />
+    </mesh>
+    {/* Front sign graphics face */}
+    <mesh position={[0, 2.55, 0.032]} castShadow receiveShadow>
+      <planeGeometry args={[1.44, 0.84]} />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>
   </group>
@@ -808,7 +825,7 @@ function Crosswalk({ distance }: { distance: number }) {
   const pose = poseAtRouteDistance(distance)
   return <group position={[pose.x + pose.rightX * ROAD_CENTER_OFFSET, 0.012, pose.z + pose.rightZ * ROAD_CENTER_OFFSET]} rotation-y={sceneYawFromHeading(pose.heading)}>
     {Array.from({ length: 8 }, (_, index) =>
-      <mesh key={index} rotation-x={-Math.PI / 2} position={[0, 0, -3.1 + index * 0.88]}>
+      <mesh key={index} rotation-x={-Math.PI / 2} position={[0, 0, -3.1 + index * 0.88]} receiveShadow>
         <planeGeometry args={[ROAD_WIDTH - 0.8, 0.48]} />
         <meshBasicMaterial color="#f5f5f3" />
       </mesh>
@@ -843,11 +860,128 @@ function TrafficLight({
   })
 
   return <group position={[lightX, 0, lightZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
-    <mesh position={[0, 2.4, 0]}><cylinderGeometry args={[0.07, 0.09, 4.8, 10]} /><meshStandardMaterial color="#555b5d" /></mesh>
-    <mesh position={[0, 4.4, 0]}><boxGeometry args={[0.5, 1.15, 0.28]} /><meshStandardMaterial color="#16191b" /></mesh>
-    <mesh position={[0, 4.72, 0.15]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#4b1717" /></mesh>
-    <mesh position={[0, 4.4, 0.15]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#514b17" /></mesh>
-    <mesh position={[0, 4.08, 0.15]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#35cf69" /></mesh>
+    <mesh position={[0, 2.4, -0.06]} castShadow><cylinderGeometry args={[0.07, 0.09, 4.8, 10]} /><meshStandardMaterial color="#555b5d" metalness={0.5} roughness={0.4} /></mesh>
+    <mesh position={[0, 4.4, 0.04]} castShadow receiveShadow><boxGeometry args={[0.5, 1.15, 0.28]} /><meshStandardMaterial color="#16191b" roughness={0.6} /></mesh>
+    <mesh position={[0, 4.72, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#4b1717" /></mesh>
+    <mesh position={[0, 4.4, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#514b17" /></mesh>
+    <mesh position={[0, 4.08, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#35cf69" /></mesh>
+  </group>
+}
+
+function TrafficCarModel({
+  color = '#c7cbd0',
+  wheelAngle = 0,
+}: {
+  color?: string
+  wheelAngle?: number
+}) {
+  return <group>
+    {/* Ground ambient contact shadow */}
+    <mesh rotation-x={-Math.PI / 2} position={[0, 0.015, 0]}>
+      <planeGeometry args={[1.92, 4.4]} />
+      <meshBasicMaterial color="#000000" transparent opacity={0.35} depthWrite={false} />
+    </mesh>
+
+    {/* Main lower body / chassis */}
+    <mesh position={[0, 0.38, 0]} castShadow receiveShadow>
+      <boxGeometry args={[SUBJECT3_TRAFFIC_CAR.widthMeters, 0.44, SUBJECT3_TRAFFIC_CAR.lengthMeters]} />
+      <meshStandardMaterial color={color} metalness={0.35} roughness={0.32} />
+    </mesh>
+
+    {/* Cabin / Greenhouse */}
+    <mesh position={[0, 0.82, -0.15]} castShadow receiveShadow>
+      <boxGeometry args={[1.46, 0.48, 2.05]} />
+      <meshStandardMaterial color="#1a2530" metalness={0.7} roughness={0.2} />
+    </mesh>
+
+    {/* Roof Panel */}
+    <mesh position={[0, 1.07, -0.15]} castShadow receiveShadow>
+      <boxGeometry args={[1.40, 0.04, 1.95]} />
+      <meshStandardMaterial color={color} metalness={0.35} roughness={0.32} />
+    </mesh>
+
+    {/* Front Windshield Angle Accent */}
+    <mesh position={[0, 0.82, -1.18]} rotation-x={0.42} castShadow receiveShadow>
+      <boxGeometry args={[1.42, 0.46, 0.04]} />
+      <meshStandardMaterial color="#141e28" metalness={0.8} roughness={0.15} />
+    </mesh>
+
+    {/* Rear Window Angle Accent */}
+    <mesh position={[0, 0.83, 0.88]} rotation-x={-0.40} castShadow receiveShadow>
+      <boxGeometry args={[1.42, 0.45, 0.04]} />
+      <meshStandardMaterial color="#141e28" metalness={0.8} roughness={0.15} />
+    </mesh>
+
+    {/* Front Grille */}
+    <mesh position={[0, 0.38, -2.13]} castShadow>
+      <boxGeometry args={[0.82, 0.16, 0.03]} />
+      <meshStandardMaterial color="#151718" metalness={0.8} roughness={0.25} />
+    </mesh>
+
+    {/* Crystal Headlights */}
+    <mesh position={[-0.64, 0.42, -2.13]} castShadow>
+      <boxGeometry args={[0.32, 0.13, 0.04]} />
+      <meshStandardMaterial color="#ffffff" emissive="#fff9e6" emissiveIntensity={0.85} roughness={0.2} />
+    </mesh>
+    <mesh position={[0.64, 0.42, -2.13]} castShadow>
+      <boxGeometry args={[0.32, 0.13, 0.04]} />
+      <meshStandardMaterial color="#ffffff" emissive="#fff9e6" emissiveIntensity={0.85} roughness={0.2} />
+    </mesh>
+
+    {/* Front License Plate */}
+    <mesh position={[0, 0.24, -2.135]} castShadow>
+      <boxGeometry args={[0.44, 0.14, 0.02]} />
+      <meshStandardMaterial color="#1a56a6" roughness={0.5} />
+    </mesh>
+
+    {/* Ruby Taillights */}
+    <mesh position={[-0.64, 0.44, 2.13]} castShadow>
+      <boxGeometry args={[0.34, 0.13, 0.04]} />
+      <meshStandardMaterial color="#dc2626" emissive="#991b1b" emissiveIntensity={0.9} roughness={0.2} />
+    </mesh>
+    <mesh position={[0.64, 0.44, 2.13]} castShadow>
+      <boxGeometry args={[0.34, 0.13, 0.04]} />
+      <meshStandardMaterial color="#dc2626" emissive="#991b1b" emissiveIntensity={0.9} roughness={0.2} />
+    </mesh>
+
+    {/* Rear License Plate */}
+    <mesh position={[0, 0.28, 2.135]} castShadow>
+      <boxGeometry args={[0.44, 0.14, 0.02]} />
+      <meshStandardMaterial color="#1a56a6" roughness={0.5} />
+    </mesh>
+
+    {/* Side Rearview Mirrors */}
+    <mesh position={[-0.94, 0.74, -0.62]} castShadow receiveShadow>
+      <boxGeometry args={[0.16, 0.10, 0.12]} />
+      <meshStandardMaterial color={color} metalness={0.35} roughness={0.32} />
+    </mesh>
+    <mesh position={[0.94, 0.74, -0.62]} castShadow receiveShadow>
+      <boxGeometry args={[0.16, 0.10, 0.12]} />
+      <meshStandardMaterial color={color} metalness={0.35} roughness={0.32} />
+    </mesh>
+
+    {/* 4 Wheels (Rubber Tires + Alloy Rims) */}
+    {[
+      { x: -0.80, z: -1.28 },
+      { x: 0.80, z: -1.28 },
+      { x: -0.80, z: 1.28 },
+      { x: 0.80, z: 1.28 },
+    ].map((pos, idx) => (
+      <group key={idx} position={[pos.x, 0.28, pos.z]} rotation-x={wheelAngle}>
+        <mesh rotation-z={Math.PI / 2} castShadow receiveShadow>
+          <cylinderGeometry args={[0.28, 0.28, 0.18, 16]} />
+          <meshStandardMaterial color="#1a1c1e" roughness={0.9} />
+        </mesh>
+        <mesh rotation-z={Math.PI / 2} castShadow>
+          <cylinderGeometry args={[0.17, 0.17, 0.19, 16]} />
+          <meshStandardMaterial color="#c0c7ce" metalness={0.8} roughness={0.25} />
+        </mesh>
+        <mesh rotation-z={Math.PI / 2}>
+          <cylinderGeometry args={[0.06, 0.06, 0.195, 12]} />
+          <meshStandardMaterial color="#333" metalness={0.5} roughness={0.5} />
+        </mesh>
+      </group>
+    ))}
   </group>
 }
 
@@ -900,11 +1034,80 @@ function StaticCar({
   })
 
   return <group
-    position={[x, 0.45, z]}
+    position={[x, 0.04, z]}
     rotation-y={sceneYawFromHeading(actorHeading)}
   >
-    <mesh><boxGeometry args={[SUBJECT3_TRAFFIC_CAR.widthMeters, 0.65, SUBJECT3_TRAFFIC_CAR.lengthMeters]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.48} /></mesh>
-    <mesh position={[0, 0.45, -0.15]}><boxGeometry args={[1.5, 0.55, 1.9]} /><meshStandardMaterial color="#60707a" metalness={0.5} roughness={0.28} /></mesh>
+    <TrafficCarModel color={color} />
+  </group>
+}
+
+function ArticulatedPedestrian({
+  color,
+  walkAngle = 0,
+}: {
+  color: string
+  walkAngle?: number
+}) {
+  const stride = Math.sin(walkAngle) * 0.42
+  return <group>
+    {/* Torso / Upper Body */}
+    <mesh position={[0, 1.08, 0]} castShadow receiveShadow>
+      <boxGeometry args={[0.34, 0.48, 0.22]} />
+      <meshStandardMaterial color={color} roughness={0.7} />
+    </mesh>
+    {/* Head & Hair */}
+    <mesh position={[0, 1.50, 0]} castShadow>
+      <sphereGeometry args={[0.13, 14, 12]} />
+      <meshStandardMaterial color="#f3c29c" roughness={0.6} />
+    </mesh>
+    <mesh position={[0, 1.56, -0.01]} castShadow>
+      <sphereGeometry args={[0.132, 14, 12]} />
+      <meshStandardMaterial color="#2b2623" roughness={0.9} />
+    </mesh>
+    {/* Left Arm */}
+    <group position={[-0.22, 1.26, 0]} rotation-x={-stride * 0.7}>
+      <mesh position={[0, -0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.042, 0.038, 0.38, 8]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, -0.38, 0]} castShadow>
+        <sphereGeometry args={[0.04, 8, 8]} />
+        <meshStandardMaterial color="#f3c29c" roughness={0.6} />
+      </mesh>
+    </group>
+    {/* Right Arm */}
+    <group position={[0.22, 1.26, 0]} rotation-x={stride * 0.7}>
+      <mesh position={[0, -0.18, 0]} castShadow>
+        <cylinderGeometry args={[0.042, 0.038, 0.38, 8]} />
+        <meshStandardMaterial color={color} roughness={0.7} />
+      </mesh>
+      <mesh position={[0, -0.38, 0]} castShadow>
+        <sphereGeometry args={[0.04, 8, 8]} />
+        <meshStandardMaterial color="#f3c29c" roughness={0.6} />
+      </mesh>
+    </group>
+    {/* Left Leg */}
+    <group position={[-0.10, 0.82, 0]} rotation-x={stride}>
+      <mesh position={[0, -0.38, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.048, 0.76, 8]} />
+        <meshStandardMaterial color="#2b3b4c" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, -0.76, -0.03]} castShadow>
+        <boxGeometry args={[0.09, 0.07, 0.18]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+      </mesh>
+    </group>
+    {/* Right Leg */}
+    <group position={[0.10, 0.82, 0]} rotation-x={-stride}>
+      <mesh position={[0, -0.38, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.048, 0.76, 8]} />
+        <meshStandardMaterial color="#2b3b4c" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, -0.76, -0.03]} castShadow>
+        <boxGeometry args={[0.09, 0.07, 0.18]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+      </mesh>
+    </group>
   </group>
 }
 
@@ -937,19 +1140,112 @@ function Pedestrian({
     }
   })
 
-  return <group position={[pedX, 0, pedZ]}>
-    <mesh position={[0, 1.05, 0]}><cylinderGeometry args={[0.18, 0.23, 1.25, 12]} /><meshStandardMaterial color={color} /></mesh>
-    <mesh position={[0, 1.88, 0]}><sphereGeometry args={[0.25, 14, 10]} /><meshStandardMaterial color="#d7aa82" /></mesh>
+  return <group position={[pedX, 0, pedZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
+    <ArticulatedPedestrian color={color} />
   </group>
 }
 
-
-function CarBody({ color = '#c7cbd0' }: { color?: string }) {
+function ScooterModel({
+  wheelAngle = 0,
+}: {
+  wheelAngle?: number
+}) {
   return <group>
-    <mesh position={[0, 0.38, 0]}><boxGeometry args={[SUBJECT3_TRAFFIC_CAR.widthMeters, 0.62, SUBJECT3_TRAFFIC_CAR.lengthMeters]} /><meshStandardMaterial color={color} metalness={0.22} roughness={0.46} /></mesh>
-    <mesh position={[0, 0.82, -0.2]}><boxGeometry args={[1.48, 0.55, 1.9]} /><meshStandardMaterial color="#526775" metalness={0.48} roughness={0.25} /></mesh>
-    <mesh position={[-0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
-    <mesh position={[0.58, 0.36, 2.13]}><boxGeometry args={[0.35, 0.13, 0.04]} /><meshStandardMaterial color="#8d1717" emissive="#4a0909" emissiveIntensity={0.8} /></mesh>
+    {/* Floorboard deck & lower chassis */}
+    <mesh position={[0, 0.18, 0]} castShadow receiveShadow>
+      <boxGeometry args={[0.38, 0.08, 0.95]} />
+      <meshStandardMaterial color="#22252a" roughness={0.8} />
+    </mesh>
+    {/* Front column / apron */}
+    <mesh position={[0, 0.52, -0.42]} rotation-x={0.18} castShadow receiveShadow>
+      <boxGeometry args={[0.32, 0.58, 0.14]} />
+      <meshStandardMaterial color="#0284c7" metalness={0.3} roughness={0.4} />
+    </mesh>
+    {/* Front LED headlight */}
+    <mesh position={[0, 0.65, -0.50]} castShadow>
+      <boxGeometry args={[0.14, 0.08, 0.04]} />
+      <meshStandardMaterial color="#ffffff" emissive="#e0f2fe" emissiveIntensity={0.9} />
+    </mesh>
+    {/* Handlebars & mirrors */}
+    <mesh position={[0, 0.82, -0.38]} rotation-z={Math.PI / 2} castShadow>
+      <cylinderGeometry args={[0.016, 0.016, 0.62, 8]} />
+      <meshStandardMaterial color="#333" metalness={0.7} roughness={0.3} />
+    </mesh>
+    <mesh position={[-0.28, 0.92, -0.36]} castShadow>
+      <circleGeometry args={[0.045, 12]} />
+      <meshStandardMaterial color="#666" metalness={0.8} roughness={0.2} />
+    </mesh>
+    <mesh position={[0.28, 0.92, -0.36]} castShadow>
+      <circleGeometry args={[0.045, 12]} />
+      <meshStandardMaterial color="#666" metalness={0.8} roughness={0.2} />
+    </mesh>
+    {/* Rear motor body & saddle seat */}
+    <mesh position={[0, 0.42, 0.22]} castShadow receiveShadow>
+      <boxGeometry args={[0.34, 0.36, 0.60]} />
+      <meshStandardMaterial color="#0284c7" metalness={0.3} roughness={0.4} />
+    </mesh>
+    <mesh position={[0, 0.62, 0.18]} castShadow receiveShadow>
+      <boxGeometry args={[0.32, 0.08, 0.52]} />
+      <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+    </mesh>
+    {/* Rear delivery cargo box */}
+    <mesh position={[0, 0.68, 0.52]} castShadow receiveShadow>
+      <boxGeometry args={[0.38, 0.36, 0.34]} />
+      <meshStandardMaterial color="#eab308" roughness={0.5} />
+    </mesh>
+    {/* Rear taillight */}
+    <mesh position={[0, 0.44, 0.54]} castShadow>
+      <boxGeometry args={[0.16, 0.06, 0.03]} />
+      <meshStandardMaterial color="#dc2626" emissive="#991b1b" emissiveIntensity={0.8} />
+    </mesh>
+    {/* Front Wheel */}
+    <group position={[0, 0.18, -0.48]} rotation-x={wheelAngle}>
+      <mesh rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.18, 0.18, 0.08, 16]} />
+        <meshStandardMaterial color="#1c1d1f" roughness={0.9} />
+      </mesh>
+      <mesh rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.10, 0.10, 0.085, 16]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} />
+      </mesh>
+    </group>
+    {/* Rear Wheel */}
+    <group position={[0, 0.18, 0.42]} rotation-x={wheelAngle}>
+      <mesh rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.18, 0.18, 0.08, 16]} />
+        <meshStandardMaterial color="#1c1d1f" roughness={0.9} />
+      </mesh>
+      <mesh rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.10, 0.10, 0.085, 16]} />
+        <meshStandardMaterial color="#94a3b8" metalness={0.7} roughness={0.3} />
+      </mesh>
+    </group>
+    {/* Rider */}
+    <group position={[0, 0.60, 0.12]}>
+      {/* Torso leaning forward slightly */}
+      <mesh position={[0, 0.35, -0.06]} rotation-x={0.16} castShadow>
+        <boxGeometry args={[0.34, 0.45, 0.22]} />
+        <meshStandardMaterial color="#eab308" roughness={0.6} />
+      </mesh>
+      {/* Helmet & Head */}
+      <mesh position={[0, 0.70, -0.12]} castShadow>
+        <sphereGeometry args={[0.15, 14, 12]} />
+        <meshStandardMaterial color="#facc15" roughness={0.3} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.69, -0.22]} castShadow>
+        <boxGeometry args={[0.16, 0.07, 0.06]} />
+        <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.8} />
+      </mesh>
+      {/* Arms holding handlebars */}
+      <mesh position={[-0.18, 0.36, -0.22]} rotation-x={0.65} castShadow>
+        <cylinderGeometry args={[0.04, 0.035, 0.40, 8]} />
+        <meshStandardMaterial color="#eab308" roughness={0.6} />
+      </mesh>
+      <mesh position={[0.18, 0.36, -0.22]} rotation-x={0.65} castShadow>
+        <cylinderGeometry args={[0.04, 0.035, 0.40, 8]} />
+        <meshStandardMaterial color="#eab308" roughness={0.6} />
+      </mesh>
+    </group>
   </group>
 }
 
@@ -1027,10 +1323,12 @@ function MovingTrafficCar({
   const group = useRef<THREE.Group>(null)
   const progress = useRef(startProgress)
   const isStopped = useRef(false)
+  const wheelAngle = useRef(0)
 
   useFrame((_, delta) => {
     if (!isStopped.current) {
       progress.current += (opposite ? -1 : 1) * speed * delta
+      wheelAngle.current += (speed / 0.28) * delta
       if (progress.current > SUBJECT3_ROUTE_LENGTH - 40) progress.current = 120
       if (progress.current < 60) progress.current = SUBJECT3_ROUTE_LENGTH - 80
     }
@@ -1063,7 +1361,7 @@ function MovingTrafficCar({
     }
   })
 
-  return <group ref={group}><CarBody color={color} /></group>
+  return <group ref={group}><TrafficCarModel color={color} wheelAngle={wheelAngle.current} /></group>
 }
 
 function SuddenBrakeCar({
@@ -1081,12 +1379,14 @@ function SuddenBrakeCar({
   const progress = useRef(2760)
   const speed = useRef(8.5)
   const isStopped = useRef(false)
+  const wheelAngle = useRef(0)
 
   useFrame((_, delta) => {
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
     if (playerProgress > 2660 && playerProgress < 2920 && !isStopped.current) {
       if (playerProgress > 2725) speed.current = Math.max(0, speed.current - 7.5 * delta)
       progress.current += speed.current * delta
+      wheelAngle.current += (speed.current / 0.28) * delta
     }
     const world = actorWorldPosition(progress.current, 0)
     if (group.current) {
@@ -1105,7 +1405,7 @@ function SuddenBrakeCar({
     }
   })
 
-  return <group ref={group}><CarBody color="#d8d4c9" /></group>
+  return <group ref={group}><TrafficCarModel color="#d8d4c9" wheelAngle={wheelAngle.current} /></group>
 }
 
 function CrossingPedestrian({
@@ -1124,6 +1424,7 @@ function CrossingPedestrian({
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
   const triggered = useRef(false)
+  const walkAngle = useRef(0)
 
   useEffect(() => () => {
     traffic.current.crosswalkPedestrianConflict = false
@@ -1137,7 +1438,12 @@ function CrossingPedestrian({
     ) {
       triggered.current = true
     }
-    if (triggered.current) elapsed.current += delta
+    if (triggered.current) {
+      elapsed.current += delta
+      if (elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS) {
+        walkAngle.current += delta * 7.5
+      }
+    }
 
     const motion = crossingPedestrianMotion(
       triggered.current,
@@ -1145,15 +1451,18 @@ function CrossingPedestrian({
     )
     traffic.current.crosswalkPedestrianConflict = motion.conflict
     const world = actorWorldPosition(motion.progress, motion.lateral)
-    if (group.current) group.current.position.set(world.x, 0, world.z)
+    if (group.current) {
+      group.current.position.set(world.x, 0, world.z)
+      // Facing the direction of crossing across the road
+      group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + Math.PI / 2
+    }
     if (triggered.current) {
       checkVehicleCollision(player, world.x, world.z, 'subject3-collision-pedestrian', onInfraction, 1.45, audioContext, audioState)
     }
   })
 
   return <group ref={group}>
-    <mesh position={[0, 1.03, 0]}><cylinderGeometry args={[0.18, 0.23, 1.25, 12]} /><meshStandardMaterial color="#3f75a2" /></mesh>
-    <mesh position={[0, 1.85, 0]}><sphereGeometry args={[0.24, 14, 10]} /><meshStandardMaterial color="#d8aa80" /></mesh>
+    <ArticulatedPedestrian color="#3f75a2" walkAngle={walkAngle.current} />
   </group>
 }
 
@@ -1173,6 +1482,7 @@ function CutInScooter({
   const triggered = useRef(false)
   const progress = useRef(1385)
   const isStopped = useRef(false)
+  const wheelAngle = useRef(0)
 
   useFrame((_, delta) => {
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
@@ -1180,6 +1490,7 @@ function CutInScooter({
     if (triggered.current && !isStopped.current) {
       elapsed.current = Math.min(5, elapsed.current + delta)
       progress.current += 3.2 * delta
+      wheelAngle.current += (3.2 / 0.18) * delta
     }
     const t = Math.min(1, elapsed.current / 3.4)
     const lateral = 3.2 - t * 3.3
@@ -1198,11 +1509,7 @@ function CutInScooter({
   })
 
   return <group ref={group}>
-    <mesh position={[0, 0.38, 0]}><boxGeometry args={[0.48, 0.42, 1.45]} /><meshStandardMaterial color="#343b40" /></mesh>
-    <mesh position={[0, 0.92, 0.08]}><cylinderGeometry args={[0.15, 0.19, 0.9, 12]} /><meshStandardMaterial color="#bf584b" /></mesh>
-    <mesh position={[0, 1.54, 0.08]}><sphereGeometry args={[0.2, 12, 9]} /><meshStandardMaterial color="#d6a67e" /></mesh>
-    <mesh position={[-0.27, 0.18, -0.48]} rotation-z={Math.PI / 2}><torusGeometry args={[0.23, 0.045, 10, 18]} /><meshStandardMaterial color="#111" /></mesh>
-    <mesh position={[-0.27, 0.18, 0.48]} rotation-z={Math.PI / 2}><torusGeometry args={[0.23, 0.045, 10, 18]} /><meshStandardMaterial color="#111" /></mesh>
+    <ScooterModel wheelAngle={wheelAngle.current} />
   </group>
 }
 
@@ -1282,15 +1589,15 @@ function RoadsideBuilding({
 
   return (
     <group position={[groupX, 0, groupZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
-      <mesh position={[0, 3, 0]}>
+      <mesh position={[0, 3, 0]} castShadow receiveShadow>
         <boxGeometry args={[7, 6, 10]} />
         <meshStandardMaterial color={index % 3 === 0 ? '#b8b2a6' : '#9daab0'} roughness={0.85} />
       </mesh>
-      <mesh position={[treeOffset, 1.2, 0]}>
+      <mesh position={[treeOffset, 1.2, 0]} castShadow>
         <cylinderGeometry args={[0.18, 0.22, 2.4, 10]} />
         <meshStandardMaterial color="#625649" />
       </mesh>
-      <mesh position={[treeOffset, 3.2, 0]}>
+      <mesh position={[treeOffset, 3.2, 0]} castShadow>
         <sphereGeometry args={[1.35, 12, 9]} />
         <meshStandardMaterial color="#41694a" />
       </mesh>
@@ -1312,14 +1619,14 @@ export function Subject3Course({
   audioState?: VehicleAudioState
 }): ReactElement {
   return <group>
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.09, -1200]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.09, -1200]} receiveShadow>
       <planeGeometry args={[1400, 5400]} />
       <meshStandardMaterial color="#62755a" roughness={1} />
     </mesh>
 
     {SUBJECT3_SEGMENTS.map((segment, index) => <RoadSegmentMesh key={index} segment={segment} />)}
     {SUBJECT3_ROUTE.map((point, index) => (
-      <mesh key={`route-node-${index}`} rotation-x={-Math.PI / 2} position={[point.x, -0.015, point.z]}>
+      <mesh key={`route-node-${index}`} rotation-x={-Math.PI / 2} position={[point.x, -0.015, point.z]} receiveShadow>
         <planeGeometry args={[SUBJECT3_ROUTE_NODE_PAD_SIZE, SUBJECT3_ROUTE_NODE_PAD_SIZE]} />
         <meshStandardMaterial color="#393e43" roughness={0.96} />
       </mesh>

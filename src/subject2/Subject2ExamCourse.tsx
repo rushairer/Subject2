@@ -72,7 +72,7 @@ function TransitionRoad({ transition }: { transition: Subject2Transition }) {
   const x = (transition.start.x + transition.end.x) / 2
   const z = (transition.start.z + transition.end.z) / 2
   return <group position={[x, 0, z]} rotation-y={sceneYawFromHeading(heading)}>
-    <mesh rotation-x={-Math.PI / 2} position-y={0.006}>
+    <mesh rotation-x={-Math.PI / 2} position-y={0.006} receiveShadow>
       <planeGeometry args={[4.2, length]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>

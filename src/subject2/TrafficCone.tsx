@@ -126,17 +126,17 @@ export function TrafficCone({
   return (
     <group ref={groupRef} position={[x, 0, z]}>
       {/* Heavy rubber square base plate */}
-      <mesh position={[0, 0.015, 0]}>
+      <mesh position={[0, 0.015, 0]} castShadow receiveShadow>
         <boxGeometry args={[0.34, 0.03, 0.34]} />
         <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
       </mesh>
       {/* Tapered orange cone body */}
-      <mesh position={[0, 0.23, 0]}>
+      <mesh position={[0, 0.23, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.045, 0.15, 0.44, 16]} />
         <meshStandardMaterial color={color} roughness={0.45} />
       </mesh>
       {/* White reflective collar sleeve */}
-      <mesh position={[0, 0.26, 0]}>
+      <mesh position={[0, 0.26, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.075, 0.098, 0.10, 16]} />
         <meshStandardMaterial color="#f4f4f4" roughness={0.25} metalness={0.15} />
       </mesh>

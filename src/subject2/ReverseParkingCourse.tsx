@@ -282,7 +282,7 @@ export function ReverseParkingCourse({
 }: ReverseParkingCourseProps = {}): ReactElement {
   const g = REVERSE_PARKING_GEOMETRY
   return <group>
-    <mesh rotation-x={-Math.PI / 2} position={[2.6, -0.025, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[2.6, -0.025, 0]} receiveShadow>
       <planeGeometry args={[18, g.laneEndZ * 2 + 4]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
@@ -324,7 +324,7 @@ export function ReverseParkingCourse({
       audioState={audioState}
     />
 
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
       <planeGeometry args={[60, 48]} />
       <meshStandardMaterial color="#627557" />
     </mesh>

@@ -255,10 +255,10 @@ export function CurveDrivingCourse(): ReactElement {
   const leftEdge = useMemo(() => ribbonGeometry(CURVE_ROAD_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, -CURVE_DRIVING.roadWidth / 2), [])
 
   return <group>
-    <mesh geometry={road} position-y={0.01}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
+    <mesh geometry={road} position-y={0.01} receiveShadow><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
     <mesh geometry={leftEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>
     <mesh geometry={rightEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
       <planeGeometry args={[70, 55]} />
       <meshStandardMaterial color="#637657" />
     </mesh>

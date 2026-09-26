@@ -262,8 +262,8 @@ export function SlopeStartCourse({
   const leftEdge = useMemo(() => surfaceGeometry(SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, 0.025), [])
 
   return <group>
-    <mesh geometry={terrain}><meshStandardMaterial color="#637657" roughness={1} /></mesh>
-    <mesh geometry={road}><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
+    <mesh geometry={terrain} receiveShadow><meshStandardMaterial color="#637657" roughness={1} /></mesh>
+    <mesh geometry={road} receiveShadow><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
 
     <group position-x={-SLOPE_GEOMETRY.roadHalf + SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>
     <group position-x={SLOPE_GEOMETRY.roadHalf - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2}><mesh geometry={leftEdge}><meshBasicMaterial color="#f3d34a" /></mesh></group>

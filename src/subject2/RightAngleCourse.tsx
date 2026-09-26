@@ -252,11 +252,11 @@ export function RightAngleCourse({
   const exitCenterX = (g.horizontalMinX + g.half) / 2
 
   return <group>
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, entryCenterZ]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, entryCenterZ]} receiveShadow>
       <planeGeometry args={[RIGHT_ANGLE.roadWidth, entryLength]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
-    <mesh rotation-x={-Math.PI / 2} position={[exitCenterX, -0.024, g.cornerCenterZ]}>
+    <mesh rotation-x={-Math.PI / 2} position={[exitCenterX, -0.024, g.cornerCenterZ]} receiveShadow>
       <planeGeometry args={[exitLength, RIGHT_ANGLE.roadWidth]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
@@ -277,7 +277,7 @@ export function RightAngleCourse({
       audioState={audioState}
     />
 
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
       <planeGeometry args={[42, 42]} />
       <meshStandardMaterial color="#637657" />
     </mesh>

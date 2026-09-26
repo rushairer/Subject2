@@ -30,15 +30,15 @@ export function DrivingLighting({ vehicle, night }: { vehicle: MutableRefObject<
   useFrame(() => {
     const x = Math.round(vehicle.current.x * 2) / 2, z = Math.round(vehicle.current.z * 2) / 2
     target.position.set(x, 0, z); target.updateMatrixWorld()
-    sun.current?.position.set(x - 8, 17, z - 11)
+    sun.current?.position.set(x - 12, 22, z - 16)
   })
   return <>
     <primitive object={target} />
     <ambientLight intensity={night ? 0.12 : 0.32} />
     <hemisphereLight args={[night ? '#8eaccf' : '#d7e6f1', '#66614e', night ? 0.18 : 0.75]} />
     <directionalLight ref={sun} target={target} color={night ? '#9bb7db' : '#fff1d7'} intensity={night ? 0.32 : 2.5} castShadow
-      shadow-mapSize={[2048, 2048]} shadow-camera-left={-13} shadow-camera-right={13}
-      shadow-camera-top={13} shadow-camera-bottom={-13} shadow-camera-near={0.5} shadow-camera-far={60}
+      shadow-mapSize={[2048, 2048]} shadow-camera-left={-28} shadow-camera-right={28}
+      shadow-camera-top={28} shadow-camera-bottom={-28} shadow-camera-near={0.5} shadow-camera-far={75}
       shadow-bias={-0.00015} shadow-normalBias={0.018} />
   </>
 }

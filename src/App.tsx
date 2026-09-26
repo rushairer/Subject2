@@ -235,17 +235,20 @@ function Road() {
   const dashes = useMemo(() => Array.from({ length: 90 }, (_, i) => 25 - i * 5), [])
   const trees = useMemo(() => Array.from({ length: 48 }, (_, i) => ({ side: i % 2 ? 1 : -1, z: 18 - Math.floor(i / 2) * 17, offset: (i % 5) * .6 })), [])
   return <group>
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, -185]}><planeGeometry args={[18, 440]} /><meshStandardMaterial color="#3b4044" roughness={1} /></mesh>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, -185]} receiveShadow><planeGeometry args={[18, 440]} /><meshStandardMaterial color="#3b4044" roughness={1} /></mesh>
     {[-9, 9].map(x => <mesh key={x} rotation-x={-Math.PI / 2} position={[x, -0.012, -185]}><planeGeometry args={[.16, 440]} /><meshBasicMaterial color="#f5f5e8" /></mesh>)}
     {dashes.map(z => <mesh key={z} rotation-x={-Math.PI / 2} position={[0, -.011, z]}><planeGeometry args={[.12, 2.5]} /><meshBasicMaterial color="#e8e5cf" /></mesh>)}
     <group position={[0, .002, -42]}>
       {Array.from({ length: 7 }, (_, i) => <mesh key={i} rotation-x={-Math.PI / 2} position={[-6 + i * 2, 0, 0]}><planeGeometry args={[1, 4]} /><meshBasicMaterial color="#fafafa" /></mesh>)}
     </group>
     {trees.map((t, i) => <group key={i} position={[t.side * (12 + t.offset), 0, t.z]}>
-      <mesh position={[0, 1.1, 0]}><cylinderGeometry args={[.15, .2, 2.2, 8]} /><meshStandardMaterial color="#5f5140" /></mesh>
-      <mesh position={[0, 3, 0]}><sphereGeometry args={[1.25, 12, 8]} /><meshStandardMaterial color="#3d6545" /></mesh>
+      <mesh position={[0, 1.1, 0]} castShadow><cylinderGeometry args={[.15, .2, 2.2, 8]} /><meshStandardMaterial color="#5f5140" /></mesh>
+      <mesh position={[0, 3, 0]} castShadow><sphereGeometry args={[1.25, 12, 8]} /><meshStandardMaterial color="#3d6545" /></mesh>
     </group>)}
-    <group position={[-7, 0, -29]}><mesh position={[0, 1.6, 0]}><cylinderGeometry args={[.08, .08, 3.2, 8]} /><meshStandardMaterial color="#777" /></mesh><mesh position={[0, 3.1, 0]}><boxGeometry args={[1.2, 1.2, .08]} /><meshStandardMaterial color="#1766a3" /></mesh></group>
+    <group position={[-7, 0, -29]}>
+      <mesh position={[0, 1.6, -0.06]} castShadow><cylinderGeometry args={[.06, .08, 3.2, 8]} /><meshStandardMaterial color="#777" /></mesh>
+      <mesh position={[0, 3.1, 0.02]} castShadow><boxGeometry args={[1.2, 1.2, .06]} /><meshStandardMaterial color="#1766a3" /></mesh>
+    </group>
   </group>
 }
 

@@ -301,11 +301,11 @@ export function SideParkingCourse({
   const laneCenterZ = (g.laneStartZ + g.laneEndZ) / 2
   const laneLength = g.laneStartZ - g.laneEndZ
   return <group>
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, laneCenterZ]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, laneCenterZ]} receiveShadow>
       <planeGeometry args={[SIDE_PARKING.laneWidth, laneLength]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
-    <mesh rotation-x={-Math.PI / 2} position={[(g.bayMouthX + g.bayBackX) / 2, -0.024, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[(g.bayMouthX + g.bayBackX) / 2, -0.024, 0]} receiveShadow>
       <planeGeometry args={[SIDE_PARKING.bayWidth, SIDE_PARKING.bayLength]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
@@ -335,7 +335,7 @@ export function SideParkingCourse({
       />
     ))}
 
-    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]}>
+    <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
       <planeGeometry args={[45, 40]} />
       <meshStandardMaterial color="#637657" />
     </mesh>
