@@ -806,3 +806,72 @@ test('right-angle wheel-out is fatal and stop penalties are deterministic across
   }, runtime, 2.1)
   assert.equal(hasInfraction(result, 'right-angle-stop-2'), true)
 })
+
+
+test('reverse parking rejects the second reverse before the opposite control line and a failed second bay entry', () => {
+  let result = updateReverseParking({
+    x: 0,
+    z: 0,
+    heading: 0,
+    speed: -0.5,
+    gear: -1,
+    engineOn: true,
+  }, {
+    ...createReverseParkingRuntime(),
+    phase: 'cross-to-opposite',
+    started: true,
+    firstControlPassed: true,
+    oppositeControlPassed: false,
+  }, 0.1)
+
+  assert.equal(hasInfraction(result, 'reverse-before-opposite-control'), true)
+  assert.equal(result.infractions.find(item => item.id === 'reverse-before-opposite-control')?.fatal, true)
+
+  result = updateReverseParking({
+    x: 0,
+    z: 0,
+    heading: 0,
+    speed: 0.5,
+    gear: 1,
+    engineOn: true,
+  }, {
+    ...createReverseParkingRuntime(),
+    phase: 'second-reverse',
+    started: true,
+    firstControlPassed: true,
+    oppositeControlPassed: true,
+  }, 0.1)
+
+  assert.equal(hasInfraction(result, 'second-reverse-not-in-bay'), true)
+  assert.equal(result.infractions.find(item => item.id === 'second-reverse-not-in-bay')?.fatal, true)
+})
+
+test('slope start covers wheel-line failure and the 30-50cm right-gap band', () => {
+  let result = updateSlopeStart({
+    x: 1.0,
+    z: 6.5,
+    heading: 0,
+    speed: 0.5,
+    engineOn: true,
+    handbrake: false,
+  }, createSlopeRuntime(), 0.1)
+
+  assert.equal(hasInfraction(result, 'slope-wheel-line'), true)
+  assert.equal(result.infractions.find(item => item.id === 'slope-wheel-line')?.fatal, true)
+
+  result = updateSlopeStart({
+    x: 0.3,
+    z: 1.6,
+    heading: 0,
+    speed: 0,
+    engineOn: true,
+    handbrake: true,
+  }, {
+    ...createSlopeRuntime(),
+    entered: true,
+  }, 0.5)
+
+  assert.equal(hasInfraction(result, 'slope-right-gap-10'), true)
+  assert.equal(hasInfraction(result, 'slope-right-gap-fail'), false)
+  assert.equal(result.infractions.find(item => item.id === 'slope-right-gap-10')?.points, 10)
+})
