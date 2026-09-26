@@ -84,6 +84,15 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Manual and automatic termination must share one exactly-once guard, preventing duplicate history records.
 - Old history records lack completion evidence. Keep optional fields compatible; do not invent completion for legacy records.
 
+## Subject 3 road and maneuver completion
+
+- Subject 3 road-boundary judging must use the full training-car body footprint, not the vehicle center alone.
+- `src/subject3/subject3Route.ts` owns the rendered road footprint used by judging. Keep segment road rectangles and 20m corner pads consistent with the meshes in `Subject3Course.tsx`.
+- Lane-change success requires ending in the requested target lane; briefly crossing the lane divider and returning does not complete the maneuver.
+- Overtake success requires both entering the overtaking lane and completing the return to the original lane before the event ends.
+- Subject 3 maneuver thresholds belong in `DRIVING_RULES.subject3`; do not duplicate lateral cutoffs in state-machine code.
+- Add regression tests for center-safe/body-out boundary cases and for incomplete maneuver end states.
+
 ## User-facing replay coordinate convention
 
 Driving replay must never expose raw world X/Z as if screen-left/screen-right were vehicle-left/vehicle-right. Replay maps must transform every trajectory, infraction, and field reference into the vehicle's initial local frame:
