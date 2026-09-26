@@ -38,7 +38,15 @@ PR validation must run `npm test` and `npm run build` before merging course-stat
 
 ## Single source of truth for training-car geometry
 
-`src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, and wheel radius. Exam collision and wheel-line checks must not introduce independent copies.
+`src/sim/vehicleDimensions.ts` owns car length, width, wheelbase, track width, axle offsets, wheel radius, tire width, and the simulator tire contact-patch length. Exam collision and wheel-line checks must not introduce independent copies.
+
+`src/sim/wheelContact.ts` owns four-wheel contact geometry and Ackermann front-wheel angles.
+
+- Wheel-line judging must use finite tire contact footprints, not zero-area wheel-center points.
+- Front tire headings must follow Ackermann left/right steering angles; rear tires follow the body heading.
+- Shared wheel geometry used by rendering and judging must come from the same helper rather than duplicated formulas.
+- Body-out rules and wheel-line rules are different concepts. Do not substitute body corners for wheel contact unless the rule explicitly evaluates the body.
+- Add regression coverage at the exact safe/contact boundary whenever a line-contact algorithm changes.
 
 ## Single source of truth for Subject 2 start poses
 
