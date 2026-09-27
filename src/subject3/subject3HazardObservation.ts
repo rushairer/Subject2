@@ -68,3 +68,63 @@ export function observeSubject3CutInHazard(
 
   return best
 }
+
+
+export const SUBJECT3_PEDESTRIAN_OBSERVATION = {
+  maximumAheadMeters: 60,
+  maximumBehindMeters: 4,
+} as const
+
+export interface Subject3PedestrianObservation {
+  hazardId: string
+  progressDeltaMeters: number
+  lateralDeltaMeters: number
+  lateralSpeedMps: number
+  planarDistanceMeters: number
+  conflict: boolean
+  timeToCrosswalkSeconds?: number
+}
+
+export function observeSubject3PedestrianHazard(
+  player: { x: number; z: number; speed: number },
+  traffic: Readonly<Subject3TrafficState>,
+): Subject3PedestrianObservation | undefined {
+  const projection = projectToSubject3Route(player.x, player.z)
+  let best: Subject3PedestrianObservation | undefined
+  let bestDistance = Infinity
+
+  for (const hazard of Object.values(traffic.hazards)) {
+    if (hazard.kind !== 'crosswalk-pedestrian' || !hazard.active) continue
+
+    const progressDeltaMeters = hazard.progress - projection.progress
+    if (
+      progressDeltaMeters < -SUBJECT3_PEDESTRIAN_OBSERVATION.maximumBehindMeters ||
+      progressDeltaMeters > SUBJECT3_PEDESTRIAN_OBSERVATION.maximumAheadMeters
+    ) {
+      continue
+    }
+
+    const lateralDeltaMeters = hazard.lateral - projection.lateral
+    const planarDistanceMeters = Math.hypot(
+      progressDeltaMeters,
+      lateralDeltaMeters,
+    )
+    if (planarDistanceMeters >= bestDistance) continue
+
+    bestDistance = planarDistanceMeters
+    best = {
+      hazardId: hazard.id,
+      progressDeltaMeters,
+      lateralDeltaMeters,
+      lateralSpeedMps: hazard.lateralSpeedMps,
+      planarDistanceMeters,
+      conflict: hazard.conflict,
+      timeToCrosswalkSeconds:
+        progressDeltaMeters > 0 && player.speed > 0.1
+          ? progressDeltaMeters / player.speed
+          : undefined,
+    }
+  }
+
+  return best
+}
