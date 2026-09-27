@@ -22,7 +22,7 @@ Slope physics must treat `grade` as a magnitude along an explicit world-space up
 
 Every Subject 2 project state machine must also have deterministic regression coverage for its canonical successful flow and its major fatal/penalty transitions. A course is not considered direction-safe merely because its rendered geometry looks correct.
 
-PR validation must run `npm test` and `npm run build` before merging course-state changes into `main`.
+PR validation must run `npm test`, `npm run build`, and `npm run test:e2e` before merging rendered driving or course-state changes into `main`.
 
 ## Single source of truth for Subject 2 rules
 
@@ -234,3 +234,16 @@ For any subsystem the user reports as "previously correct":
 - identify the first breaking commit;
 - restore the minimum affected subsystem;
 - only then continue enhancements.
+
+
+## Browser and WebGL release gate
+
+Rendered driving behavior is release-critical and cannot be proven by Node-only state-machine tests.
+
+- Pull requests and `main` releases must pass `npm test`, `npm run build`, and `npm run test:e2e`.
+- `e2e/driving-smoke.spec.ts` owns the minimum real-browser smoke path: profile/menu, a Subject 2 3D scene, Subject 3 3D scene, four camera modes, basic keyboard vehicle controls, clean runtime console/page errors, and result/replay entry.
+- GitHub Pages deployment must remain downstream of the Chromium/WebGL smoke job. Never upload/deploy the Pages artifact before browser smoke succeeds.
+- Preserve Playwright failure artifacts (HTML report, trace, screenshot/video) in CI so WebGL, mirror, camera and interaction regressions are diagnosable.
+- A green TypeScript build is not sufficient evidence for changes to Three.js rendering, RenderTarget mirrors, camera placement, shadows, visible road geometry, dynamic actors or keyboard interaction.
+- Browser tests should interact through user-visible/accessibility semantics where practical. Do not add brittle test-only business branches or bypass the real control path.
+- Keep the mirror reflection baseline rule above in force: browser smoke supplements, but does not replace, direct comparison with known-good commit `80094e7a` for reflection-layer changes.
