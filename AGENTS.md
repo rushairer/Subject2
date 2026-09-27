@@ -259,3 +259,7 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 - Known rule families should have specific coaching. Unknown/future rule IDs must fall back to conservative replay guidance rather than inventing thresholds or legal requirements.
 - Replay advice supplements the scoring matrices; it must not become a second source of truth for points, fatality, timing thresholds, geometry tolerances or pass lines.
 - Any new diagnosis family or slice behavior needs deterministic unit coverage in `tests/replay-diagnosis.test.ts`.
+- `src/replay/replayTrainingFocus.ts` owns session-level habit aggregation. Each infraction maps to exactly one primary habit so a single error cannot inflate multiple priorities.
+- Training priorities sort by existing evidence only: fatal-event count first, then emitted penalty points, recurrence count and earliest event time. Do not invent a separate coaching score or change scoring-matrix semantics.
+- Show at most three priority habits. Every priority card must retain representative rule evidence and, when timestamp/project data exists, navigate back to the corresponding replay position.
+- Aggregation must remain a presentation/coaching layer: it may summarize emitted infractions but must never create, suppress or mutate infractions.
