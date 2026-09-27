@@ -36,7 +36,7 @@ export interface FollowingDistanceCoachingReport {
 function eligibleSample(sample: FollowingDistanceCoachingSample) {
   const minimumSpeedKmh =
     DRIVING_RULES.subject3.followingCoaching.minimumSpeedKmh
-  const speedKmh = Math.abs(sample.speed) * 3.6
+  const speedKmh = sample.speed * 3.6
 
   return (
     sample.project === 'subject3' &&
@@ -121,15 +121,23 @@ export function buildFollowingDistanceCoachingReport(
     const durationSeconds = segmentDuration(current)
     if (durationSeconds >= minimumSustainedSeconds) {
       const representative = representativeSample(current)
+      const minimumGapMeters = current.reduce(
+        (minimum, sample) => Math.min(minimum, sample.leadGapMeters ?? Infinity),
+        Infinity,
+      )
+      const minimumTimeGapSeconds = current.reduce(
+        (minimum, sample) => Math.min(minimum, sample.leadTimeGapSeconds ?? Infinity),
+        Infinity,
+      )
       segments.push({
         vehicleId: currentVehicleId,
         startTime: current[0].t,
         endTime: current[current.length - 1].t,
         durationSeconds,
         representativeTime: representative.t,
-        minimumGapMeters: representative.leadGapMeters ?? 0,
-        minimumTimeGapSeconds: representative.leadTimeGapSeconds ?? 0,
-        representativeSpeedKmh: Math.abs(representative.speed) * 3.6,
+        minimumGapMeters,
+        minimumTimeGapSeconds,
+        representativeSpeedKmh: representative.speed * 3.6,
         representativeClosingSpeedMps: representative.leadClosingSpeedMps ?? 0,
         representativeTimeToCollisionSeconds:
           representative.leadTimeToCollisionSeconds,
