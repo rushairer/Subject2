@@ -17,6 +17,7 @@ import { trainingPackForHabit, type TrainingPackId } from '../training/trainingP
 import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
 import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
 import { NightLightingCoachingPanel } from './NightLightingCoachingPanel'
+import { SuddenBrakeCoachingPanel } from './SuddenBrakeCoachingPanel'
 import { DrivingDynamicsTimeline } from './DrivingDynamicsTimelinePanel'
 
 export interface TrajectorySample {
@@ -35,10 +36,14 @@ export interface TrajectorySample {
   engineOn?: boolean
   engineRpm?: number
   clutch?: number
+  throttle?: number
+  brake?: number
   night?: boolean
   lowBeam?: boolean
   highBeam?: boolean
   leadVehicleId?: string
+  leadScenario?: 'sudden-brake'
+  leadSpeedMps?: number
   leadGapMeters?: number
   leadTimeGapSeconds?: number
   leadClosingSpeedMps?: number
@@ -329,6 +334,10 @@ function headlampLabel(sample: TrajectorySample) {
   return '关闭'
 }
 
+function pedalLabel(value: number | undefined) {
+  return value == null ? '--' : `${Math.round(value * 100)}%`
+}
+
 function operationOffsetLabel(offsetSeconds: number) {
   if (offsetSeconds === 0) return '扣分时'
   return offsetSeconds < 0
@@ -518,6 +527,8 @@ function ProjectReplay({
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
         <span><b>{headlampLabel(current)}</b><small>前照灯</small></span>
+        <span><b>{pedalLabel(current.throttle)}</b><small>油门</small></span>
+        <span><b>{pedalLabel(current.brake)}</b><small>制动</small></span>
         {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
           <span>
             <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
@@ -595,6 +606,15 @@ export function ExamReplay({
     />
 
     <FollowingDistanceCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <SuddenBrakeCoachingPanel
       samples={samples}
       onSelect={t => setFocusRequest(previous => ({
         project: 'subject3',
