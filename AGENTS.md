@@ -221,6 +221,20 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
 - Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
 
+## Subject 3 night-road lighting coaching
+
+`src/coaching/nightLightingCoaching.ts` owns advisory replay analysis for high-beam use in concrete traffic contexts.
+
+- This layer is coaching only. It must never emit `Infraction`, subtract points, terminate an exam, change completion/pass-fail, or feed training-priority penalty aggregation.
+- The 150 m meeting threshold comes from the road-traffic implementation regulation and applies here as a replay context boundary; do not relabel it as a simulator-invented value.
+- “Near following” has no single statutory distance in this implementation. Reuse `DRIVING_RULES.subject3.followingCoaching.referenceTimeGapSeconds` only as a training filter, and user-facing copy must keep that distinction explicit.
+- Never flag free-road high-beam use merely because high beam is active. Require a matching oncoming-within-boundary or close-following traffic context plus the sustained-duration window.
+- Oncoming observation must come from the deterministic Subject 3 traffic registry and route progress, not raw Three.js transforms or screen-space distance.
+- Trajectory samples keep `night`, `lowBeam`, `highBeam`, oncoming vehicle ID/distance and related fields optional so older replay/history data remains compatible.
+- Replay evidence jumps must show the recorded headlamp state in the existing project readout so the coaching card remains auditable.
+- Changes to oncoming observation require deterministic coverage in `tests/subject3-lead-vehicle.test.ts`; changes to lighting segmentation/filtering require `tests/night-lighting-coaching.test.ts`.
+- Browser coverage must exercise a real night Subject 3 scene through result/replay and verify both the night-lighting panel and headlamp readout.
+
 ## Replay driving dynamics timeline
 
 `src/replay/drivingDynamicsTimeline.ts` owns the session-wide speed/gear timeline model and `DrivingDynamicsTimeline.tsx` owns its replay UI.
