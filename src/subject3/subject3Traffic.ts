@@ -26,14 +26,49 @@ export const SUBJECT3_CROSSING_DURATION_SECONDS = 4.8
 export const SUBJECT3_CROSSING_START_LATERAL = 3.4
 export const SUBJECT3_CROSSING_END_LATERAL = -5.7
 
+export interface Subject3TrafficVehicleState {
+  id: string
+  progress: number
+  lateral: number
+  speedMps: number
+  opposite: boolean
+}
+
 export interface Subject3TrafficState {
   crosswalkPedestrianConflict: boolean
+  vehicles: Record<string, Subject3TrafficVehicleState>
 }
 
 export function createSubject3TrafficState(): Subject3TrafficState {
   return {
     crosswalkPedestrianConflict: false,
+    vehicles: {},
   }
+}
+
+export function updateSubject3TrafficVehicle(
+  state: Subject3TrafficState,
+  vehicle: Subject3TrafficVehicleState,
+) {
+  const current = state.vehicles[vehicle.id]
+  if (current) {
+    current.progress = vehicle.progress
+    current.lateral = vehicle.lateral
+    current.speedMps = vehicle.speedMps
+    current.opposite = vehicle.opposite
+    return current
+  }
+
+  const next = { ...vehicle }
+  state.vehicles[vehicle.id] = next
+  return next
+}
+
+export function removeSubject3TrafficVehicle(
+  state: Subject3TrafficState,
+  id: string,
+) {
+  delete state.vehicles[id]
 }
 
 export function crossingPedestrianMotion(
