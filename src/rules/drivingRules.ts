@@ -79,6 +79,18 @@ export const DRIVING_RULES = {
       evidenceWindowSeconds: 3,
       maximumSampleGapSeconds: 0.65,
     },
+    // Simulator coaching heuristics for the scripted scooter cut-in.
+    // They gate replay evidence only and never define an exam-scoring rule.
+    cutInCoaching: {
+      minimumPlayerSpeedKmh: 5,
+      maximumRelevantAheadMeters: 35,
+      maximumRelevantBehindMeters: 3,
+      brakeResponseThreshold: 0.15,
+      throttleReleaseDelta: 0.12,
+      reactionWindowSeconds: 1.5,
+      evidenceWindowSeconds: 3,
+      maximumSampleGapSeconds: 0.65,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
