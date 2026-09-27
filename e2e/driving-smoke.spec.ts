@@ -76,7 +76,7 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '科三E2E')
 
-  await page.getByRole('button', { name: '夜间' }).click()
+  await page.getByRole('button', { name: '夜间', exact: true }).click()
   await page.getByRole('button', { name: /综合道路驾驶/ }).click()
 
   await expectHealthyDrivingScene(page)
