@@ -303,3 +303,102 @@ export function polygonTouchesOutsideRectUnion(
   const areaTolerance = Math.max(1e-9, totalArea * 1e-9)
   return coveredArea < totalArea - areaTolerance
 }
+
+/** Signed area in a vertex-relative frame avoids large world-coordinate cancellation. */
+function signedLocalPolygonArea(points: readonly XZVector[]) {
+  if (points.length < 3) return 0
+  const origin = points[0]
+  let twiceArea = 0
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i]
+    const b = points[i + 1]
+    twiceArea += (a.x - origin.x) * (b.z - origin.z)
+      - (b.x - origin.x) * (a.z - origin.z)
+  }
+  return twiceArea / 2
+}
+
+interface ConvexBoundary {
+  inside: Boundary
+  outside: Boundary
+}
+
+function convexRegionBoundaries(region: readonly XZVector[]): ConvexBoundary[] {
+  const area = signedLocalPolygonArea(region)
+  if (!Number.isFinite(area) || area === 0) return []
+  const winding = Math.sign(area)
+  const boundaries: ConvexBoundary[] = []
+  for (let i = 0; i < region.length; i++) {
+    const start = region[i]
+    const end = region[(i + 1) % region.length]
+    const edgeX = end.x - start.x
+    const edgeZ = end.z - start.z
+    const length = Math.hypot(edgeX, edgeZ)
+    if (length === 0) continue
+    const signedDistance = (point: XZVector) => winding * (
+      edgeX * (point.z - start.z) - edgeZ * (point.x - start.x)
+    ) / length
+    const intersect = (a: XZVector, b: XZVector): XZVector => {
+      const distanceA = signedDistance(a)
+      const distanceB = signedDistance(b)
+      // clipPolygon calls this only across the boundary, so the denominator
+      // cannot be zero. Clamping protects the segment from roundoff at a tip.
+      const t = Math.max(0, Math.min(1, distanceA / (distanceA - distanceB)))
+      return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }
+    }
+    boundaries.push({
+      inside: { inside: point => signedDistance(point) >= 0, intersect },
+      outside: { inside: point => signedDistance(point) <= 0, intersect },
+    })
+  }
+  return boundaries
+}
+
+/**
+ * Exact area coverage of a convex body polygon by a union of convex regions,
+ * including translated/rotated course grounds and connection-road rectangles.
+ * Region winding may be clockwise or counterclockwise. Boundary contact is
+ * contained: this world-envelope helper does not replace painted-line judges.
+ *
+ * Each region is subtracted from the remaining convex fragments. Covered area
+ * is removed only once, and shared/internal edges are never inset or inflated.
+ * The final absolute area tolerance (square metres) absorbs seam roundoff only;
+ * no per-fragment tolerance can silently discard a sum of real uncovered areas.
+ */
+export function polygonTouchesOutsideConvexUnion(
+  polygon: readonly XZVector[],
+  regions: readonly (readonly XZVector[])[],
+  areaTolerance = 1e-8,
+) {
+  const totalArea = Math.abs(signedLocalPolygonArea(polygon))
+  if (!Number.isFinite(totalArea) || totalArea === 0) return true
+  const boundaries = regions.map(convexRegionBoundaries).filter(edges => edges.length >= 3)
+  if (boundaries.length === 0) return true
+
+  // The common case (one ground rectangle contains the car) needs no clipping,
+  // and overlapping secondary rectangles cannot introduce subdivision noise.
+  if (boundaries.some(edges => edges.every(edge => polygon.every(edge.inside.inside)))) return false
+
+  let residual: XZVector[][] = [[...polygon]]
+  for (const region of boundaries) {
+    const nextResidual: XZVector[][] = []
+    for (const fragment of residual) {
+      let candidate = fragment
+      for (const edge of region) {
+        // The outside piece cannot be covered by this region. The inside
+        // piece proceeds to the next edge, making the output pieces disjoint.
+        const outside = clipPolygon(candidate, edge.outside)
+        if (Math.abs(signedLocalPolygonArea(outside)) > 0) nextResidual.push(outside)
+        candidate = clipPolygon(candidate, edge.inside)
+        if (Math.abs(signedLocalPolygonArea(candidate)) === 0) break
+      }
+      // The candidate remaining inside every edge is covered and discarded.
+    }
+    residual = nextResidual
+    if (residual.length === 0) return false
+  }
+
+  const uncoveredArea = residual.reduce((sum, fragment) => sum + Math.abs(signedLocalPolygonArea(fragment)), 0)
+  const tolerance = Number.isFinite(areaTolerance) ? Math.max(0, areaTolerance) : 1e-8
+  return uncoveredArea > tolerance
+}

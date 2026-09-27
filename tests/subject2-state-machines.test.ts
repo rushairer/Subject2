@@ -27,6 +27,17 @@ import {
   createRightAngleRuntime,
   updateRightAngle,
 } from '../src/subject2/RightAngleCourse'
+import { SUBJECT2_START_POSES } from '../src/subject2/courseStartPoses'
+import { SUBJECT2_GROUNDS } from '../src/subject2/courseGroundGeometry'
+import { localPoseToWorld } from '../src/subject2/courseTransform'
+import { subject2EffectiveAreaInfraction } from '../src/subject2/subject2EffectiveArea'
+import {
+  SUBJECT2_C1_SEQUENCE,
+  SUBJECT2_EXAM_PLACEMENTS,
+  subject2ExamSequence,
+  subject2ExamTransitions,
+  subject2ExamWorldStartPose,
+} from '../src/subject2/subject2ExamLayout'
 
 function hasInfraction(result: { infractions: Array<{ id: string }> }, id: string) {
   return result.infractions.some(item => item.id === id)
@@ -874,4 +885,107 @@ test('slope start covers wheel-line failure and the 30-50cm right-gap band', () 
   assert.equal(hasInfraction(result, 'slope-right-gap-10'), true)
   assert.equal(hasInfraction(result, 'slope-right-gap-fail'), false)
   assert.equal(result.infractions.find(item => item.id === 'slope-right-gap-10')?.points, 10)
+})
+
+test('subject2-effective-area-exit leaves all canonical local and continuous starts clear', () => {
+  for (const project of SUBJECT2_C1_SEQUENCE) {
+    assert.equal(subject2EffectiveAreaInfraction(
+      SUBJECT2_START_POSES[project], project, false, false,
+    ), undefined, `${project} local start must not immediately fail`)
+  }
+  for (const automatic of [false, true]) {
+    for (const project of subject2ExamSequence(automatic)) {
+      assert.equal(subject2EffectiveAreaInfraction(
+        subject2ExamWorldStartPose(project), project, true, automatic,
+      ), undefined, `${project} world start must remain inside the continuous grounds`)
+    }
+  }
+})
+
+test('subject2-effective-area-exit is fatal without maneuver entry or an active project judge', () => {
+  const outside = { x: 10_000, z: 10_000, heading: 0 }
+  for (const automatic of [false, true]) {
+    for (const project of subject2ExamSequence(automatic)) {
+      for (const continuous of [false, true]) {
+        const infraction = subject2EffectiveAreaInfraction(outside, project, continuous, automatic)
+        assert.equal(infraction?.id, 'subject2-effective-area-exit')
+        assert.equal(infraction?.points, 100)
+        assert.equal(infraction?.fatal, true)
+      }
+    }
+  }
+})
+
+test('effective-area judging follows translated and rotated course placement instead of world X', () => {
+  const project = 'reverse-parking'
+  const placement = SUBJECT2_EXAM_PLACEMENTS[project]
+  assert.ok(Math.abs(placement.heading) > 0.1, 'the fixture must exercise a rotated canonical course')
+  assert.ok(Math.hypot(placement.x, placement.z) > 0.1, 'the fixture must exercise world translation')
+  const localInside = { x: SUBJECT2_GROUNDS[project].width / 4, z: 0, heading: 0 }
+  const worldInside = localPoseToWorld(localInside, placement)
+  assert.ok(Math.abs(worldInside.x) > 10.2, 'legacy global X cutoff would reject this valid terrain')
+  assert.equal(subject2EffectiveAreaInfraction(localInside, project, false, false), undefined)
+  assert.equal(subject2EffectiveAreaInfraction(worldInside, project, true, false), undefined)
+
+  const worldOutside = localPoseToWorld({ x: 1_000, z: 1_000, heading: 0 }, placement)
+  assert.equal(subject2EffectiveAreaInfraction(worldOutside, project, true, false)?.id, 'subject2-effective-area-exit')
+})
+
+test('continuous effective area permits centered travel on connecting roads with project judging disabled', () => {
+  for (const automatic of [false, true]) {
+    for (const transition of subject2ExamTransitions(automatic)) {
+      const dx = transition.end.x - transition.start.x
+      const dz = transition.end.z - transition.start.z
+      const midpoint = {
+        x: (transition.start.x + transition.end.x) / 2,
+        z: (transition.start.z + transition.end.z) / 2,
+        heading: Math.atan2(dx, -dz),
+      }
+      assert.equal(subject2EffectiveAreaInfraction(
+        midpoint, transition.to, true, automatic,
+      ), undefined, `${transition.from} → ${transition.to} connection must remain driveable`)
+    }
+  }
+})
+
+test('effective-area exit uses the full body footprint rather than the vehicle center', () => {
+  const project = 'reverse-parking'
+  const pose = { x: SUBJECT2_GROUNDS[project].width / 2 - 0.1, z: 0, heading: 0 }
+  assert.ok(pose.x < SUBJECT2_GROUNDS[project].width / 2)
+  assert.equal(subject2EffectiveAreaInfraction(pose, project, false, false)?.id, 'subject2-effective-area-exit')
+})
+
+test('native Subject 2 boundary guards remain active before a maneuver starts', () => {
+  const parked = { speed: 0, gear: 0, engineOn: false, leftIndicator: false, handbrake: true }
+  const reverse = updateReverseParking({
+    ...SUBJECT2_START_POSES['reverse-parking'], ...parked, x: 100,
+  }, createReverseParkingRuntime(), 0.1)
+  assert.equal(reverse.runtime.started, false)
+  assert.equal(hasInfraction(reverse, 'reverse-parking-body-out'), true)
+
+  const side = updateSideParking({
+    ...SUBJECT2_START_POSES['side-parking'], ...parked, x: SIDE_PARKING_GEOMETRY.laneHalf + 4,
+  }, createSideParkingRuntime(), 0.1)
+  assert.equal(side.runtime.started, false)
+  assert.equal(side.runtime.entered, false)
+  assert.equal(side.infractions.some(item => item.id.startsWith('side-parking-line-contact')), true)
+
+  const curve = updateCurveDriving({
+    ...SUBJECT2_START_POSES['curve-driving'], ...parked, x: 100,
+  }, createCurveRuntime(), 0.1)
+  assert.equal(curve.runtime.started, false)
+  assert.equal(hasInfraction(curve, 'curve-wheel-line'), true)
+  assert.equal(hasInfraction(curve, 'curve-reverse'), false)
+
+  const rightAngle = updateRightAngle({
+    ...SUBJECT2_START_POSES['right-angle'], ...parked, x: RIGHT_ANGLE_GEOMETRY.half + 4,
+  }, createRightAngleRuntime(), 0.1)
+  assert.equal(rightAngle.runtime.entered, false)
+  assert.equal(hasInfraction(rightAngle, 'right-angle-wheel-out'), true)
+
+  const slope = updateSlopeStart({
+    ...SUBJECT2_START_POSES['slope-start'], ...parked, x: SLOPE_GEOMETRY.roadHalf + 4,
+  }, createSlopeRuntime(), 0.1)
+  assert.equal(slope.runtime.entered, false)
+  assert.equal(hasInfraction(slope, 'slope-wheel-line'), true)
 })

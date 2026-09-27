@@ -1,7 +1,6 @@
-import {
-  convexPolygonPenetration,
-  convexPolygonsIntersect,
-} from '../sim/planarGeometry'
+import { convexPolygonsIntersect } from '../sim/planarGeometry'
+import { resolveVehicleImpact, type CollisionMotion } from '../sim/collisionResponse'
+import { forwardFromHeading, type XZVector } from '../sim/vehicleFrame'
 import {
   orientedRectangleFootprint,
   vehicleBodyFootprint,
@@ -10,6 +9,7 @@ import {
 import {
   CENTER_LINE_OFFSET,
   RIGHT_EDGE_OFFSET,
+  projectToSubject3Route,
 } from './subject3Route'
 
 export const SUBJECT3_TRAFFIC_CAR = {
@@ -81,6 +81,27 @@ export function removeSubject3TrafficVehicle(
   delete state.vehicles[id]
 }
 
+/** Publish the same displaced world pose and velocity used by physical actors. */
+export function updateSubject3TrafficAfterImpact(
+  state: Subject3TrafficState,
+  id: string,
+  base: VehicleBodyPose,
+  motion: CollisionMotion,
+  opposite: boolean,
+) {
+  const projection = projectToSubject3Route(base.x + motion.offsetX, base.z + motion.offsetZ)
+  const routeForward = forwardFromHeading(projection.heading)
+  const signedSpeed = motion.velocityX * routeForward.x + motion.velocityZ * routeForward.z
+  return updateSubject3TrafficVehicle(
+    state,
+    id,
+    projection.progress,
+    projection.lateral,
+    Math.abs(signedSpeed),
+    signedSpeed < -0.05 ? true : signedSpeed > 0.05 ? false : opposite,
+  )
+}
+
 export function crossingPedestrianMotion(
   triggered: boolean,
   elapsedSeconds: number,
@@ -126,33 +147,11 @@ export function subject3VehicleCollision(
   )
 }
 
-/**
- * Resolves vehicle collision between player and a traffic car by pushing the player back
- * along the contact normal and stopping velocity to prevent penetration.
- */
+/** Subject 3 supplies actor dimensions; all physical response belongs to the shared engine. */
 export function resolveSubject3VehicleCollision(
   player: { x: number; z: number; heading: number; speed: number },
   actor: VehicleBodyPose,
-): { collided: boolean; impactSpeed: number } {
-  const result = convexPolygonPenetration(
-    vehicleBodyFootprint(player),
-    orientedRectangleFootprint(
-      actor,
-      SUBJECT3_TRAFFIC_CAR.lengthMeters,
-      SUBJECT3_TRAFFIC_CAR.widthMeters,
-    ),
-  )
-
-  if (!result.intersecting) {
-    return { collided: false, impactSpeed: 0 }
-  }
-
-  const impactSpeed = Math.abs(player.speed)
-  const pushBack = result.penetration + 0.02
-  player.x += result.normal.x * pushBack
-  player.z += result.normal.z * pushBack
-  player.speed = 0
-
-  return { collided: true, impactSpeed }
+  actorVelocity?: XZVector,
+) {
+  return resolveVehicleImpact(player, actor, SUBJECT3_TRAFFIC_CAR, actorVelocity)
 }
-

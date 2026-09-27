@@ -1,3 +1,4 @@
+import { SUBJECT2_GROUNDS } from './courseGroundGeometry'
 import { useMemo, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import type { Vehicle } from '../sim/vehicleCollision'
@@ -136,7 +137,6 @@ export function updateSlopeStart(
   if (!runtime.entered && movingForward && inCourseEntry) runtime.entered = true
 
   if (
-    runtime.entered &&
     wheelContactFootprints(vehicle).some(footprint =>
       footprint.corners.some(point =>
         Math.abs(point.x) >= SLOPE_GEOMETRY.roadHalf - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
@@ -257,7 +257,7 @@ export function SlopeStartCourse({
   audioContext,
   audioState,
 }: SlopeStartCourseProps = {}): ReactElement {
-  const terrain = useMemo(() => surfaceGeometry(24, -0.07), [])
+  const terrain = useMemo(() => surfaceGeometry(SUBJECT2_GROUNDS['slope-start'].width, -0.07), [])
   const road = useMemo(() => surfaceGeometry(SLOPE_START.roadWidth, 0), [])
   const leftEdge = useMemo(() => surfaceGeometry(SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, 0.025), [])
 

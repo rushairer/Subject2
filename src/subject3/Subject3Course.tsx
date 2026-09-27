@@ -6,18 +6,19 @@ import {
   subject3Infraction,
   type Subject3InfractionRuleId,
 } from '../rules/subject3Rules'
-import { playCollisionImpact, playMeetingWhoosh, type VehicleAudioState } from '../audio/vehicleAudio'
+import { playMeetingWhoosh, type VehicleAudioState } from '../audio/vehicleAudio'
 import {
-  convexPolygonPenetration,
   polygonTouchesOutsideRectUnion,
 } from '../sim/planarGeometry'
-import { resolveRigidCircleObstacle } from '../sim/vehicleCollision'
+import { COLLISION_PROFILES, type CollisionKind } from '../sim/collisionResponse'
+import { useCollisionBody } from '../sim/useCollisionBody'
+import { actorContactCircles } from '../sim/collisionActorGeometry'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
 import {
   orientedRectangleFootprint,
   vehicleBodyFootprint,
 } from '../sim/vehicleFootprint'
-import { sceneYawFromHeading, worldPointFromVehicle } from '../sim/vehicleFrame'
+import { forwardFromHeading, rightFromHeading, sceneYawFromHeading, worldPointFromVehicle } from '../sim/vehicleFrame'
 import {
   CENTER_LINE_OFFSET,
   LANE_WIDTH,
@@ -43,6 +44,8 @@ import {
 } from './subject3Route'
 import {
   SUBJECT3_CROSSING_DURATION_SECONDS,
+  SUBJECT3_CROSSING_START_LATERAL,
+  SUBJECT3_CROSSING_END_LATERAL,
   SUBJECT3_CROSSWALK_PROGRESS,
   SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
   SUBJECT3_TRAFFIC_CAR,
@@ -51,8 +54,7 @@ import {
   createSubject3TrafficState,
   crossingPedestrianMotion,
   removeSubject3TrafficVehicle,
-  resolveSubject3VehicleCollision,
-  subject3VehicleCollision,
+  updateSubject3TrafficAfterImpact,
   updateSubject3TrafficVehicle,
   type Subject3TrafficState,
 } from './subject3Traffic'
@@ -527,10 +529,8 @@ export function updateSubject3(
 ): { runtime: Subject3Runtime; infractions: Subject3Infraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: Subject3Infraction[] = []
-  if (runtime.completed) return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
 
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
-  runtime.progress = Math.max(runtime.progress, projection.progress)
 
   const roadRects = subject3RoadRectsNearProgress(
     projection.progress,
@@ -549,6 +549,8 @@ export function updateSubject3(
       'roadBoundary',
     ))
   }
+  if (runtime.completed) return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
+  runtime.progress = Math.max(runtime.progress, projection.progress)
 
   const speedMps = Math.abs(vehicle.speed)
   const speedKmh = speedMps * 3.6
@@ -767,13 +769,13 @@ function RouteSign({
   const signX = pose.x + pose.rightX * lateral
   const signZ = pose.z + pose.rightZ * lateral
 
-  useFrame(() => {
-    if (!player || !onInfraction) return
-    const outcome = resolveRigidCircleObstacle(player.current, { x: signX, z: signZ, radius: 0.18 })
-    if (outcome.collided) {
-      handleVehicleCollision(player, 'subject3-collision-sign', onInfraction, audioContext, audioState, outcome.impactSpeed)
-    }
-  })
+  const body = useSubject3Collision('pole', player, onInfraction, 'subject3-collision-sign', audioContext, audioState)
+  const pole = worldPointFromVehicle(signX, signZ, pose.heading, 0.06)
+  useFrame((_, delta) => {
+    body.step(Math.min(delta, 0.05))
+    body.circle({ ...pole, radius: 0.06 })
+    body.animate(pose.heading)
+  }, -1)
 
   const isSpeedLimit = label.includes('限速')
   const isSchool = label.includes('学校')
@@ -799,6 +801,7 @@ function RouteSign({
 
   return (
     <group position={[signX, 0, signZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
+      <group ref={body.visual}>
       {/* Support pole mounted cleanly behind the sign board */}
       <mesh position={[0, 1.35, -0.06]} castShadow>
         <cylinderGeometry args={[0.045, 0.06, 2.7, 12]} />
@@ -864,6 +867,7 @@ function RouteSign({
           </mesh>
         </group>
       )}
+      </group>
     </group>
   )
 }
@@ -886,20 +890,22 @@ function TrafficLight({
   const lightX = pose.x + pose.rightX * lateral
   const lightZ = pose.z + pose.rightZ * lateral
 
-  useFrame(() => {
-    if (!player || !onInfraction) return
-    const outcome = resolveRigidCircleObstacle(player.current, { x: lightX, z: lightZ, radius: 0.20 })
-    if (outcome.collided) {
-      handleVehicleCollision(player, 'subject3-collision-traffic-light', onInfraction, audioContext, audioState, outcome.impactSpeed)
-    }
-  })
+  const body = useSubject3Collision('pole', player, onInfraction, 'subject3-collision-traffic-light', audioContext, audioState)
+  const pole = worldPointFromVehicle(lightX, lightZ, pose.heading, 0.06)
+  useFrame((_, delta) => {
+    body.step(Math.min(delta, 0.05))
+    body.circle({ ...pole, radius: 0.09 })
+    body.animate(pose.heading)
+  }, -1)
 
   return <group position={[lightX, 0, lightZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
+    <group ref={body.visual}>
     <mesh position={[0, 2.4, -0.06]} castShadow><cylinderGeometry args={[0.07, 0.09, 4.8, 10]} /><meshStandardMaterial color="#555b5d" metalness={0.5} roughness={0.4} /></mesh>
     <mesh position={[0, 4.4, 0.04]} castShadow receiveShadow><boxGeometry args={[0.5, 1.15, 0.28]} /><meshStandardMaterial color="#16191b" roughness={0.6} /></mesh>
     <mesh position={[0, 4.72, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#4b1717" /></mesh>
     <mesh position={[0, 4.4, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#514b17" /></mesh>
     <mesh position={[0, 4.08, 0.19]}><circleGeometry args={[0.12, 20]} /><meshBasicMaterial color="#35cf69" /></mesh>
+    </group>
   </group>
 }
 
@@ -1044,49 +1050,37 @@ function StaticCar({
   audioState?: VehicleAudioState
 }) {
   const pose = actorRoutePose(distance, lateral)
-  const x = pose.x
-  const z = pose.z
-
   const actorHeading = pose.heading + (opposite ? Math.PI : 0)
+  const group = useRef<THREE.Group>(null)
+  const body = useSubject3Collision('vehicle', player, onInfraction, `subject3-collision-${id}`, audioContext, audioState)
 
-  useEffect(() => {
-    updateSubject3TrafficVehicle(
-      traffic.current,
-      id,
-      distance,
-      lateral,
-      0,
-      opposite,
-    )
-    return () => removeSubject3TrafficVehicle(traffic.current, id)
-  }, [distance, id, lateral, opposite, traffic])
+  useEffect(() => () => removeSubject3TrafficVehicle(traffic.current, id), [id, traffic])
 
-  useFrame(() => {
-    if (opposite) {
+  useFrame((_, delta) => {
+    body.step(Math.min(delta, 0.05))
+    const motion = body.motion.current
+    const actor = { x: pose.x + motion.offsetX, z: pose.z + motion.offsetZ, heading: actorHeading }
+    body.vehicle(actor, SUBJECT3_TRAFFIC_CAR, { x: motion.velocityX, z: motion.velocityZ })
+    if (motion.active) {
+      updateSubject3TrafficAfterImpact(traffic.current, id, pose, motion, opposite)
+    } else {
+      updateSubject3TrafficVehicle(traffic.current, id, distance, lateral, 0, opposite)
+    }
+    if (group.current) {
+      group.current.position.set(actor.x, 0.04, actor.z)
+      group.current.rotation.y = sceneYawFromHeading(actorHeading)
+    }
+    body.animate(actorHeading)
+    if (opposite && !motion.active) {
       const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-      const dist = distance - playerProgress
-      if (dist >= -4 && dist <= 4) {
-        const relSpeed = Math.abs(player.current.speed)
-        if (relSpeed > 2.0) {
-          playMeetingWhoosh(audioContext ?? null, relSpeed, audioState)
-        }
+      if (Math.abs(distance - playerProgress) <= 4 && Math.abs(player.current.speed) > 2) {
+        playMeetingWhoosh(audioContext ?? null, Math.abs(player.current.speed), audioState)
       }
     }
-    const outcome = resolveSubject3VehicleCollision(player.current, {
-      x,
-      z,
-      heading: actorHeading,
-    })
-    if (outcome.collided) {
-      handleVehicleCollision(player, `subject3-collision-${id}`, onInfraction, audioContext, audioState, outcome.impactSpeed)
-    }
-  })
+  }, -1)
 
-  return <group
-    position={[x, 0.04, z]}
-    rotation-y={sceneYawFromHeading(actorHeading)}
-  >
-    <TrafficCarModel color={color} />
+  return <group ref={group} position={[pose.x, 0.04, pose.z]} rotation-y={sceneYawFromHeading(actorHeading)}>
+    <group ref={body.visual}><TrafficCarModel color={color} /></group>
   </group>
 }
 
@@ -1178,22 +1172,21 @@ function Pedestrian({
   audioState?: VehicleAudioState
 }) {
   const pose = poseAtRouteDistance(distance)
-  const pedX = pose.x + pose.rightX * lateral
-  const pedZ = pose.z + pose.rightZ * lateral
+  const base = worldPointFromVehicle(pose.x, pose.z, pose.heading, 0, lateral)
+  const group = useRef<THREE.Group>(null)
+  const body = useSubject3Collision('pedestrian', player, onInfraction, 'subject3-collision-pedestrian', audioContext, audioState)
 
-  const hasCollided = useRef(false)
+  useFrame((_, delta) => {
+    body.step(Math.min(delta, 0.05))
+    const motion = body.motion.current
+    const actor = { x: base.x + motion.offsetX, z: base.z + motion.offsetZ, heading: pose.heading }
+    const tilt = body.animate(pose.heading)
+    body.circles(actorContactCircles('pedestrian', actor, tilt), { x: motion.velocityX, z: motion.velocityZ })
+    group.current?.position.set(actor.x, 0, actor.z)
+  }, -1)
 
-  useFrame(() => {
-    if (!player || !onInfraction) return
-    const outcome = resolveRigidCircleObstacle(player.current, { x: pedX, z: pedZ, radius: 0.35 })
-    if (outcome.collided && !hasCollided.current) {
-      hasCollided.current = true
-      handleVehicleCollision(player, 'subject3-collision-pedestrian', onInfraction, audioContext, audioState, outcome.impactSpeed)
-    }
-  })
-
-  return <group position={[pedX, 0, pedZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
-    <ArticulatedPedestrian color={color} />
+  return <group ref={group} position={[base.x, 0, base.z]} rotation-y={sceneYawFromHeading(pose.heading)}>
+    <group ref={body.visual}><ArticulatedPedestrian color={color} /></group>
   </group>
 }
 
@@ -1308,29 +1301,31 @@ function actorWorldPosition(progress: number, lateral: number) {
       heading: pose.heading,
       x: pose.x,
       z: pose.z,
-      rightX: Math.cos(pose.heading),
-      rightZ: Math.sin(pose.heading),
+      rightX: rightFromHeading(pose.heading).x,
+      rightZ: rightFromHeading(pose.heading).z,
     },
     x: pose.x,
     z: pose.z,
   }
 }
 
-function handleVehicleCollision(
-  player: MutableRefObject<Subject3Vehicle>,
+/** Course-specific scoring adapter; all physical response lives in sim/. */
+function useSubject3Collision(
+  kind: CollisionKind,
+  player: MutableRefObject<Subject3Vehicle> | undefined,
+  onInfraction: ((item: Subject3Infraction) => void) | undefined,
   id: string,
-  onInfraction: (item: Subject3Infraction) => void,
   audioContext?: AudioContext | null,
   audioState?: VehicleAudioState,
-  impactSpeed = 0,
 ) {
-  playCollisionImpact(audioContext ?? null, impactSpeed || player.current.speed, audioState)
-  player.current.speed = 0
-  onInfraction(subject3Infraction(
-    id,
-    '道路驾驶过程中与其他交通参与者发生碰撞',
-    'collision',
-  ))
+  return useCollisionBody({
+    kind, player, audioContext, audioState,
+    onImpact: onInfraction ? () => onInfraction(subject3Infraction(
+      id,
+      `道路驾驶过程中与${COLLISION_PROFILES[kind].label}发生碰撞`,
+      'collision',
+    )) : undefined,
+  })
 }
 
 function MovingTrafficCar({
@@ -1362,56 +1357,51 @@ function MovingTrafficCar({
   const progress = useRef(startProgress)
   const isStopped = useRef(false)
   const wheelAngle = useRef(0)
+  const body = useSubject3Collision('vehicle', player, onInfraction, `subject3-collision-${id}`, audioContext, audioState)
 
-  useEffect(() => () => {
-    removeSubject3TrafficVehicle(traffic.current, id)
-  }, [id, traffic])
+  useEffect(() => () => removeSubject3TrafficVehicle(traffic.current, id), [id, traffic])
 
   useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    body.step(dt)
     if (!isStopped.current) {
-      progress.current += (opposite ? -1 : 1) * speed * delta
-      wheelAngle.current += (speed / 0.28) * delta
+      progress.current += (opposite ? -1 : 1) * speed * dt
+      wheelAngle.current += (speed / 0.28) * dt
       if (progress.current > SUBJECT3_ROUTE_LENGTH - 40) progress.current = 120
       if (progress.current < 60) progress.current = SUBJECT3_ROUTE_LENGTH - 80
     }
     const world = actorWorldPosition(progress.current, lateral)
-    updateSubject3TrafficVehicle(
-      traffic.current,
-      id,
-      progress.current,
-      lateral,
-      isStopped.current ? 0 : speed,
-      opposite,
-    )
-    if (group.current) {
-      group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + (opposite ? Math.PI : 0)
+    const actorHeading = world.pose.heading + (opposite ? Math.PI : 0)
+    const motion = body.motion.current
+    const actor = { x: world.x + motion.offsetX, z: world.z + motion.offsetZ, heading: actorHeading }
+    const forward = forwardFromHeading(actorHeading)
+    const velocity = isStopped.current
+      ? { x: motion.velocityX, z: motion.velocityZ }
+      : { x: forward.x * speed, z: forward.z * speed }
+    if (body.vehicle(actor, SUBJECT3_TRAFFIC_CAR, velocity)?.collided) isStopped.current = true
+    if (motion.active) {
+      updateSubject3TrafficAfterImpact(traffic.current, id, world.pose, motion, opposite)
+    } else {
+      updateSubject3TrafficVehicle(traffic.current, id, progress.current, lateral, isStopped.current ? 0 : speed, opposite)
     }
+    if (group.current) {
+      group.current.position.set(actor.x, 0.04, actor.z)
+      group.current.rotation.y = sceneYawFromHeading(actorHeading)
+    }
+    body.animate(actorHeading)
 
     if (opposite && !isStopped.current) {
       const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-      const dist = progress.current - playerProgress
-      if (dist >= -4 && dist <= 4) {
-        const relSpeed = Math.abs(player.current.speed) + speed
-        if (relSpeed > 2.0) {
-          playMeetingWhoosh(audioContext ?? null, relSpeed, audioState)
-        }
+      if (Math.abs(progress.current - playerProgress) <= 4) {
+        const relativeSpeed = Math.abs(player.current.speed) + speed
+        if (relativeSpeed > 2) playMeetingWhoosh(audioContext ?? null, relativeSpeed, audioState)
       }
     }
+  }, -1)
 
-    const actorHeading = world.pose.heading + (opposite ? Math.PI : 0)
-    const outcome = resolveSubject3VehicleCollision(player.current, {
-      x: world.x,
-      z: world.z,
-      heading: actorHeading,
-    })
-    if (outcome.collided) {
-      isStopped.current = true
-      handleVehicleCollision(player, `subject3-collision-${id}`, onInfraction, audioContext, audioState, outcome.impactSpeed)
-    }
-  })
-
-  return <group ref={group}><TrafficCarModel color={color} wheelAngle={wheelAngle.current} /></group>
+  return <group ref={group}><group ref={body.visual}>
+    <TrafficCarModel color={color} wheelAngle={wheelAngle.current} />
+  </group></group>
 }
 
 function SuddenBrakeCar({
@@ -1432,44 +1422,46 @@ function SuddenBrakeCar({
   const speed = useRef(8.5)
   const isStopped = useRef(false)
   const wheelAngle = useRef(0)
+  const body = useSubject3Collision('vehicle', player, onInfraction, 'subject3-collision-sudden-brake', audioContext, audioState)
 
-  useEffect(() => () => {
-    removeSubject3TrafficVehicle(traffic.current, 'sudden-brake')
-  }, [traffic])
+  useEffect(() => () => removeSubject3TrafficVehicle(traffic.current, 'sudden-brake'), [traffic])
 
   useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    body.step(dt)
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-    if (playerProgress > 2660 && playerProgress < 2920 && !isStopped.current) {
-      if (playerProgress > 2725) speed.current = Math.max(0, speed.current - 7.5 * delta)
-      progress.current += speed.current * delta
-      wheelAngle.current += (speed.current / 0.28) * delta
+    const moving = playerProgress > 2660 && playerProgress < 2920 && !isStopped.current
+    if (moving) {
+      if (playerProgress > 2725) speed.current = Math.max(0, speed.current - 7.5 * dt)
+      progress.current += speed.current * dt
+      wheelAngle.current += (speed.current / 0.28) * dt
     }
     const world = actorWorldPosition(progress.current, 0)
-    updateSubject3TrafficVehicle(
-      traffic.current,
-      'sudden-brake',
-      progress.current,
-      0,
-      isStopped.current ? 0 : speed.current,
-      false,
-    )
-    if (group.current) {
-      group.current.position.set(world.x, 0.04, world.z)
-      group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
-    }
-    const outcome = resolveSubject3VehicleCollision(player.current, {
-      x: world.x,
-      z: world.z,
-      heading: world.pose.heading,
-    })
-    if (outcome.collided) {
+    const motion = body.motion.current
+    const actor = { x: world.x + motion.offsetX, z: world.z + motion.offsetZ, heading: world.pose.heading }
+    const forward = forwardFromHeading(actor.heading)
+    const velocity = isStopped.current
+      ? { x: motion.velocityX, z: motion.velocityZ }
+      : { x: forward.x * (moving ? speed.current : 0), z: forward.z * (moving ? speed.current : 0) }
+    if (body.vehicle(actor, SUBJECT3_TRAFFIC_CAR, velocity)?.collided) {
       isStopped.current = true
       speed.current = 0
-      handleVehicleCollision(player, 'subject3-collision-sudden-brake', onInfraction, audioContext, audioState, outcome.impactSpeed)
     }
-  })
+    if (motion.active) {
+      updateSubject3TrafficAfterImpact(traffic.current, 'sudden-brake', world.pose, motion, false)
+    } else {
+      updateSubject3TrafficVehicle(traffic.current, 'sudden-brake', progress.current, 0, moving ? speed.current : 0, false)
+    }
+    if (group.current) {
+      group.current.position.set(actor.x, 0.04, actor.z)
+      group.current.rotation.y = sceneYawFromHeading(actor.heading)
+    }
+    body.animate(actor.heading)
+  }, -1)
 
-  return <group ref={group}><TrafficCarModel color="#d8d4c9" wheelAngle={wheelAngle.current} /></group>
+  return <group ref={group}><group ref={body.visual}>
+    <TrafficCarModel color="#d8d4c9" wheelAngle={wheelAngle.current} />
+  </group></group>
 }
 
 function CrossingPedestrian({
@@ -1489,54 +1481,47 @@ function CrossingPedestrian({
   const elapsed = useRef(0)
   const triggered = useRef(false)
   const isStopped = useRef(false)
-  const hasCollided = useRef(false)
   const walkAngle = useRef(0)
+  const body = useSubject3Collision('pedestrian', player, onInfraction, 'subject3-collision-pedestrian', audioContext, audioState)
 
-  useEffect(() => () => {
-    traffic.current.crosswalkPedestrianConflict = false
-  }, [traffic])
+  useEffect(() => () => { traffic.current.crosswalkPedestrianConflict = false }, [traffic])
 
   useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    body.step(dt)
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-    if (
-      !triggered.current &&
-      playerProgress > SUBJECT3_CROSSWALK_TRIGGER_PROGRESS
-    ) {
-      triggered.current = true
-    }
+    if (!triggered.current && playerProgress > SUBJECT3_CROSSWALK_TRIGGER_PROGRESS) triggered.current = true
     if (triggered.current && !isStopped.current) {
-      elapsed.current += delta
-      if (elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS) {
-        walkAngle.current += delta * 7.5
-      }
+      elapsed.current = Math.min(SUBJECT3_CROSSING_DURATION_SECONDS, elapsed.current + dt)
+      if (elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS) walkAngle.current += dt * 7.5
     }
-
-    const motion = crossingPedestrianMotion(
-      triggered.current,
-      elapsed.current,
-    )
-    traffic.current.crosswalkPedestrianConflict = motion.conflict
-    const world = actorWorldPosition(motion.progress, motion.lateral)
+    const crossing = crossingPedestrianMotion(triggered.current, elapsed.current)
+    const world = actorWorldPosition(crossing.progress, crossing.lateral)
+    const motion = body.motion.current
+    const heading = world.pose.heading - Math.PI / 2
+    const actor = { x: world.x + motion.offsetX, z: world.z + motion.offsetZ, heading }
+    const tilt = body.animate(heading)
+    const right = rightFromHeading(world.pose.heading)
+    const crossingSpeed = triggered.current && !isStopped.current && elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS
+      ? (SUBJECT3_CROSSING_END_LATERAL - SUBJECT3_CROSSING_START_LATERAL) / SUBJECT3_CROSSING_DURATION_SECONDS : 0
+    const velocity = isStopped.current
+      ? { x: motion.velocityX, z: motion.velocityZ }
+      : { x: right.x * crossingSpeed, z: right.z * crossingSpeed }
+    if (body.circles(actorContactCircles('pedestrian', actor, tilt), velocity)?.collided) isStopped.current = true
+    // After contact, conflict follows the same displaced position as the actor.
+    const actual = projectToSubject3Route(actor.x, actor.z)
+    traffic.current.crosswalkPedestrianConflict = motion.active
+      ? actual.lateral <= RIGHT_EDGE_OFFSET && actual.lateral >= CENTER_LINE_OFFSET
+      : crossing.conflict
     if (group.current) {
-      group.current.position.set(world.x, 0, world.z)
-      // Facing the direction of crossing across the road
-      group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + Math.PI / 2
+      group.current.position.set(actor.x, 0, actor.z)
+      group.current.rotation.y = sceneYawFromHeading(heading)
     }
-    if (triggered.current) {
-      const outcome = resolveRigidCircleObstacle(player.current, { x: world.x, z: world.z, radius: 0.35 })
-      if (outcome.collided) {
-        isStopped.current = true
-        if (!hasCollided.current) {
-          hasCollided.current = true
-          handleVehicleCollision(player, 'subject3-collision-pedestrian', onInfraction, audioContext, audioState, outcome.impactSpeed)
-        }
-      }
-    }
-  })
+  }, -1)
 
-  return <group ref={group}>
+  return <group ref={group}><group ref={body.visual}>
     <ArticulatedPedestrian color="#3f75a2" walkAngle={isStopped.current ? 0 : walkAngle.current} />
-  </group>
+  </group></group>
 }
 
 function CutInScooter({
@@ -1556,34 +1541,41 @@ function CutInScooter({
   const progress = useRef(1385)
   const isStopped = useRef(false)
   const wheelAngle = useRef(0)
+  const body = useSubject3Collision('scooter', player, onInfraction, 'subject3-collision-scooter', audioContext, audioState)
 
   useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    body.step(dt)
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
     if (!triggered.current && playerProgress > 1290) triggered.current = true
     if (triggered.current && !isStopped.current) {
-      elapsed.current = Math.min(5, elapsed.current + delta)
-      progress.current += 3.2 * delta
-      wheelAngle.current += (3.2 / 0.18) * delta
+      elapsed.current = Math.min(5, elapsed.current + dt)
+      progress.current += 3.2 * dt
+      wheelAngle.current += (3.2 / 0.18) * dt
     }
-    const t = Math.min(1, elapsed.current / 3.4)
-    const lateral = 3.2 - t * 3.3
+    const lateral = 3.2 - Math.min(1, elapsed.current / 3.4) * 3.3
     const world = actorWorldPosition(progress.current, lateral)
+    const motion = body.motion.current
+    const actor = { x: world.x + motion.offsetX, z: world.z + motion.offsetZ, heading: world.pose.heading }
+    const tilt = body.animate(actor.heading)
+    const forward = forwardFromHeading(actor.heading)
+    const right = rightFromHeading(actor.heading)
+    const lateralSpeed = elapsed.current < 3.4 ? -3.3 / 3.4 : 0
+    const velocity = isStopped.current
+      ? { x: motion.velocityX, z: motion.velocityZ }
+      : triggered.current
+        ? { x: forward.x * 3.2 + right.x * lateralSpeed, z: forward.z * 3.2 + right.z * lateralSpeed }
+        : { x: 0, z: 0 }
+    if (body.circles(actorContactCircles('scooter', actor, tilt), velocity)?.collided) isStopped.current = true
     if (group.current) {
-      group.current.position.set(world.x, 0.18, world.z)
-      group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
+      group.current.position.set(actor.x, 0.18, actor.z)
+      group.current.rotation.y = sceneYawFromHeading(actor.heading)
     }
-    if (triggered.current) {
-      const outcome = resolveRigidCircleObstacle(player.current, { x: world.x, z: world.z, radius: 0.9 })
-      if (outcome.collided) {
-        isStopped.current = true
-        handleVehicleCollision(player, 'subject3-collision-scooter', onInfraction, audioContext, audioState, outcome.impactSpeed)
-      }
-    }
-  })
+  }, -1)
 
-  return <group ref={group}>
+  return <group ref={group}><group ref={body.visual}>
     <ScooterModel wheelAngle={wheelAngle.current} />
-  </group>
+  </group></group>
 }
 
 function DynamicTraffic({
@@ -1638,27 +1630,16 @@ function RoadsideBuilding({
     [groupX, groupZ, pose.heading],
   )
 
-  useFrame(() => {
-    // 1. Solid building collision check
-    const bResult = convexPolygonPenetration(
-      vehicleBodyFootprint(player.current),
-      buildingFootprint,
-    )
-    if (bResult.intersecting) {
-      const impactSpeed = Math.abs(player.current.speed)
-      player.current.x += bResult.normal.x * (bResult.penetration + 0.03)
-      player.current.z += bResult.normal.z * (bResult.penetration + 0.03)
-      player.current.speed = 0
-      handleVehicleCollision(player, 'subject3-collision-building', onInfraction, audioContext, audioState, impactSpeed)
-      return
-    }
-
-    // 2. Solid tree trunk collision check
-    const treeOutcome = resolveRigidCircleObstacle(player.current, { x: treeX, z: treeZ, radius: 0.28 })
-    if (treeOutcome.collided) {
-      handleVehicleCollision(player, 'subject3-collision-tree', onInfraction, audioContext, audioState, treeOutcome.impactSpeed)
-    }
-  })
+  const building = useSubject3Collision('building', player, onInfraction, 'subject3-collision-building', audioContext, audioState)
+  const tree = useSubject3Collision('tree', player, onInfraction, 'subject3-collision-tree', audioContext, audioState)
+  useFrame((_, delta) => {
+    const dt = Math.min(delta, 0.05)
+    building.step(dt)
+    building.polygon(buildingFootprint)
+    tree.step(dt)
+    tree.circle({ x: treeX, z: treeZ, radius: 0.22 })
+    tree.animate(pose.heading)
+  }, -1)
 
   return (
     <group position={[groupX, 0, groupZ]} rotation-y={sceneYawFromHeading(pose.heading)}>
@@ -1670,10 +1651,14 @@ function RoadsideBuilding({
         <cylinderGeometry args={[0.18, 0.22, 2.4, 10]} />
         <meshStandardMaterial color="#625649" />
       </mesh>
-      <mesh position={[treeOffset, 3.2, 0]} castShadow>
-        <sphereGeometry args={[1.35, 12, 9]} />
-        <meshStandardMaterial color="#41694a" />
-      </mesh>
+      <group position={[treeOffset, 2.4, 0]}>
+        <group ref={tree.visual}>
+          <mesh position={[0, 0.8, 0]} castShadow>
+            <sphereGeometry args={[1.35, 12, 9]} />
+            <meshStandardMaterial color="#41694a" />
+          </mesh>
+        </group>
+      </group>
     </group>
   )
 }

@@ -1,3 +1,4 @@
+import { SUBJECT2_GROUNDS } from './courseGroundGeometry'
 import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
@@ -221,7 +222,7 @@ export function updateSideParking(
     }
   }
 
-  if (runtime.started && wheelTouchesBoundary(vehicle)) {
+  if (wheelTouchesBoundary(vehicle)) {
     if (!runtime.contactLatched) {
       infractions.push(subject2Infraction('side-parking-line-contact', Math.floor(runtime.elapsed * 10)))
       runtime.contactLatched = true
@@ -336,7 +337,7 @@ export function SideParkingCourse({
     ))}
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
-      <planeGeometry args={[45, 40]} />
+      <planeGeometry args={[SUBJECT2_GROUNDS['side-parking'].width, SUBJECT2_GROUNDS['side-parking'].length]} />
       <meshStandardMaterial color="#637657" />
     </mesh>
   </group>

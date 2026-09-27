@@ -1,7 +1,10 @@
+import { SUBJECT2_CONNECTION_ROAD_WIDTH } from './courseGroundGeometry'
 import type { MutableRefObject, ReactElement } from 'react'
+import { useFrame } from '@react-three/fiber'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import { sceneYawFromHeading } from '../sim/vehicleFrame'
+import { useCollisionBody } from '../sim/useCollisionBody'
 import { CurveDrivingCourse } from './CurveDrivingCourse'
 import { ReverseParkingCourse } from './ReverseParkingCourse'
 import { RightAngleCourse } from './RightAngleCourse'
@@ -16,6 +19,7 @@ import {
 } from './subject2ExamLayout'
 import type { Subject2ProjectId } from './courseStartPoses'
 import type { CoursePlacement } from './courseTransform'
+import { COURSE_GATE_GEOMETRY, courseGatePosts } from './courseGateGeometry'
 
 function PlacedCourse({
   placement,
@@ -36,25 +40,55 @@ function PlacedCourse({
 function CourseGate({
   project,
   active,
+  vehicle,
+  audioContext,
+  audioState,
 }: {
   project: Subject2ProjectId
   active: boolean
+  vehicle?: MutableRefObject<Vehicle>
+  audioContext?: AudioContext | null
+  audioState?: VehicleAudioState
 }) {
   const pose = subject2ExamWorldStartPose(project)
+  const posts = courseGatePosts(pose)
+  const leftBody = useCollisionBody({ kind: 'pole', player: vehicle, audioContext, audioState })
+  const rightBody = useCollisionBody({ kind: 'pole', player: vehicle, audioContext, audioState })
+  const bodies = [leftBody, rightBody]
+  useFrame((_, dt) => {
+    bodies.forEach((body, index) => {
+      body.step(dt)
+      body.circle(posts[index])
+      body.animate(pose.heading)
+    })
+  }, -1)
   const postColor = active ? '#65d9ff' : '#53758f'
   const markerColor = active ? '#f5d06f' : '#7f8b94'
   return <group
     position={[pose.x, 0, pose.z]}
     rotation-y={sceneYawFromHeading(pose.heading)}
   >
-    {[-2.25, 2.25].map(x => (
-      <mesh key={x} position={[x, 1.05, 0]}>
-        <cylinderGeometry args={[0.07, 0.09, 2.1, 10]} />
-        <meshStandardMaterial color={postColor} emissive={active ? postColor : '#000000'} emissiveIntensity={active ? 0.18 : 0} />
-      </mesh>
+    {posts.map((post, index) => (
+      <group key={post.side} position={[post.localX, 0, 0]}>
+        <group ref={bodies[index].visual}>
+          <mesh position-y={COURSE_GATE_GEOMETRY.postHeightMeters / 2}>
+            <cylinderGeometry args={[
+              COURSE_GATE_GEOMETRY.postTopRadiusMeters,
+              COURSE_GATE_GEOMETRY.postRadiusMeters,
+              COURSE_GATE_GEOMETRY.postHeightMeters,
+              10,
+            ]} />
+            <meshStandardMaterial color={postColor} emissive={active ? postColor : '#000000'} emissiveIntensity={active ? 0.18 : 0} />
+          </mesh>
+        </group>
+      </group>
     ))}
-    <mesh position={[0, 2.05, 0]}>
-      <boxGeometry args={[4.5, 0.12, 0.12]} />
+    <mesh position={[0, COURSE_GATE_GEOMETRY.crossbarHeightMeters, 0]}>
+      <boxGeometry args={[
+        COURSE_GATE_GEOMETRY.postOffsetMeters * 2,
+        COURSE_GATE_GEOMETRY.crossbarThicknessMeters,
+        COURSE_GATE_GEOMETRY.crossbarThicknessMeters,
+      ]} />
       <meshStandardMaterial color={postColor} emissive={active ? postColor : '#000000'} emissiveIntensity={active ? 0.18 : 0} />
     </mesh>
     <mesh rotation-x={-Math.PI / 2} position={[0, 0.022, 0]}>
@@ -73,7 +107,7 @@ function TransitionRoad({ transition }: { transition: Subject2Transition }) {
   const z = (transition.start.z + transition.end.z) / 2
   return <group position={[x, 0, z]} rotation-y={sceneYawFromHeading(heading)}>
     <mesh rotation-x={-Math.PI / 2} position-y={0.006} receiveShadow>
-      <planeGeometry args={[4.2, length]} />
+      <planeGeometry args={[SUBJECT2_CONNECTION_ROAD_WIDTH, length]} />
       <meshStandardMaterial color="#3c4144" roughness={1} />
     </mesh>
     <mesh rotation-x={-Math.PI / 2} position={[-2.02, 0.016, 0]}>
@@ -108,6 +142,9 @@ export function Subject2ExamCourse({
         key={`gate-${project}`}
         project={project}
         active={project === activeProject}
+        vehicle={vehicle}
+        audioContext={audioContext}
+        audioState={audioState}
       />
     ))}
     {transitions.map(transition => (

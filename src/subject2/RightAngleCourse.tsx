@@ -1,3 +1,4 @@
+import { SUBJECT2_GROUNDS } from './courseGroundGeometry'
 import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
@@ -169,7 +170,6 @@ export function updateRightAngle(
   if (!runtime.entered && inEntryLane) runtime.entered = true
 
   if (
-    runtime.entered &&
     wheelContactFootprints(vehicle).some(footprint =>
       footprintTouchesOutsideRectUnion(footprint, allowedRoadRects(), 0) ||
       boundaryLineRects().some(rect =>
@@ -278,7 +278,7 @@ export function RightAngleCourse({
     />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
-      <planeGeometry args={[42, 42]} />
+      <planeGeometry args={[SUBJECT2_GROUNDS['right-angle'].width, SUBJECT2_GROUNDS['right-angle'].length]} />
       <meshStandardMaterial color="#637657" />
     </mesh>
   </group>

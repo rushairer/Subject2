@@ -105,7 +105,9 @@ export function checkVehicleCircleCollision(
     }
   }
 
-  const colliding = dist <= obstacle.radius
+  // Decimal body dimensions can put an exact painted/rendered contact a few
+  // ulps outside the radius. This is far below a meaningful physical gap.
+  const colliding = dist <= obstacle.radius + 1e-9
   const normLong = dLong / dist
   const normLat = dLat / dist
   const normal: XZVector = {
@@ -116,81 +118,10 @@ export function checkVehicleCircleCollision(
   return {
     colliding,
     distance: dist - obstacle.radius,
-    penetration: colliding ? obstacle.radius - dist : 0,
+    penetration: colliding ? Math.max(0, obstacle.radius - dist) : 0,
     normal,
     contactPoint,
     relativeLongitudinal: longitudinal,
     relativeLateral: lateral,
   }
-}
-
-export interface ConeImpactResult {
-  impactSpeed: number
-  knockAxis: [number, number, number]
-  slideDir: [number, number]
-  initialSlideSpeed: number
-}
-
-/**
- * Calculates knockdown tilt axis and slide trajectory when a vehicle collides with a traffic cone.
- */
-export function calculateConeImpact(
-  vehicle: VehiclePose & { speed: number },
-  obstacle: CircleObstacle,
-  collision: VehicleCircleCollisionResult,
-): ConeImpactResult {
-  const impactSpeed = Math.max(0.18, Math.abs(vehicle.speed))
-  const forward = forwardFromHeading(vehicle.heading)
-
-  let dirX: number
-  let dirZ: number
-
-  if (Math.abs(vehicle.speed) > 0.05) {
-    const sgn = vehicle.speed >= 0 ? 1 : -1
-    dirX = forward.x * sgn
-    dirZ = forward.z * sgn
-  } else {
-    // If vehicle has minimal velocity, use collision push normal
-    dirX = collision.normal.x
-    dirZ = collision.normal.z
-  }
-
-  const len = Math.hypot(dirX, dirZ) || 1
-  const normDirX = dirX / len
-  const normDirZ = dirZ / len
-
-  // In Three.js: axis = up x dir = (0, 1, 0) x (normDirX, 0, normDirZ) = (normDirZ, 0, -normDirX)
-  const knockAxis: [number, number, number] = [normDirZ, 0, -normDirX]
-  const slideDir: [number, number] = [normDirX, normDirZ]
-  const initialSlideSpeed = Math.min(2.8, 0.45 + impactSpeed * 0.75)
-
-  return {
-    impactSpeed,
-    knockAxis,
-    slideDir,
-    initialSlideSpeed,
-  }
-}
-
-/**
- * Resolves a collision between the vehicle and a rigid, immovable obstacle (e.g. sign pole).
- * Prevents the vehicle from clipping through by resetting penetration and zeroing vehicle speed.
- */
-export function resolveRigidCircleObstacle(
-  vehicle: { x: number; z: number; heading: number; speed: number },
-  obstacle: CircleObstacle,
-  dimensions?: { lengthMeters: number; widthMeters: number },
-): { collided: boolean; impactSpeed: number } {
-  const collision = checkVehicleCircleCollision(vehicle, obstacle, dimensions)
-  if (!collision.colliding) {
-    return { collided: false, impactSpeed: 0 }
-  }
-
-  const impactSpeed = Math.abs(vehicle.speed)
-  const pushBack = collision.penetration + 0.02
-  vehicle.x -= collision.normal.x * pushBack
-  vehicle.z -= collision.normal.z * pushBack
-  vehicle.speed = 0
-
-  return { collided: true, impactSpeed }
 }

@@ -1,3 +1,4 @@
+import { subject2EffectiveAreaInfraction } from './subject2/subject2EffectiveArea'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
@@ -486,7 +487,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       const firstPress = pressDrivingKey(keys.current, k, e.repeat)
       syncLook()
       if (!firstPress) return
-      if (!audioContext.current && (k === 'q' || k === 'e' || k === 'v' || k === 'b')) {
+      if (!audioContext.current) {
         const ctx = new AudioContext()
         audioContext.current = ctx
         if (ctx.state === 'suspended') void ctx.resume()
@@ -643,6 +644,12 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       dt,
     )
 
+  }, -2) // Integrate once before all shared course collision bodies.
+
+  useFrame((_, rawDt) => {
+    // Collisions run at -1: the camera, judges and replay see the resolved pose.
+    const dt = Math.min(rawDt, .05)
+    const v = vehicle.current
     const judgedVehicle = continuousExam
       ? subject2ExamLocalVehicle(session.examId as Subject2ProjectId, v)
       : v
@@ -730,7 +737,10 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     } else {
       speedTimer.current = 0
     }
-    if (!['reverse-parking', 'side-parking', 'right-angle', 'curve-driving', 'slope-start', 'subject3'].includes(session.examId) && Math.abs(v.x) > 10.2) onInfraction({ id: 'road-boundary', title: '车辆驶出当前训练道路边界', points: 100, fatal: true })
+    if (session.examId !== 'subject3') {
+      const outsideArea = subject2EffectiveAreaInfraction(v, session.examId as Subject2ProjectId, continuousExam, automatic)
+      if (outsideArea) onInfraction(outsideArea)
+    }
 
     let projectUpdate: { status: string; infractions: Infraction[] } | null = null
     let projectCompleted = false
@@ -1120,7 +1130,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         <PedalReadout automatic={automatic} throttle={display.throttle} brake={display.brake} clutch={display.clutch} />
         <div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span>{!automatic && <span className={display.biteLatched ? 'on' : ''}>{display.biteLatched ? '半联动保持' : '离合结合'}</span>}<span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div>
       </div>
-      {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
+      {infractions.length > 0 && <div className="penalty-toast" role="status">{infractions[infractions.length - 1].title} · 已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>
 }

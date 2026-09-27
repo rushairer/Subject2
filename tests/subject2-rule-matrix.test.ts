@@ -9,6 +9,7 @@ import {
 import { passLineForExam } from '../src/session/sessionResult'
 
 const expectedRuleIds = [
+  'subject2-effective-area-exit',
   'reverse-before-first-control',
   'reverse-parking-timeout',
   'reverse-parking-body-out',
@@ -50,6 +51,7 @@ test('Subject 2 rule matrix contains every current infraction exactly once', () 
   }, {})
 
   assert.deepEqual(counts, {
+    common: 1,
     'reverse-parking': 7,
     'side-parking': 5,
     'slope-start': 9,
@@ -119,6 +121,7 @@ test('course judges source penalties from the central rule matrix', () => {
     'SlopeStartCourse.tsx',
     'CurveDrivingCourse.tsx',
     'RightAngleCourse.tsx',
+    'subject2EffectiveArea.ts',
   ]
 
   for (const file of courses) {

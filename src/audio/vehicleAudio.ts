@@ -2,11 +2,13 @@
  * Procedural Web Audio synthesis for vehicle sound effects:
  * - Turn indicator / hazard flasher mechanical relay clicks ("哒-嗒")
  * - Oncoming traffic Doppler whoosh / air displacement ("呼——咻")
- * - Collision impact thud / metal crunch
+ * - Material-specific collision thuds, crunches and resonances
  *
  * All sounds are synthesized purely in software via Web Audio API nodes with
  * zero external audio file dependencies.
  */
+
+import type { CollisionKind } from '../sim/collisionResponse'
 
 export interface VehicleAudioState {
   relayTimer: number
@@ -174,65 +176,153 @@ export function playMeetingWhoosh(
   noise.start(now)
 }
 
+interface CollisionTone {
+  readonly waveform: OscillatorType
+  readonly startHz: number
+  readonly endHz: number
+  readonly duration: number
+  readonly gain: number
+}
+
+export interface CollisionAudioProfile {
+  readonly thump: CollisionTone
+  readonly noise: {
+    readonly filter: BiquadFilterType
+    readonly frequency: number
+    readonly q: number
+    readonly duration: number
+    readonly gain: number
+    readonly clatter?: boolean
+  }
+  readonly ring?: CollisionTone
+}
+
+/** Sound design only: these values never determine collision physics or scoring. */
+export const COLLISION_AUDIO_PROFILES: Readonly<Record<CollisionKind, CollisionAudioProfile>> = {
+  pedestrian: {
+    thump: { waveform: 'sine', startHz: 82, endHz: 36, duration: 0.15, gain: 0.13 },
+    noise: { filter: 'lowpass', frequency: 220, q: 0.6, duration: 0.08, gain: 0.055 },
+  },
+  vehicle: {
+    thump: { waveform: 'sine', startHz: 110, endHz: 32, duration: 0.32, gain: 0.25 },
+    noise: { filter: 'highpass', frequency: 600, q: 0.7, duration: 0.18, gain: 0.18 },
+  },
+  scooter: {
+    thump: { waveform: 'triangle', startHz: 230, endHz: 75, duration: 0.14, gain: 0.12 },
+    noise: { filter: 'bandpass', frequency: 1650, q: 1.4, duration: 0.22, gain: 0.11, clatter: true },
+  },
+  pole: {
+    thump: { waveform: 'sine', startHz: 145, endHz: 40, duration: 0.16, gain: 0.23 },
+    noise: { filter: 'highpass', frequency: 2000, q: 0.7, duration: 0.07, gain: 0.11 },
+    ring: { waveform: 'sine', startHz: 830, endHz: 800, duration: 0.55, gain: 0.12 },
+  },
+  tree: {
+    thump: { waveform: 'triangle', startHz: 150, endHz: 58, duration: 0.17, gain: 0.22 },
+    noise: { filter: 'lowpass', frequency: 950, q: 0.7, duration: 0.11, gain: 0.07 },
+  },
+  building: {
+    thump: { waveform: 'sine', startHz: 95, endHz: 26, duration: 0.2, gain: 0.29 },
+    noise: { filter: 'lowpass', frequency: 1400, q: 0.7, duration: 0.12, gain: 0.17 },
+  },
+  cone: {
+    thump: { waveform: 'triangle', startHz: 360, endHz: 160, duration: 0.14, gain: 0.18 },
+    noise: { filter: 'bandpass', frequency: 850, q: 2.4, duration: 0.2, gain: 0.08, clatter: true },
+  },
+}
+
+/** Stationary contact is silent; finite impact speed scales continuously to a safe maximum. */
+export function collisionAudioIntensity(impactSpeedMps: number): number {
+  if (!Number.isFinite(impactSpeedMps)) return 0
+  return Math.min(1, Math.max(0, (Math.abs(impactSpeedMps) - 0.1) / 7.9))
+}
+
+// Reuse one short source buffer per context. Repeated contacts must not allocate
+// and fill thousands of noise samples every rendered frame.
+const collisionNoiseBuffers = new WeakMap<AudioContext, AudioBuffer>()
+
+function collisionNoiseBuffer(ctx: AudioContext): AudioBuffer {
+  const cached = collisionNoiseBuffers.get(ctx)
+  if (cached) return cached
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.25), ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  collisionNoiseBuffers.set(ctx, buffer)
+  return buffer
+}
+
+function playCollisionTone(ctx: AudioContext, now: number, intensity: number, tone: CollisionTone) {
+  const osc = ctx.createOscillator()
+  osc.type = tone.waveform
+  osc.frequency.setValueAtTime(tone.startHz, now)
+  osc.frequency.exponentialRampToValueAtTime(tone.endHz, now + tone.duration)
+
+  const gain = ctx.createGain()
+  const peak = tone.gain * intensity
+  gain.gain.setValueAtTime(peak, now)
+  gain.gain.exponentialRampToValueAtTime(peak * 0.002, now + tone.duration)
+
+  osc.connect(gain)
+  gain.connect(ctx.destination)
+  osc.onended = () => {
+    osc.disconnect()
+    gain.disconnect()
+  }
+  osc.start(now)
+  osc.stop(now + tone.duration + 0.005)
+}
+
 /**
- * Synthesizes heavy metal collision thud and impact crunch.
+ * Soft pedestrian thuds, vehicle crunches, scooter clatter, metal pole ringing,
+ * woody tree impacts, hard building thuds and hollow plastic cone knocks share
+ * bounded speed-based volume.
  */
 export function playCollisionImpact(
   ctx: AudioContext | null,
   impactSpeedMps: number,
   state?: VehicleAudioState,
+  kind: CollisionKind = 'vehicle',
 ) {
-  if (!ctx) return
-  if (ctx.state === 'suspended') void ctx.resume()
+  const intensity = collisionAudioIntensity(impactSpeedMps)
+  if (!ctx || intensity === 0) return
 
   const now = ctx.currentTime
-  if (state && now - state.lastCollisionTime < 0.8) {
-    return // Debounce rapid consecutive frames
-  }
+  if (state && now - state.lastCollisionTime < 0.8) return
   if (state) state.lastCollisionTime = now
+  if (ctx.state === 'suspended') void ctx.resume()
 
-  const intensity = Math.min(1.0, Math.max(0.3, Math.abs(impactSpeedMps) / 8.0))
+  const profile = COLLISION_AUDIO_PROFILES[kind]
+  playCollisionTone(ctx, now, intensity, profile.thump)
+  if (profile.ring) playCollisionTone(ctx, now, intensity, profile.ring)
 
-  // 1. Low-frequency impact thump (120Hz -> 30Hz)
-  const osc = ctx.createOscillator()
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(110, now)
-  osc.frequency.exponentialRampToValueAtTime(32, now + 0.28)
+  const source = ctx.createBufferSource()
+  source.buffer = collisionNoiseBuffer(ctx)
+  const filter = ctx.createBiquadFilter()
+  filter.type = profile.noise.filter
+  filter.frequency.setValueAtTime(profile.noise.frequency, now)
+  filter.Q.setValueAtTime(profile.noise.q, now)
 
-  const oscGain = ctx.createGain()
-  oscGain.gain.setValueAtTime(0.25 * intensity, now)
-  oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32)
-
-  osc.connect(oscGain)
-  oscGain.connect(ctx.destination)
-  osc.start(now)
-  osc.stop(now + 0.35)
-
-  // 2. High-frequency metal crunch noise
-  const noiseDuration = 0.18
-  const noiseSize = Math.floor(ctx.sampleRate * noiseDuration)
-  const noiseBuffer = ctx.createBuffer(1, noiseSize, ctx.sampleRate)
-  const noiseData = noiseBuffer.getChannelData(0)
-  for (let i = 0; i < noiseSize; i++) {
-    noiseData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (noiseSize * 0.3))
+  const gain = ctx.createGain()
+  const peak = profile.noise.gain * intensity
+  gain.gain.setValueAtTime(peak, now)
+  if (profile.noise.clatter) {
+    // Quieter bounces distinguish a light frame or hollow cone from a single crunch.
+    gain.gain.exponentialRampToValueAtTime(peak * 0.04, now + 0.045)
+    gain.gain.setValueAtTime(peak * 0.48, now + 0.06)
+    gain.gain.exponentialRampToValueAtTime(peak * 0.015, now + 0.098)
+    gain.gain.setValueAtTime(peak * 0.22, now + 0.115)
   }
+  gain.gain.exponentialRampToValueAtTime(peak * 0.002, now + profile.noise.duration)
 
-  const noiseSource = ctx.createBufferSource()
-  noiseSource.buffer = noiseBuffer
-
-  const noiseFilter = ctx.createBiquadFilter()
-  noiseFilter.type = 'highpass'
-  noiseFilter.frequency.setValueAtTime(600, now)
-
-  const noiseGain = ctx.createGain()
-  noiseGain.gain.setValueAtTime(0.18 * intensity, now)
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, now + noiseDuration)
-
-  noiseSource.connect(noiseFilter)
-  noiseFilter.connect(noiseGain)
-  noiseGain.connect(ctx.destination)
-
-  noiseSource.start(now)
+  source.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+  source.onended = () => {
+    source.disconnect()
+    filter.disconnect()
+    gain.disconnect()
+  }
+  source.start(now)
+  source.stop(now + profile.noise.duration)
 }
 
 /**
@@ -306,4 +396,3 @@ export function playConeImpact(
 
   noiseSource.start(now)
 }
-

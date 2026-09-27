@@ -321,6 +321,16 @@ For any subsystem the user reports as "previously correct":
 - restore the minimum affected subsystem;
 - only then continue enhancements.
 
+## Shared world collisions and effective-area containment
+
+- Subject 2 and Subject 3 must use `src/sim/collisionResponse.ts` and `useCollisionBody.ts` for physical response, material animation and sound. Course adapters may attach scoring callbacks but must not implement independent speed resets or impulses.
+- Collision shapes, actor velocity and motion offsets use world coordinates; placed-course props convert to local coordinates only for rendering. Cars retain oriented body polygons; compact people, scooters and cones may use shared compound circle proxies that follow visible tilt.
+- Course-gate posts use `courseGateGeometry.ts`; the open center and elevated crossbar must not become invisible walls.
+- Integrate vehicle physics at frame priority -2, resolve contacts at -1, then update camera/judges/replay. These negative priorities must not take over rendering.
+- Native project boundary checks must not wait for a reverse/start/entry maneuver before detecting a departure. Continuous navigation still disables the next project's judge.
+- `subject2EffectiveArea.ts` supplies the separate full-session outer-area guard using actual ground surfaces and connecting roads. Preserve rotated placements, open internal seams and legal canonical starts; do not reintroduce a global world-X cutoff.
+- `courseGroundGeometry.ts` is shared by ground rendering and outer-area judging. The outer-area failure severity belongs in `subject2Rules.ts`, while Subject 3 road containment remains in its state machine and scoring matrix.
+
 
 ## Browser and WebGL release gate
 

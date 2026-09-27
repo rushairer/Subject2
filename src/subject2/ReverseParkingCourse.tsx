@@ -1,3 +1,4 @@
+import { SUBJECT2_GROUNDS } from './courseGroundGeometry'
 import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
@@ -195,7 +196,7 @@ export function updateReverseParking(
     }
   }
 
-  if (runtime.started && bodyOutsideProject(vehicle)) {
+  if (bodyOutsideProject(vehicle)) {
     infractions.push(subject2Infraction('reverse-parking-body-out'))
   }
 
@@ -325,7 +326,7 @@ export function ReverseParkingCourse({
     />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
-      <planeGeometry args={[60, 48]} />
+      <planeGeometry args={[SUBJECT2_GROUNDS['reverse-parking'].width, SUBJECT2_GROUNDS['reverse-parking'].length]} />
       <meshStandardMaterial color="#627557" />
     </mesh>
   </group>

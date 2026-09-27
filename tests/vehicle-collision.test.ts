@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  calculateConeImpact,
-  checkVehicleCircleCollision,
-  resolveRigidCircleObstacle,
-} from '../src/sim/vehicleCollision'
+import { checkVehicleCircleCollision } from '../src/sim/vehicleCollision'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 
 test('vehicle collision detects clear separation', () => {
@@ -66,66 +62,27 @@ test('vehicle collision handles rotated vehicle heading', () => {
   assert.ok(result.normal.x > 0.9) // Points along +X (forward)
 })
 
-test('calculateConeImpact produces valid tilt axis and slide direction', () => {
-  const vehicle = { x: 0, z: 0, heading: 0, speed: 2.0 }
-  const obstacle = { x: 0, z: -2.2, radius: 0.2 }
-  const collision = checkVehicleCircleCollision(vehicle, obstacle)
-  const impact = calculateConeImpact(vehicle, obstacle, collision)
-
-  assert.ok(impact.impactSpeed >= 2.0)
-  // Moving forward in -Z: slideDir should be along -Z
-  assert.ok(Math.abs(impact.slideDir[0]) < 1e-4)
-  assert.ok(impact.slideDir[1] < -0.9)
-  // Knock axis should be perpendicular to dir: (0, 0, -1) has knockAxis = (-1, 0, 0)
-  assert.ok(impact.knockAxis[0] < -0.9)
-  assert.equal(impact.knockAxis[1], 0)
-})
-
-test('calculateConeImpact handles reverse driving impact', () => {
-  const vehicle = { x: 0, z: 0, heading: 0, speed: -1.5 }
-  const obstacle = { x: 0, z: 2.2, radius: 0.2 }
-  const collision = checkVehicleCircleCollision(vehicle, obstacle)
-  const impact = calculateConeImpact(vehicle, obstacle, collision)
-
-  assert.ok(impact.impactSpeed >= 1.5)
-  // Reversing towards +Z: slideDir should be along +Z
-  assert.ok(impact.slideDir[1] > 0.9)
-  // Knock axis should be (1, 0, 0)
-  assert.ok(impact.knockAxis[0] > 0.9)
-})
-
-test('resolveRigidCircleObstacle pushes car out and stops velocity', () => {
+test('vehicle collision resolves the nearest normal when a circle center is inside the bumper', () => {
   const halfLength = TRAINING_CAR.lengthMeters / 2
-  const vehicle = { x: 0, z: 0, heading: 0, speed: 2.5 }
-  // Obstacle penetrated 0.05m inside front bumper
+  const vehicle = { x: 0, z: 0, heading: 0 }
   const obstacle = { x: 0, z: -(halfLength - 0.05), radius: 0.15 }
-
-  const outcome = resolveRigidCircleObstacle(vehicle, obstacle)
-  assert.equal(outcome.collided, true)
-  assert.equal(vehicle.speed, 0)
-  // Vehicle should have been pushed backward (towards +Z, away from front obstacle)
-  assert.ok(vehicle.z > 0.05)
-
-  // Re-checking after push-back should show no penetration
-  const recheck = checkVehicleCircleCollision(vehicle, obstacle)
-  assert.equal(recheck.colliding, false)
+  const contact = checkVehicleCircleCollision(vehicle, obstacle)
+  assert.equal(contact.colliding, true)
+  assert.ok(Math.abs(contact.penetration - 0.2) < 1e-9)
+  assert.ok(Math.abs(contact.distance + 0.05) < 1e-9)
+  assert.deepEqual(contact.normal, { x: 0, z: -1 })
 })
 
-test('pedestrian obstacle collides at front bumper perimeter without hood penetration', () => {
+test('circle contact starts exactly at the body perimeter and rejects a measurable gap', () => {
   const halfLength = TRAINING_CAR.lengthMeters / 2
   const pedRadius = 0.35
-  const vehicle = { x: 0, z: 0, heading: 0, speed: 2.0 }
-
-  // Pedestrian obstacle slightly overlapping front bumper: distance from bumper is < 0.02m
-  const obstacleTouching = { x: 0, z: -(halfLength + pedRadius - 0.02), radius: pedRadius }
-  const outcome = resolveRigidCircleObstacle(vehicle, obstacleTouching)
-  assert.equal(outcome.collided, true)
-  assert.equal(vehicle.speed, 0)
-  // Vehicle pushed back by minimal penetration (< 0.06m), stopping right at bumper boundary
-  assert.ok(vehicle.z > 0.01 && vehicle.z < 0.06)
-
-  // Re-checking after push-back should show clear separation
-  const recheck = checkVehicleCircleCollision(vehicle, obstacleTouching)
-  assert.equal(recheck.colliding, false)
+  const vehicle = { x: 0, z: 0, heading: 0 }
+  const exact = checkVehicleCircleCollision(vehicle, { x: 0, z: -(halfLength + pedRadius), radius: pedRadius })
+  assert.equal(exact.colliding, true)
+  assert.ok(exact.penetration >= 0 && exact.penetration < 1e-9)
+  const shallow = checkVehicleCircleCollision(vehicle, { x: 0, z: -(halfLength + pedRadius - 0.02), radius: pedRadius })
+  assert.equal(shallow.colliding, true)
+  assert.ok(Math.abs(shallow.penetration - 0.02) < 1e-9)
+  const separated = checkVehicleCircleCollision(vehicle, { x: 0, z: -(halfLength + pedRadius + 1e-6), radius: pedRadius })
+  assert.equal(separated.colliding, false)
 })
-

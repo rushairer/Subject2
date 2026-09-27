@@ -1,4 +1,5 @@
 export type Subject2RuleProject =
+  | 'common'
   | 'reverse-parking'
   | 'side-parking'
   | 'slope-start'
@@ -82,6 +83,13 @@ export interface Subject2InfractionRule {
 }
 
 export const SUBJECT2_INFRACTION_RULES = {
+  'subject2-effective-area-exit': {
+    project: 'common',
+    id: 'subject2-effective-area-exit',
+    title: '车辆驶出考试场地有效区域',
+    points: 100,
+    fatal: true,
+  },
   'reverse-before-first-control': {
     project: 'reverse-parking',
     id: 'reverse-before-first-control',

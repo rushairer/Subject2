@@ -1,3 +1,4 @@
+import { SUBJECT2_GROUNDS } from './courseGroundGeometry'
 import { useMemo, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
@@ -171,18 +172,18 @@ export function updateCurveDriving(
   ) runtime.started = true
   if (runtime.started) runtime.progressIndex = Math.max(runtime.progressIndex, nearest.index)
 
-  if (runtime.started) {
-    if (
-      wheelContactFootprints(vehicle).some(footprint =>
-        wheelContactSamplePoints(footprint).some(point =>
-          nearestWheelDistance(point.x, point.z) >=
-            halfRoad - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2,
-        ),
-      )
-    ) {
-      infractions.push(subject2Infraction('curve-wheel-line'))
-    }
+  if (
+    wheelContactFootprints(vehicle).some(footprint =>
+      wheelContactSamplePoints(footprint).some(point =>
+        nearestWheelDistance(point.x, point.z) >=
+          halfRoad - SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2,
+      ),
+    )
+  ) {
+    infractions.push(subject2Infraction('curve-wheel-line'))
+  }
 
+  if (runtime.started) {
     if (movingReverse && !runtime.reverseLatched) {
       runtime.reverseLatched = true
       infractions.push(subject2Infraction('curve-reverse'))
@@ -259,7 +260,7 @@ export function CurveDrivingCourse(): ReactElement {
     <mesh geometry={leftEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>
     <mesh geometry={rightEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
-      <planeGeometry args={[70, 55]} />
+      <planeGeometry args={[SUBJECT2_GROUNDS['curve-driving'].width, SUBJECT2_GROUNDS['curve-driving'].length]} />
       <meshStandardMaterial color="#637657" />
     </mesh>
   </group>

@@ -10,14 +10,21 @@ import {
   removeSubject3TrafficVehicle,
   subject3TrafficCollision,
   subject3VehicleCollision,
+  updateSubject3TrafficAfterImpact,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
+import { createCollisionMotion } from '../src/sim/collisionResponse'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
+import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from '../src/sim/vehicleFrame'
 import {
   CENTER_LINE_OFFSET,
   RIGHT_EDGE_OFFSET,
   SUBJECT3_EVENTS,
+  poseAtRouteDistance,
 } from '../src/subject3/subject3Route'
+
+const near = (actual: number, expected: number, epsilon = 1e-8) =>
+  assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`)
 
 test('traffic state starts clear with an empty deterministic vehicle registry', () => {
   assert.deepEqual(createSubject3TrafficState(), {
@@ -54,6 +61,56 @@ test('traffic registry keeps same-direction and opposing actors distinguishable'
   assert.equal(traffic.vehicles['flow-a'].opposite, false)
   assert.equal(traffic.vehicles['oncoming-a'].opposite, true)
   assert.equal(Object.keys(traffic.vehicles).length, 2)
+})
+
+test('post-impact telemetry follows displaced world positions on rotated route segments', () => {
+  for (const progress of [200, 850, 1250, 1900]) {
+    const route = poseAtRouteDistance(progress)
+    const base = { ...worldPointFromVehicle(route.x, route.z, route.heading, 0, -3.5), heading: route.heading }
+    const forward = forwardFromHeading(route.heading)
+    const right = rightFromHeading(route.heading)
+    const motion = {
+      ...createCollisionMotion(),
+      active: true,
+      offsetX: forward.x * 0.7 + right.x * 0.4,
+      offsetZ: forward.z * 0.7 + right.z * 0.4,
+      velocityX: forward.x * 1.6 + right.x * 0.8,
+      velocityZ: forward.z * 1.6 + right.z * 0.8,
+    }
+    const state = createSubject3TrafficState()
+    const existing = updateSubject3TrafficVehicle(state, 'crashed-car', progress, -3.5, 8, true)
+    const updated = updateSubject3TrafficAfterImpact(state, 'crashed-car', base, motion, true)
+    assert.equal(updated, existing, 'per-frame impact publication preserves stable telemetry identity')
+    near(updated.progress, progress + 0.7)
+    near(updated.lateral, -3.1)
+    near(updated.speedMps, 1.6)
+    assert.equal(updated.opposite, false)
+  }
+})
+
+test('post-impact telemetry reports reverse travel and preserves original direction after settling', () => {
+  const base = poseAtRouteDistance(850)
+  const forward = forwardFromHeading(base.heading)
+  const right = rightFromHeading(base.heading)
+  const state = createSubject3TrafficState()
+  const motion = createCollisionMotion()
+  motion.active = true
+
+  motion.velocityX = forward.x * -2
+  motion.velocityZ = forward.z * -2
+  const reverse = updateSubject3TrafficAfterImpact(state, 'car', base, motion, false)
+  near(reverse.speedMps, 2)
+  assert.equal(reverse.opposite, true)
+
+  for (const originallyOpposite of [false, true]) {
+    for (const longitudinalSpeed of [-0.04, 0, 0.04]) {
+      motion.velocityX = forward.x * longitudinalSpeed + right.x * 2
+      motion.velocityZ = forward.z * longitudinalSpeed + right.z * 2
+      const settled = updateSubject3TrafficAfterImpact(state, 'car', base, motion, originallyOpposite)
+      near(settled.speedMps, Math.abs(longitudinalSpeed))
+      assert.equal(settled.opposite, originallyOpposite)
+    }
+  }
 })
 
 test('crossing pedestrian uses the rendered crosswalk progress', () => {
