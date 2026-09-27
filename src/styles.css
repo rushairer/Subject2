@@ -34,7 +34,7 @@
 .replay-focus-head{display:grid;gap:7px;margin-bottom:16px}
 .replay-focus-head h3{margin:4px 0 0}
 .replay-focus-description{max-width:820px;margin:0;color:#8298a9;font-size:11px;line-height:1.65;text-align:left}
-.gear-speed-coaching>.replay-focus-meta{margin-bottom:12px}
+.gear-speed-coaching>.replay-focus-meta,.following-distance-coaching>.replay-focus-meta{margin-bottom:12px}
 .replay-focus-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:12px;align-items:stretch}
 .replay-focus-card{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;min-width:0;overflow:hidden;padding:13px;border:1px solid #25465c;border-radius:14px;background:#0b2030;color:inherit;text-align:left;transition:border-color .16s ease,background .16s ease}
 .replay-focus-card:hover{border-color:#3e6f8e;background:#0c2334}
