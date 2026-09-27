@@ -28,10 +28,10 @@ export const DRIVING_RULES = {
     // Simulator coaching heuristics only. These values do not represent
     // national exam scoring thresholds and must never emit infractions.
     gearSpeedCoaching: {
-      minimumSpeedKmh: 6,
+      minimumSpeedKmh: 3,
       maximumClutchPosition: 0.18,
       minimumRecommendedRpm: 1050,
-      maximumRecommendedRpm: 3000,
+      maximumRecommendedRpm: 3400,
       minimumSustainedSeconds: 1.5,
       maximumSampleGapSeconds: 0.65,
     },
