@@ -103,7 +103,7 @@ export function buildTrainingPackReport(
   const stages = stageResults
     .filter(stage => stage.packId === packId)
     .map(stage => summarizeStage(pack.habits, stage))
-    .toSorted((a, b) => a.index - b.index)
+    .sort((a, b) => a.index - b.index)
 
   const retryCandidate = stages.length > 0
     ? [...stages].sort(compareRetryPriority)[0]
