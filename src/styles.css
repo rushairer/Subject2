@@ -13,3 +13,7 @@
 .cluster .gear{font-size:26px;white-space:nowrap;min-width:64px}
 .cluster .lamps{gap:8px;flex-wrap:wrap;justify-content:center;max-width:430px}
 .cluster .lamps span{font-size:10px;white-space:nowrap}
+
+.replay-event-context{display:flex!important;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;color:#8fa9bb!important}
+.replay-event-context i{padding:3px 6px;border:1px solid #26465d;border-radius:999px;background:#0c2030;color:#9fc5dc;font-size:9px;font-style:normal;font-weight:700;white-space:nowrap}
+@media(max-width:700px){.replay-event-context{gap:4px}.replay-event-context i{font-size:8px}}
