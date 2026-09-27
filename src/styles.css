@@ -319,3 +319,14 @@
   .replay-dynamics-readout>button{grid-column:1/-1;width:100%}
   .replay-dynamics-chart svg{min-height:150px}
 }
+
+.result-comment{margin:22px 0 8px;padding:20px 22px;border:1px solid #31516a;border-radius:18px;background:linear-gradient(145deg,#10263a,#0a1825);text-align:left;box-shadow:inset 0 1px 0 #ffffff08}
+.result-comment.passed{border-color:#2f6d54;background:linear-gradient(145deg,#102d28,#0a1b1c)}
+.result-comment.failed{border-color:#6f4242;background:linear-gradient(145deg,#2d171b,#160e14)}
+.result-comment.incomplete{border-color:#635a3a;background:linear-gradient(145deg,#282414,#17150e)}
+.result-comment-topline{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#7f9bad;font-size:11px;font-weight:900;letter-spacing:.12em}
+.result-comment-topline>b{padding:5px 9px;border-radius:999px;background:#ffffff0d;color:#dff6ff;letter-spacing:.06em}
+.result-comment blockquote{margin:14px 0 8px;font-size:clamp(20px,3vw,28px);line-height:1.35;font-weight:900;letter-spacing:-.025em;color:#f7fbff}
+.result-comment p{margin:0;color:#9eb3c4;line-height:1.65}
+.result-share-btn{width:100%;margin-top:16px;padding:12px 16px;border:1px solid #ffffff1c;border-radius:12px;background:#ffffff0a;color:#e9f7ff;font-weight:900;cursor:pointer;transition:.18s ease}
+.result-share-btn:hover{transform:translateY(-1px);border-color:#65b8e6;background:#12304a}
