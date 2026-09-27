@@ -19,6 +19,7 @@ import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel
 import { NightLightingCoachingPanel } from './NightLightingCoachingPanel'
 import { SuddenBrakeCoachingPanel } from './SuddenBrakeCoachingPanel'
 import { CutInResponseCoachingPanel } from './CutInResponseCoachingPanel'
+import { PedestrianResponseCoachingPanel } from './PedestrianResponseCoachingPanel'
 import { DrivingDynamicsTimeline } from './DrivingDynamicsTimelinePanel'
 
 export interface TrajectorySample {
@@ -60,6 +61,13 @@ export interface TrajectorySample {
   cutInLateralSpeedMps?: number
   cutInClosingSpeedMps?: number
   cutInTimeToLongitudinalMeetSeconds?: number
+  pedestrianHazardId?: string
+  pedestrianConflict?: boolean
+  pedestrianProgressDeltaMeters?: number
+  pedestrianLateralDeltaMeters?: number
+  pedestrianLateralSpeedMps?: number
+  pedestrianPlanarDistanceMeters?: number
+  pedestrianTimeToCrosswalkSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -551,6 +559,15 @@ function ProjectReplay({
               加塞目标 · 纵向 {current.cutInProgressDeltaMeters.toFixed(1)} m · 横向 {Math.abs(current.cutInLateralDeltaMeters).toFixed(1)} m
             </small>
           </span>}
+        {current.pedestrianHazardId &&
+          current.pedestrianProgressDeltaMeters != null &&
+          current.pedestrianLateralDeltaMeters != null &&
+          <span>
+            <b>{current.pedestrianConflict ? '冲突中' : '横穿中'}</b>
+            <small>
+              行人 · 前后 {current.pedestrianProgressDeltaMeters.toFixed(1)} m · 横向 {Math.abs(current.pedestrianLateralDeltaMeters).toFixed(1)} m
+            </small>
+          </span>}
       </div>
     </div>
   </article>
@@ -641,6 +658,15 @@ export function ExamReplay({
     />
 
     <CutInResponseCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <PedestrianResponseCoachingPanel
       samples={samples}
       onSelect={t => setFocusRequest(previous => ({
         project: 'subject3',
