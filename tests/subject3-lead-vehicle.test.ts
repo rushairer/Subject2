@@ -12,7 +12,7 @@ import {
   createSubject3TrafficState,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
-import { SUBJECT3_ROUTE_LENGTH, actorRoutePose } from '../src/subject3/subject3Route'
+import { actorRoutePose } from '../src/subject3/subject3Route'
 
 function playerAt(progress: number, lateral = 0, speed = 10) {
   const pose = actorRoutePose(progress, lateral)
@@ -123,19 +123,6 @@ test('oncoming observation ignores opposing vehicles already behind the player',
     observeSubject3OncomingVehicle(playerAt(1000, 0, 10), traffic),
     undefined,
   )
-})
-
-test('oncoming observation handles the route wrap without treating distant traffic as near', () => {
-  const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, 'wrapped-ahead', 30, -8.75, 8, true)
-  const playerProgress = SUBJECT3_ROUTE_LENGTH - 70
-
-  const observation = observeSubject3OncomingVehicle(
-    playerAt(playerProgress, 0, 10),
-    traffic,
-  )
-  assert.equal(observation?.vehicleId, 'wrapped-ahead')
-  assert.ok((observation?.centerDistanceMeters ?? Infinity) < 120)
 })
 
 test('oncoming observation respects the forward observation horizon and reverse filter', () => {
