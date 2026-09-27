@@ -1,5 +1,5 @@
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { LANE_WIDTH, projectToSubject3Route } from './subject3Route'
+import { LANE_WIDTH, SUBJECT3_ROUTE_LENGTH, projectToSubject3Route } from './subject3Route'
 import {
   SUBJECT3_TRAFFIC_CAR,
   type Subject3TrafficState,
@@ -74,5 +74,64 @@ export function observeSubject3LeadVehicle(
     leadSpeedMps: lead.speedMps,
     closingSpeedMps,
     timeToCollisionSeconds,
+  }
+}
+
+
+export const SUBJECT3_ONCOMING_OBSERVATION = {
+  maximumLookaheadMeters: 180,
+  minimumPlayerSpeedMps: 0.25,
+} as const
+
+export interface Subject3OncomingVehicleObservation {
+  vehicleId: string
+  centerDistanceMeters: number
+  oncomingSpeedMps: number
+  closingSpeedMps: number
+  timeToMeetSeconds?: number
+}
+
+function forwardRouteDistance(fromProgress: number, toProgress: number) {
+  const raw = (toProgress - fromProgress) % SUBJECT3_ROUTE_LENGTH
+  return raw < 0 ? raw + SUBJECT3_ROUTE_LENGTH : raw
+}
+
+export function observeSubject3OncomingVehicle(
+  player: { x: number; z: number; speed: number },
+  traffic: Readonly<Subject3TrafficState>,
+): Subject3OncomingVehicleObservation | undefined {
+  const playerSpeed = player.speed
+  if (playerSpeed < SUBJECT3_ONCOMING_OBSERVATION.minimumPlayerSpeedMps) return undefined
+
+  const projection = projectToSubject3Route(player.x, player.z)
+  let oncoming: Subject3TrafficVehicleState | undefined
+  let oncomingDistance = Infinity
+
+  for (const vehicle of Object.values(traffic.vehicles)) {
+    if (!vehicle.opposite) continue
+
+    const distance = forwardRouteDistance(projection.progress, vehicle.progress)
+    if (
+      distance <= 0 ||
+      distance > SUBJECT3_ONCOMING_OBSERVATION.maximumLookaheadMeters ||
+      distance >= oncomingDistance
+    ) {
+      continue
+    }
+
+    oncoming = vehicle
+    oncomingDistance = distance
+  }
+
+  if (!oncoming) return undefined
+
+  const closingSpeedMps = Math.max(0, playerSpeed) + Math.max(0, oncoming.speedMps)
+  return {
+    vehicleId: oncoming.id,
+    centerDistanceMeters: oncomingDistance,
+    oncomingSpeedMps: oncoming.speedMps,
+    closingSpeedMps,
+    timeToMeetSeconds:
+      closingSpeedMps > 0.1 ? oncomingDistance / closingSpeedMps : undefined,
   }
 }
