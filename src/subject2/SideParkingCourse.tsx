@@ -290,6 +290,7 @@ export interface SideParkingCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
+  onConeImpact?: (index: number) => void
 }
 
 export function SideParkingCourse({
@@ -297,6 +298,7 @@ export function SideParkingCourse({
   placement,
   audioContext,
   audioState,
+  onConeImpact,
 }: SideParkingCourseProps = {}): ReactElement {
   const g = SIDE_PARKING_GEOMETRY
   const laneCenterZ = (g.laneStartZ + g.laneEndZ) / 2
@@ -333,6 +335,7 @@ export function SideParkingCourse({
         placement={placement}
         audioContext={audioContext}
         audioState={audioState}
+        onImpact={() => onConeImpact?.(i)}
       />
     ))}
 
