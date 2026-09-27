@@ -204,6 +204,8 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Require a sustained mismatch window before surfacing evidence so ordinary shifts, clutch transitions and brief RPM excursions do not become false coaching events.
 - Trajectory samples must retain optional `engineOn`, `engineRpm` and `clutch` fields for this analysis while remaining compatible with older samples that lack them.
 - Replay may show duration, gear, speed and RPM evidence and jump to the representative trajectory time. It must not add the coaching item to the error timeline or training-priority penalty aggregation.
+- A manual C1 Subject 3 replay with recorded trajectory but fewer than two applicable gear-speed samples must render an explicit “有效样本不足” state instead of hiding the module or treating missing evidence as a clean result.
+- Browser coverage may validate the gear-speed replay integration through that insufficient-evidence state. Exact speed/RPM thresholds, filtering and mismatch classification belong to deterministic `tests/gear-speed-coaching.test.ts`, not wall-clock WebGL driving speed.
 - Changes to classification, sustained-window logic or filtering require deterministic coverage in `tests/gear-speed-coaching.test.ts`.
 
 ## Subject 3 traffic telemetry and following-distance coaching
