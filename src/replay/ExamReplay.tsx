@@ -8,7 +8,7 @@ import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
-import { buildReplayTrainingFocus, type ReplayTrainingFocus } from './replayTrainingFocus'
+import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
 
 export interface TrajectorySample {
   t: number
@@ -300,10 +300,12 @@ function TrainingFocusSummary({
   items,
   projects,
   onSelect,
+  onStartTraining,
 }: {
   items: ReplayTrainingFocus[]
   projects: Set<string>
   onSelect: (item: ReplayTrainingFocus) => void
+  onStartTraining?: (project: ReplayTrainingProjectId) => void
 }) {
   if (items.length === 0) return null
 
@@ -313,7 +315,7 @@ function TrainingFocusSummary({
         <div className="eyebrow">TRAINING PRIORITIES</div>
         <h3 id="replay-focus-title">本次优先改进</h3>
       </div>
-      <p>先解决最影响成绩和安全的 2–3 个习惯，再回看下面的具体轨迹证据。</p>
+      <p>先解决最影响成绩和安全的 2–3 个习惯；可以回看证据，也可以直接进入对应项目专项训练。</p>
     </div>
 
     <div className="replay-focus-grid">
@@ -323,15 +325,11 @@ function TrainingFocusSummary({
           representative.t != null &&
           representative.project != null &&
           projects.has(representative.project)
+        const canTrain = item.recommendedProject != null && onStartTraining != null
 
-        return <button
+        return <article
           key={item.id}
-          type="button"
           className="replay-focus-card"
-          disabled={!canFocus}
-          onClick={() => {
-            if (canFocus) onSelect(item)
-          }}
           aria-label={`优先改进 ${index + 1}：${item.title}`}
         >
           <span className="replay-focus-rank">{index + 1}</span>
@@ -348,9 +346,27 @@ function TrainingFocusSummary({
             <span className="replay-focus-evidence">
               {item.evidenceTitles.map(title => <i key={title}>{title}</i>)}
             </span>
+            <span className="replay-focus-actions">
+              <button
+                type="button"
+                className="replay-focus-evidence-btn"
+                disabled={!canFocus}
+                onClick={() => {
+                  if (canFocus) onSelect(item)
+                }}
+              >
+                {canFocus ? '查看轨迹证据' : '查看下方明细'}
+              </button>
+              {canTrain && <button
+                type="button"
+                className="replay-focus-training-btn"
+                onClick={() => onStartTraining(item.recommendedProject!)}
+              >
+                专项训练 · {projectLabel(item.recommendedProject!)}
+              </button>}
+            </span>
           </span>
-          <span className="replay-focus-action">{canFocus ? '查看证据 →' : '查看下方明细'}</span>
-        </button>
+        </article>
       })}
     </div>
   </section>
@@ -441,9 +457,11 @@ function ProjectReplay({
 export function ExamReplay({
   samples,
   infractions,
+  onStartTraining,
 }: {
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
+  onStartTraining?: (project: ReplayTrainingProjectId) => void
 }): ReactElement | null {
   const [focusRequest, setFocusRequest] = useState<{
     project: string
@@ -484,6 +502,7 @@ export function ExamReplay({
           token: (previous?.token ?? 0) + 1,
         }))
       }}
+      onStartTraining={onStartTraining}
     />
 
     <div className="replay-projects">
