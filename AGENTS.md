@@ -223,6 +223,19 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
 - Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
 
+## Subject 3 sudden-brake response coaching
+
+`src/coaching/suddenBrakeCoaching.ts` owns advisory replay analysis for the scripted same-lane sudden-brake vehicle.
+
+- This module is coaching only. It must never emit `Infraction`, change score/pass-fail, terminate an exam, or feed training-priority penalty aggregation.
+- Only actors explicitly published with `Subject3TrafficVehicleState.scenario === 'sudden-brake'` may trigger this analysis. Never infer a scripted emergency merely from an arbitrary lead vehicle slowing down.
+- Scenario tagging belongs in the deterministic Subject 3 traffic registry. Keep ordinary flow vehicles untagged so scenario semantics cannot leak between actors.
+- Detect the trigger from measured lead-speed deceleration plus the configured relevance filters in `DRIVING_RULES.subject3.suddenBrakeCoaching`. Those values are simulator coaching heuristics, not statutory reaction-time or exam-scoring thresholds.
+- Record optional `throttle`, `brake`, `leadScenario`, and `leadSpeedMps` in trajectory samples. Older replay/history samples without those fields must remain readable.
+- Reaction evidence reports only what the simulator observed: throttle release latency, brake latency/maximum brake, minimum gap/time-gap/TTC. Missing brake input must not be labeled automatically as a driving error because another evasive action may have occurred.
+- The replay evidence jump must reuse the existing project/time focus path, and the project readout must expose recorded throttle/brake values so the response card is auditable.
+- Changes to traffic scenario publication require coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; trigger/response timing changes require deterministic coverage in `tests/sudden-brake-coaching.test.ts`.
+
 ## Subject 3 night-road lighting coaching
 
 `src/coaching/nightLightingCoaching.ts` owns advisory replay analysis for high-beam use in concrete traffic contexts.
