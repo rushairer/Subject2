@@ -45,6 +45,19 @@ test('traffic vehicle telemetry updates in place and can be removed', () => {
   assert.deepEqual(traffic.vehicles, {})
 })
 
+test('traffic scenario tags are explicit and do not leak into ordinary flow actors', () => {
+  const traffic = createSubject3TrafficState()
+
+  updateSubject3TrafficVehicle(traffic, 'flow-a', 620, 0, 9.2, false)
+  updateSubject3TrafficVehicle(traffic, 'sudden-brake', 720, 0, 8.5, false, 'sudden-brake')
+
+  assert.equal(traffic.vehicles['flow-a'].scenario, undefined)
+  assert.equal(traffic.vehicles['sudden-brake'].scenario, 'sudden-brake')
+
+  updateSubject3TrafficVehicle(traffic, 'sudden-brake', 722, 0, 8.2, false)
+  assert.equal(traffic.vehicles['sudden-brake'].scenario, undefined)
+})
+
 test('traffic registry keeps same-direction and opposing actors distinguishable', () => {
   const traffic = createSubject3TrafficState()
 
