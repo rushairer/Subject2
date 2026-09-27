@@ -247,3 +247,15 @@ Rendered driving behavior is release-critical and cannot be proven by Node-only 
 - A green TypeScript build is not sufficient evidence for changes to Three.js rendering, RenderTarget mirrors, camera placement, shadows, visible road geometry, dynamic actors or keyboard interaction.
 - Browser tests should interact through user-visible/accessibility semantics where practical. Do not add brittle test-only business branches or bypass the real control path.
 - Keep the mirror reflection baseline rule above in force: browser smoke supplements, but does not replace, direct comparison with known-good commit `80094e7a` for reflection-layer changes.
+
+
+## Replay diagnosis and coaching
+
+Replay coaching must remain deterministic and evidence-linked until an explicit AI coaching layer is introduced.
+
+- `src/replay/replayDiagnosis.ts` owns the current before/after operation slice and rule-based coaching text.
+- Never fabricate post-event vehicle state. If the session ended before a requested +1.5s/+3s checkpoint, omit that checkpoint instead of clamping it to the last sample.
+- Operation slices must stay inside the infraction's exact project ID, including continuous-exam transition IDs; never borrow a nearby sample from a different project.
+- Known rule families should have specific coaching. Unknown/future rule IDs must fall back to conservative replay guidance rather than inventing thresholds or legal requirements.
+- Replay advice supplements the scoring matrices; it must not become a second source of truth for points, fatality, timing thresholds, geometry tolerances or pass lines.
+- Any new diagnosis family or slice behavior needs deterministic unit coverage in `tests/replay-diagnosis.test.ts`.
