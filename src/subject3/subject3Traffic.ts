@@ -1,6 +1,6 @@
 import { convexPolygonsIntersect } from '../sim/planarGeometry'
 import { resolveVehicleImpact, type CollisionMotion } from '../sim/collisionResponse'
-import { forwardFromHeading, type XZVector } from '../sim/vehicleFrame'
+import { forwardFromHeading, rightFromHeading, type XZVector } from '../sim/vehicleFrame'
 import {
   orientedRectangleFootprint,
   vehicleBodyFootprint,
@@ -27,6 +27,7 @@ export const SUBJECT3_CROSSING_START_LATERAL = 3.4
 export const SUBJECT3_CROSSING_END_LATERAL = -5.7
 
 export type Subject3TrafficVehicleScenario = 'sudden-brake'
+export type Subject3TrafficHazardKind = 'cut-in-scooter' | 'crosswalk-pedestrian'
 
 export interface Subject3TrafficVehicleState {
   id: string
@@ -37,15 +38,28 @@ export interface Subject3TrafficVehicleState {
   scenario?: Subject3TrafficVehicleScenario
 }
 
+export interface Subject3TrafficHazardState {
+  id: string
+  kind: Subject3TrafficHazardKind
+  progress: number
+  lateral: number
+  longitudinalSpeedMps: number
+  lateralSpeedMps: number
+  active: boolean
+  conflict: boolean
+}
+
 export interface Subject3TrafficState {
   crosswalkPedestrianConflict: boolean
   vehicles: Record<string, Subject3TrafficVehicleState>
+  hazards: Record<string, Subject3TrafficHazardState>
 }
 
 export function createSubject3TrafficState(): Subject3TrafficState {
   return {
     crosswalkPedestrianConflict: false,
     vehicles: {},
+    hazards: {},
   }
 }
 
@@ -86,6 +100,75 @@ export function removeSubject3TrafficVehicle(
   id: string,
 ) {
   delete state.vehicles[id]
+}
+
+export function updateSubject3TrafficHazard(
+  state: Subject3TrafficState,
+  id: string,
+  kind: Subject3TrafficHazardKind,
+  progress: number,
+  lateral: number,
+  longitudinalSpeedMps: number,
+  lateralSpeedMps: number,
+  active: boolean,
+  conflict: boolean,
+) {
+  const current = state.hazards[id]
+  if (current) {
+    current.kind = kind
+    current.progress = progress
+    current.lateral = lateral
+    current.longitudinalSpeedMps = longitudinalSpeedMps
+    current.lateralSpeedMps = lateralSpeedMps
+    current.active = active
+    current.conflict = conflict
+    return current
+  }
+
+  const next: Subject3TrafficHazardState = {
+    id,
+    kind,
+    progress,
+    lateral,
+    longitudinalSpeedMps,
+    lateralSpeedMps,
+    active,
+    conflict,
+  }
+  state.hazards[id] = next
+  return next
+}
+
+export function updateSubject3TrafficHazardFromWorld(
+  state: Subject3TrafficState,
+  id: string,
+  kind: Subject3TrafficHazardKind,
+  actor: { x: number; z: number },
+  velocity: XZVector,
+  active: boolean,
+  conflict: boolean,
+) {
+  const projection = projectToSubject3Route(actor.x, actor.z)
+  const routeForward = forwardFromHeading(projection.heading)
+  const routeRight = rightFromHeading(projection.heading)
+  return updateSubject3TrafficHazard(
+    state,
+    id,
+    kind,
+    projection.progress,
+    projection.lateral,
+    velocity.x * routeForward.x + velocity.z * routeForward.z,
+    velocity.x * routeRight.x + velocity.z * routeRight.z,
+    active,
+    conflict,
+  )
+}
+
+export function removeSubject3TrafficHazard(
+  state: Subject3TrafficState,
+  id: string,
+) {
+  delete state.hazards[id]
 }
 
 /** Publish the same displaced world pose and velocity used by physical actors. */

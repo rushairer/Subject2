@@ -25,6 +25,7 @@ import {
 } from './subject3/subject3Practice'
 import { createSubject3TrafficState, type Subject3TrafficState } from './subject3/subject3Traffic'
 import { observeSubject3LeadVehicle, observeSubject3OncomingVehicle } from './subject3/subject3LeadVehicle'
+import { observeSubject3CutInHazard } from './subject3/subject3HazardObservation'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { subject3Infraction } from './rules/subject3Rules'
@@ -979,6 +980,10 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
         activeExamId === 'subject3' && traffic
           ? observeSubject3OncomingVehicle(v, traffic)
           : undefined
+      const cutInHazard =
+        activeExamId === 'subject3' && traffic
+          ? observeSubject3CutInHazard(v, traffic)
+          : undefined
       trajectory.current.push({
         t: (now - sessionStartedAt.current) / 1000,
         x: replayVehicle.x,
@@ -1010,6 +1015,15 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
         oncomingVehicleId: oncomingVehicle?.vehicleId,
         oncomingDistanceMeters: oncomingVehicle?.centerDistanceMeters,
         oncomingTimeToMeetSeconds: oncomingVehicle?.timeToMeetSeconds,
+        cutInHazardId: cutInHazard?.hazardId,
+        cutInConflict: cutInHazard?.conflict,
+        cutInProgressDeltaMeters: cutInHazard?.progressDeltaMeters,
+        cutInLateralDeltaMeters: cutInHazard?.lateralDeltaMeters,
+        cutInLongitudinalSpeedMps: cutInHazard?.longitudinalSpeedMps,
+        cutInLateralSpeedMps: cutInHazard?.lateralSpeedMps,
+        cutInClosingSpeedMps: cutInHazard?.closingSpeedMps,
+        cutInTimeToLongitudinalMeetSeconds:
+          cutInHazard?.timeToLongitudinalMeetSeconds,
       })
     }
   }
