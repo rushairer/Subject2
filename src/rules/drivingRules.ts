@@ -67,6 +67,18 @@ export const DRIVING_RULES = {
       minimumSustainedSeconds: 0.8,
       maximumSampleGapSeconds: 0.65,
     },
+    // Simulator coaching heuristics for the scripted sudden-brake actor.
+    // These values describe replay evidence, not exam scoring thresholds.
+    suddenBrakeCoaching: {
+      minimumPlayerSpeedKmh: 5,
+      maximumRelevantTimeGapSeconds: 5,
+      minimumLeadDecelerationMps2: 3,
+      brakeResponseThreshold: 0.15,
+      throttleReleaseDelta: 0.12,
+      reactionWindowSeconds: 1.5,
+      evidenceWindowSeconds: 3,
+      maximumSampleGapSeconds: 0.65,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
