@@ -142,13 +142,15 @@ test('replay coaching explains an infraction with before-after operation context
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
   await expect(page.getByRole('heading', { name: '本次优先改进' })).toBeVisible()
-  const focus = page.getByRole('button', { name: /优先改进 1：安全检查与起停流程/ })
+  const focus = page.getByRole('article', { name: /优先改进 1：安全检查与起停流程/ })
   await expect(focus).toBeVisible()
-  await expect(focus).toBeEnabled()
   await expect(focus).toContainText('1 条相关记录')
   await expect(focus).toContainText('含 1 条不合格')
   await expect(focus).toContainText('训练重点')
-  await focus.click()
+
+  const evidenceButton = focus.getByRole('button', { name: '查看轨迹证据' })
+  await expect(evidenceButton).toBeEnabled()
+  await evidenceButton.click()
 
   const event = page.getByRole('button', { name: /起步或行驶时未按规定使用安全带/ })
   await expect(event).toBeVisible()
@@ -157,6 +159,15 @@ test('replay coaching explains an infraction with before-after operation context
   await expect(event).toContainText('扣分时')
   await expect(event).toContainText(/km\/h/)
   await expect(event.locator('.replay-operation-point.event')).toBeVisible()
+
+  const targetedTraining = focus.getByRole('button', { name: '专项训练 · 倒车入库' })
+  await expect(targetedTraining).toBeEnabled()
+  await targetedTraining.click()
+
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('诊断E2E · 训练 · 白天')
+  await expect(page.locator('.project-status')).toContainText(/倒库|控制线|起始端/)
+  await expect(page.getByText('模拟考试成绩单')).toHaveCount(0)
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
