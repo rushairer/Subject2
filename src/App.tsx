@@ -43,6 +43,7 @@ import { createVehicleAudioState, updateTurnIndicatorAudio } from './audio/vehic
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { buildResultComment } from './session/resultComment'
+import type { DrivingIncident, DrivingIncidentDraft } from './session/drivingIncident'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 import { DrivingHelp } from './ui/DrivingHelp'
@@ -117,14 +118,6 @@ interface Infraction {
   title: string
   points: number
   fatal?: boolean
-  t?: number
-  x?: number
-  z?: number
-  project?: string
-}
-interface DrivingIncident {
-  id: string
-  title: string
   t?: number
   x?: number
   z?: number
@@ -403,7 +396,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   onToggleHelp: () => void,
   onReady: () => void,
   onInfraction: (i: Infraction) => void,
-  onIncident: (incident: Pick<DrivingIncident, 'id' | 'title'>) => void,
+  onIncident: (incident: DrivingIncidentDraft) => void,
   onTick: (traffic?: Readonly<Subject3TrafficState>) => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
@@ -832,21 +825,21 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
-        onConeImpact={index => onIncident({ id: `reverse-parking-cone-${index}`, title: '倒车入库时撞到锥桶' })}
+        onIncident={onIncident}
       />
     ) : session.examId === 'side-parking' ? (
       <SideParkingCourse
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
-        onConeImpact={index => onIncident({ id: `side-parking-cone-${index}`, title: '侧方停车时撞到锥桶' })}
+        onIncident={onIncident}
       />
     ) : session.examId === 'right-angle' ? (
       <RightAngleCourse
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
-        onConeImpact={index => onIncident({ id: `right-angle-cone-${index}`, title: '直角转弯时撞到锥桶' })}
+        onIncident={onIncident}
       />
     ) : session.examId === 'curve-driving' ? (
       <CurveDrivingCourse />
@@ -855,6 +848,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
+        onIncident={onIncident}
       />
     ) : session.examId === 'subject3' ? (
       <Subject3Course
@@ -938,7 +932,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
       project: replayProjectId,
     }]
   })
-  const addIncident = (item: Pick<DrivingIncident, 'id' | 'title'>) => {
+  const addIncident = (item: DrivingIncidentDraft) => {
     const now = performance.now()
     const replayVehicle = activeReplayVehicle()
     onIncident({
@@ -1209,7 +1203,7 @@ function Result({
     status,
     resultLabel,
     infractionTitles: infractions.map(item => item.title),
-    incidentTitles: incidents.map(item => item.title),
+    incidents,
     fatalCount: infractions.filter(item => item.fatal).length,
   })
   const [shareState, setShareState] = useState<'idle' | 'shared' | 'copied'>('idle')
