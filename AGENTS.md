@@ -263,3 +263,7 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 - Training priorities sort by existing evidence only: fatal-event count first, then emitted penalty points, recurrence count and earliest event time. Do not invent a separate coaching score or change scoring-matrix semantics.
 - Show at most three priority habits. Every priority card must retain representative rule evidence and, when timestamp/project data exists, navigate back to the corresponding replay position.
 - Aggregation must remain a presentation/coaching layer: it may summarize emitted infractions but must never create, suppress or mutate infractions.
+- Targeted replay training must start a fresh `practice` session. It must never rewrite the completed result, mutate persisted history, or convert the prior session into practice retroactively.
+- A targeted-training destination should come from the representative infraction's evidence project. For continuous-exam `transition:from:to` samples, resolve to the upcoming `to` project; never expose an internal transition ID or `subject2-exam` as a standalone training destination.
+- Keep “查看轨迹证据” and “专项训练” as separate actions. Evidence navigation stays inside the result replay; targeted training intentionally leaves the result and starts a new driving session.
+- Browser coverage must exercise the full result → priority habit → evidence → targeted-practice path so coaching navigation cannot silently rot.
