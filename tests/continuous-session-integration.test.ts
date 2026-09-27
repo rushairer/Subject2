@@ -40,7 +40,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 test('course changes do not key-remount the driving world or its cockpit', () => {
   assert.doesNotMatch(app, /<DrivingWorld\b[^>]*\bkey=/)
   assert.match(app, /if \(runtimeProject\.current !== session\.examId\)/)
-  assert.match(app, /projectJudgingEnabled=\{!navigatingToProject\}/)
+  assert.match(app, /projectJudgingEnabled=\{subject2ProjectJudgingEnabled\(combinedExam, activeEntryReached\)\}/)
   assert.match(app, /if \(projectJudgingEnabled\)/)
 })
 
