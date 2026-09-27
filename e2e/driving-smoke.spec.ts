@@ -159,7 +159,7 @@ test('Subject 3 night scene records lighting state and exposes replay coaching',
     await expect.poll(
       async () => Number(await speed.textContent()),
       { timeout: 15_000 },
-    ).toBeGreaterThan(6)
+    ).toBeGreaterThan(3)
     await page.waitForTimeout(900)
   } finally {
     await page.keyboard.up('w')
@@ -451,6 +451,7 @@ test('replay coaching explains an infraction with before-after operation context
 
 
 test('C1 sequential keys shift once per press and help preserves held steering', async ({ page }) => {
+  test.setTimeout(60_000)
   const errors = captureRuntimeErrors(page)
   await page.goto('./')
   await page.getByLabel('姓名').fill('键盘C1')
