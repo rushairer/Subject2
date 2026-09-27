@@ -471,6 +471,177 @@ const INFRACTION_ROAST_RULES: readonly RoastRule[] = [
   },
 ]
 
+type ContextHeadlineRule = {
+  pattern: RegExp
+  badges: readonly string[]
+  lines: readonly string[]
+}
+
+const CONTEXT_HEADLINE_RULES: readonly ContextHeadlineRule[] = [
+  {
+    pattern: /行人.*碰撞|碰撞.*行人|撞.*行人/,
+    badges: ['刹车必修课', '安全第一', '先把刹车认熟'],
+    lines: [
+      '这段先别秀技术，刹车得比剧情反转更快。',
+      '行人不是考试道具，这一题只能用安全意识答。',
+      '成绩可以重来，遇到行人先把车稳稳停下来。',
+    ],
+  },
+  {
+    pattern: /与车辆发生碰撞|碰撞.*车辆|撞车|车辆碰撞/,
+    badges: ['强行会师', '距离归零', '保险公司预警'],
+    lines: [
+      '跟车不是跟到一起，你把“保持距离”做成了反义词。',
+      '两辆车各走各的，你硬是安排了一场会师。',
+      '这段回放最大的观众，可能是保险公司。',
+      '道路社交可以有，车身握手就免了。',
+    ],
+  },
+  {
+    pattern: /电动车.*碰撞|碰撞.*电动车|撞.*电动车|摩托车.*碰撞/,
+    badges: ['强行认识', '安全距离失踪', '碰撞图鉴 +1'],
+    lines: [
+      '两轮车不是收集品，不用靠车头解锁图鉴。',
+      '安全距离被你压缩成了社交距离。',
+      '这不是会车，是强行认识。',
+    ],
+  },
+  {
+    pattern: /树木|撞树|树/,
+    badges: ['绿化亲密接触', '树：我没动', '路线过于自然'],
+    lines: [
+      '树没动，你动了；责任划分相当清晰。',
+      '路这么宽，最后还是和树双向奔赴。',
+      '树都不会横穿马路，这次确实很难让它背锅。',
+      '绿化验收通过，驾驶路线需要复审。',
+    ],
+  },
+  {
+    pattern: /锥桶|雪糕桶|路锥|锥形桶/,
+    badges: ['精准命中', '锥桶受害者协会', '点位很特别', '现场有桶'],
+    lines: [
+      '点位没找准，雪糕桶倒是找得挺准。',
+      '100 分归 100 分，锥桶有不同意见。',
+      '别人绕桩，你负责和桩建立联系。',
+      '锥桶都穿荧光橙了，还是没躲过你的精准打击。',
+      '这不是绕桩，是线下见面。',
+    ],
+  },
+  {
+    pattern: /建筑|墙|围墙|房/,
+    badges: ['建筑质检员', '靠边过头', '物业预警'],
+    lines: [
+      '这是驾驶考试，不是建筑质量抽检。',
+      '教练让你靠边，没让你靠墙。',
+      '建筑一直没动，今天路线倒挺有想法。',
+    ],
+  },
+  {
+    pattern: /立杆|灯杆|标志杆|桩杆|入口立杆/,
+    badges: ['准头用错地方', '杆：谢谢关注', '精准碰杆'],
+    lines: [
+      '这么细一根杆都能精准命中，准头值得用在别处。',
+      '教练说盯点，不是盯着杆子开过去。',
+      '杆子没挡路，你主动去找它了。',
+    ],
+  },
+  {
+    pattern: /安全带/,
+    badges: ['送分题送回去', '记性掉线', '安全带被冷落'],
+    lines: [
+      '这题只考记性，你选择展示忘性。',
+      '安全带只要两秒，你用一整张成绩单记住了它。',
+      '上车第一件事没做，后面的技术展示多少有点抢跑。',
+      '方向盘可以慢慢学，安全带真不用练到第二把。',
+    ],
+  },
+  {
+    pattern: /熄火|发动机停止/,
+    badges: ['发动机先退考', '动力已下班', '半联动失联'],
+    lines: [
+      '教练没喊停，发动机先交卷了。',
+      '半联动没找到，倒是精准找到了熄火点。',
+      '油离配合还没谈拢，发动机先退出群聊。',
+    ],
+  },
+  {
+    pattern: /溜车|后溜|倒溜|后退/,
+    badges: ['向前考试 向后发挥', '重力胜出', '先撤退再说'],
+    lines: [
+      '考试要求向前，你先给历史倒了个带。',
+      '车没想回家，是你的脚让它产生了这个念头。',
+      '坡道只负责斜，往哪儿走还得你负责。',
+    ],
+  },
+  {
+    pattern: /压线|出线|越线|触线|轧线|车身出/,
+    badges: ['边线磁吸', '贴脸输出', '精准压线'],
+    lines: [
+      '考试线不是磁吸充电器，真不用贴这么近。',
+      '线没动，车动了，所以责任划分也挺清楚。',
+      '精准度是有的，只是全用在压线上了。',
+    ],
+  },
+  {
+    pattern: /超速|超过.*速度|速度过高/,
+    badges: ['不是排位赛', '油门事业心强', '圈速无效'],
+    lines: [
+      '这是驾考模拟，不是排位赛。',
+      '油门很有事业心，可惜考试不看圈速。',
+      '车速上去了，分数下来的速度也没闲着。',
+    ],
+  },
+  {
+    pattern: /未完整观察|未完成.*观察|未观察|观察.*不足/,
+    badges: ['后视镜非 DLC', '靠信念驾驶', '信息收集失败'],
+    lines: [
+      '后视镜不是付费 DLC，装了就得用。',
+      '别人开车靠观察，你这段更像靠信念。',
+      '先看再动四个字，今天执行成了先动再说。',
+    ],
+  },
+  {
+    pattern: /转向灯|方向灯/,
+    badges: ['先斩后奏', '灯还没表态', '信号掉线'],
+    lines: [
+      '方向盘已经表态了，转向灯还保持中立。',
+      '动作都发生了，信号还没发出去，这叫先斩后奏。',
+      '心里知道往哪儿转，不代表别人也知道。',
+    ],
+  },
+  {
+    pattern: /远光|近光|灯光|照明/,
+    badges: ['灯亮规则暗', '灯光氛围组', '时机很个性'],
+    lines: [
+      '车灯很亮，规则记忆稍微有点暗。',
+      '灯光不是氛围组，什么时候开什么得讲规矩。',
+      '设备在线，判断暂时离线。',
+    ],
+  },
+  {
+    pattern: /驻车制动|手刹/,
+    badges: ['内部意见不统一', '手刹拒绝出发', '前进受阻'],
+    lines: [
+      '车想走，手刹想留，内部意见完全没统一。',
+      '油门负责前进，手刹负责反对，你负责夹在中间。',
+      '起步前少开了一个会：问问手刹同不同意。',
+    ],
+  },
+]
+
+function contextualHeadline(titles: readonly string[], seed: string) {
+  for (const rule of CONTEXT_HEADLINE_RULES) {
+    const title = titles.find(candidate => rule.pattern.test(candidate))
+    if (!title) continue
+    return {
+      title,
+      badge: pick(rule.badges, seed + '|context-badge|' + title),
+      headline: pick(rule.lines, seed + '|context-headline|' + title),
+    }
+  }
+  return null
+}
+
 const DEFAULT_INFRACTION_ROASTS = [
   '这个失误不一定致命，但很会抢镜。',
   '教练看完没说话，先把回放往前拖了五秒。',
@@ -493,12 +664,16 @@ function buildDetail({
   incidentTitles = [],
   fatalCount,
 }: Pick<ResultCommentInput, 'status' | 'score' | 'passLine' | 'infractionTitles' | 'incidentTitles' | 'fatalCount'>) {
-  const primaryInfraction = infractionTitles[0]
+  const highlightedInfraction = contextualHeadline(infractionTitles, [status, score, passLine, 'detail'].join('|'))
+  const primaryInfraction = highlightedInfraction?.title ?? infractionTitles[0]
   const primaryIncident = incidentTitles[0]
   const gap = Math.max(0, passLine - score)
-  const incidentNote = primaryIncident
-    ? `现场花絮：${primaryIncident}。 ${infractionRoast(primaryIncident, [status, score, passLine, 'incident'].join('|'))}`
-    : ''
+  const coneIncidents = incidentTitles.filter(title => /锥桶|雪糕桶|路锥|锥形桶/.test(title))
+  const incidentNote = coneIncidents.length > 1
+    ? `现场花絮：本次共与 ${coneIncidents.length} 个锥桶发生接触。教练让你绕桩，你这是来给锥桶点名的。`
+    : primaryIncident
+      ? `现场花絮：${primaryIncident}。 ${infractionRoast(primaryIncident, [status, score, passLine, 'incident'].join('|'))}`
+      : ''
   const appendIncident = (text: string) => incidentNote ? `${text} ${incidentNote}` : text
 
   if (status === 'incomplete') {
@@ -507,7 +682,7 @@ function buildDetail({
 
   if (status === 'failed' && fatalCount > 0) {
     return appendIncident(primaryInfraction
-      ? `主要剧情转折：${primaryInfraction}。 ${infractionRoast(primaryInfraction, [status, score, passLine].join('|'))}`
+      ? `教练重点点评：${primaryInfraction}。 ${infractionRoast(primaryInfraction, [status, score, passLine].join('|'))}`
       : '出现了不合格项目。好在这里是模拟器，问题暴露得越早越值。')
   }
 
@@ -521,7 +696,9 @@ function buildDetail({
   }
 
   if (score === 100 && infractionTitles.length === 0) {
-    return appendIncident('零扣分事件。今天的方向盘和你意见高度一致。')
+    return incidentTitles.length > 0
+      ? appendIncident('成绩单确实是零扣分，但现场并不算无事发生。')
+      : '零扣分事件。今天的方向盘和你意见高度一致。'
   }
 
   if (infractionTitles.length === 0) {
@@ -557,7 +734,15 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
   let badge: string
   let headline: string
 
-  if (status === 'incomplete') {
+  const context = contextualHeadline(
+    incidentTitles.length > 0 ? incidentTitles : infractionTitles,
+    seed,
+  )
+
+  if (context) {
+    badge = context.badge
+    headline = context.headline
+  } else if (status === 'incomplete') {
     badge = pick(INCOMPLETE_BADGES, seed + '|badge')
     headline = pick(INCOMPLETE, seed)
   } else if (status === 'failed' && fatalCount > 0) {
