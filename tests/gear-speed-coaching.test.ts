@@ -42,7 +42,7 @@ test('automatic sessions are excluded from manual gear-speed coaching', () => {
 test('disengaged clutch and launch-speed samples are excluded', () => {
   const report = buildGearSpeedCoachingReport([
     sample(0, { engineRpm: 800, clutch: 1 }),
-    sample(0.3, { engineRpm: 800, clutch: 0, speed: 1 }),
+    sample(0.3, { engineRpm: 800, clutch: 0, speed: 0.7 }),
   ])
 
   assert.equal(report.applicableSampleCount, 0)
