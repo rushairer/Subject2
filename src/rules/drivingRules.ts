@@ -25,6 +25,16 @@ export const DRIVING_RULES = {
     biteClutchPosition: 0.52,
     stallThrottleThreshold: 0.16,
     stallSpeedThreshold: 0.62,
+    // Simulator coaching heuristics only. These values do not represent
+    // national exam scoring thresholds and must never emit infractions.
+    gearSpeedCoaching: {
+      minimumSpeedKmh: 6,
+      maximumClutchPosition: 0.18,
+      minimumRecommendedRpm: 1050,
+      maximumRecommendedRpm: 3400,
+      minimumSustainedSeconds: 1.5,
+      maximumSampleGapSeconds: 0.65,
+    },
   },
   subject3: {
     signalLeadSeconds: 3,
