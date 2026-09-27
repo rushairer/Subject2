@@ -892,8 +892,8 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
   let badge: string
   let headline: string
 
-  const context = contextualHeadline(
-    effectiveIncidentTitles.length > 0 ? incidentTitles : infractionTitles,
+  const context = contextualIncidentHeadline(incidents, seed) ?? contextualHeadline(
+    effectiveIncidentTitles.length > 0 ? effectiveIncidentTitles : infractionTitles,
     seed,
   )
 
