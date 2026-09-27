@@ -169,3 +169,58 @@ test('non-scoring cone incidents still influence the shareable coach comment', (
   assert.doesNotMatch(comment.detail, /零扣分事件。今天的方向盘和你意见高度一致。$/)
   assert.match(comment.shareText, /100 分 · 合格/)
 })
+
+
+test('a cone incident can take over the headline even when the score is perfect', () => {
+  const comment = buildResultComment({
+    examTitle: '侧方停车',
+    score: 100,
+    passLine: 80,
+    status: 'passed',
+    resultLabel: '合格',
+    infractionTitles: [],
+    incidentTitles: ['侧方停车时撞到锥桶'],
+    fatalCount: 0,
+  })
+  assert.match(comment.badge, /精准命中|锥桶受害者协会|点位很特别|现场有桶/)
+  assert.match(comment.headline, /锥桶|雪糕桶|桩|100 分/)
+  assert.match(comment.detail, /成绩单确实是零扣分/)
+  assert.match(comment.detail, /现场花絮/)
+})
+
+test('a later tree collision is more useful to roast than an earlier generic minor error', () => {
+  const comment = buildResultComment({
+    examTitle: '科目三道路驾驶',
+    score: 0,
+    passLine: 90,
+    status: 'failed',
+    resultLabel: '未合格',
+    infractionTitles: [
+      '直线行驶方向控制不稳',
+      '道路驾驶过程中与树木发生碰撞',
+    ],
+    fatalCount: 1,
+  })
+  assert.match(comment.badge, /绿化亲密接触|树：我没动|路线过于自然/)
+  assert.match(comment.headline, /树|绿化|路/)
+  assert.match(comment.detail, /教练重点点评：道路驾驶过程中与树木发生碰撞/)
+})
+
+test('multiple cone contacts get a combined coach comment instead of hiding after the first one', () => {
+  const comment = buildResultComment({
+    examTitle: '科目二模拟考试',
+    score: 90,
+    passLine: 80,
+    status: 'passed',
+    resultLabel: '合格',
+    infractionTitles: [],
+    incidentTitles: [
+      '倒车入库时撞到锥桶',
+      '侧方停车时撞到锥桶',
+      '直角转弯时撞到锥桶',
+    ],
+    fatalCount: 0,
+  })
+  assert.match(comment.detail, /共与 3 个锥桶发生接触/)
+  assert.match(comment.detail, /给锥桶点名/)
+})
