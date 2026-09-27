@@ -14,6 +14,7 @@ import { DrivingLighting } from './cockpit/DrivingLighting'
 import { DRIVER_EYE } from './cockpit/mirrorLayout'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
 import {
+  SUBJECT3_PRACTICE_SLICES,
   subject3PracticeInitialStatus,
   subject3PracticeRuntimeSeed,
   subject3PracticeSliceById,
@@ -338,6 +339,23 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <button className="subject3-card" onClick={() => onStart({ examId: 'subject3', mode, time })}>
         <div><span className="task-index">ROAD</span><h3>综合道路驾驶</h3><p>覆盖上车准备、起步、直线、加减挡、变道、靠边停车、路口、人行横道、学校、公交站、会车、超车、掉头、夜间行驶等训练场景。</p></div><span className="enter">进入 3D 道路 →</span>
       </button>
+      <div className="subject3-practice-grid" aria-label="科目三专项短练">
+        {SUBJECT3_PRACTICE_SLICES.map(slice => <button
+          key={slice.id}
+          className="subject3-practice-card"
+          onClick={() => onStart({
+            examId: 'subject3',
+            mode: 'practice',
+            time,
+            subject3Practice: slice.id,
+          })}
+        >
+          <span className="task-index">DRILL</span>
+          <strong>{slice.title}</strong>
+          <p>{slice.summary}</p>
+          <span className="enter">专项短练 →</span>
+        </button>)}
+      </div>
     </section>
     <aside className="legal-note">规则基线按现行中国大陆机动车驾驶人考试规范建模；实际考场路线、检测设备和地方执行细节可能不同。本项目用于模拟训练，不替代当地主管部门要求。</aside>
   </main>
@@ -1042,6 +1060,7 @@ function Result({
   onBack,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
   onContinueTrainingPack,
   onRetryTrainingPackStage,
   trainingPackStages,
@@ -1055,6 +1074,7 @@ function Result({
   onBack: () => void
   onStartTraining: (examId: ReplayTrainingProjectId) => void
   onStartTrainingPack: (packId: TrainingPackId) => void
+  onStartSubject3Practice: (slice: Subject3PracticeSliceId) => void
   onContinueTrainingPack: (state: TrainingPackSessionState) => void
   onRetryTrainingPackStage: (state: TrainingPackSessionState) => void
   trainingPackStages: readonly TrainingPackStageResult[]
@@ -1104,6 +1124,7 @@ function Result({
       infractions={infractions}
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
+      onStartSubject3Practice={onStartSubject3Practice}
     />
 
     {trainingPack && nextPackState
@@ -1224,6 +1245,12 @@ export default function App() {
       time: session.time,
     })}
     onStartTrainingPack={packId => startTrainingPack(packId, session.time)}
+    onStartSubject3Practice={subject3Practice => startSession({
+      examId: 'subject3',
+      mode: 'practice',
+      time: session.time,
+      subject3Practice,
+    })}
     onContinueTrainingPack={trainingPack => {
       const stage = trainingPackStage(trainingPack)
       startSession({
