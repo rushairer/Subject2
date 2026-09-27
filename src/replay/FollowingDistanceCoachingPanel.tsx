@@ -88,7 +88,7 @@ export function FollowingDistanceCoachingPanel({
                     ? ` · 追近 ${segment.representativeClosingSpeedMps.toFixed(1)} m/s`
                     : ''}
                   {segment.representativeTimeToCollisionSeconds != null
-                    ? ` · TTC ${segment.representativeTimeToCollisionSeconds.toFixed(1)} 秒`
+                    ? ` · 按当前速度差约 ${segment.representativeTimeToCollisionSeconds.toFixed(1)} 秒追到前车`
                     : ''}
                 </span>
                 <span className="replay-focus-practice">
