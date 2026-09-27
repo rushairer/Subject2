@@ -467,6 +467,10 @@ test('ending a training session reaches the incomplete result and replay surface
 
   const dynamics = page.getByRole('region', { name: '速度 / 挡位时间轴' })
   await expect(dynamics).toBeVisible()
+  await expect(dynamics).toContainText('危险事件 0 个')
+  await expect(
+    dynamics.getByRole('img', { name: '整场训练速度曲线、挡位变化与危险交通事件图' }),
+  ).toBeVisible()
   await expect(dynamics.getByRole('slider', { name: '速度和挡位时间轴游标' })).toHaveValue('0')
 
   const projectScrubber = page.getByRole('slider', { name: '侧方停车复盘时间轴' })

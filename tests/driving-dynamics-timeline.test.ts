@@ -5,6 +5,10 @@ import {
   dynamicsGearLabel,
   type DrivingDynamicsSample,
 } from '../src/replay/drivingDynamicsTimeline'
+import {
+  buildDrivingDynamicsEventMarkers,
+  type DrivingDynamicsEventSample,
+} from '../src/replay/drivingDynamicsEvents'
 
 function sample(
   t: number,
@@ -116,4 +120,150 @@ test('gear labels distinguish reverse, neutral, manual and automatic drive', () 
   assert.equal(dynamicsGearLabel({ gear: 0, automatic: false }), 'N')
   assert.equal(dynamicsGearLabel({ gear: 4, automatic: false }), '4')
   assert.equal(dynamicsGearLabel({ gear: 1, automatic: true }), 'D')
+})
+
+
+function eventSample(
+  t: number,
+  overrides: Partial<DrivingDynamicsEventSample> = {},
+): DrivingDynamicsEventSample {
+  return {
+    t,
+    project: 'subject3',
+    speed: 8,
+    gear: 2,
+    automatic: false,
+    throttle: 0.5,
+    brake: 0,
+    ...overrides,
+  }
+}
+
+test('generic timeline model preserves defensive-driving evidence fields', () => {
+  const model = buildDrivingDynamicsTimeline([
+    eventSample(0, {
+      leadScenario: 'sudden-brake',
+      leadVehicleId: 'lead-a',
+      cutInHazardId: 'cut-a',
+      pedestrianHazardId: 'ped-a',
+    }),
+    eventSample(0.2),
+  ])
+
+  assert.equal(model.samples[0].leadScenario, 'sudden-brake')
+  assert.equal(model.samples[0].leadVehicleId, 'lead-a')
+  assert.equal(model.samples[0].cutInHazardId, 'cut-a')
+  assert.equal(model.samples[0].pedestrianHazardId, 'ped-a')
+})
+
+test('dynamics event markers reuse the three coaching evidence moments', () => {
+  const samples: DrivingDynamicsEventSample[] = [
+    eventSample(0, {
+      leadScenario: 'sudden-brake',
+      leadVehicleId: 'lead-a',
+      leadSpeedMps: 12,
+      leadTimeGapSeconds: 2.5,
+      leadGapMeters: 20,
+      leadTimeToCollisionSeconds: 4.5,
+    }),
+    eventSample(0.2, {
+      leadScenario: 'sudden-brake',
+      leadVehicleId: 'lead-a',
+      leadSpeedMps: 10.8,
+      leadTimeGapSeconds: 2.2,
+      leadGapMeters: 17,
+      leadTimeToCollisionSeconds: 3.5,
+    }),
+    eventSample(0.4, {
+      leadScenario: 'sudden-brake',
+      leadVehicleId: 'lead-a',
+      leadSpeedMps: 9.6,
+      leadTimeGapSeconds: 1.8,
+      leadGapMeters: 14,
+      leadTimeToCollisionSeconds: 2.7,
+    }),
+    eventSample(5, {
+      cutInHazardId: 'cut-a',
+      cutInConflict: false,
+      cutInProgressDeltaMeters: 20,
+      cutInLateralDeltaMeters: 2,
+    }),
+    eventSample(5.2, {
+      cutInHazardId: 'cut-a',
+      cutInConflict: true,
+      cutInProgressDeltaMeters: 15,
+      cutInLateralDeltaMeters: 1.2,
+    }),
+    eventSample(5.4, {
+      cutInHazardId: 'cut-a',
+      cutInConflict: true,
+      cutInProgressDeltaMeters: 9,
+      cutInLateralDeltaMeters: 0.5,
+    }),
+    eventSample(10, {
+      pedestrianHazardId: 'ped-a',
+      pedestrianConflict: false,
+      pedestrianProgressDeltaMeters: 24,
+      pedestrianLateralDeltaMeters: 1.6,
+      pedestrianPlanarDistanceMeters: 24.1,
+    }),
+    eventSample(10.2, {
+      pedestrianHazardId: 'ped-a',
+      pedestrianConflict: true,
+      pedestrianProgressDeltaMeters: 18,
+      pedestrianLateralDeltaMeters: 0.9,
+      pedestrianPlanarDistanceMeters: 18,
+    }),
+    eventSample(10.4, {
+      pedestrianHazardId: 'ped-a',
+      pedestrianConflict: true,
+      pedestrianProgressDeltaMeters: 12,
+      pedestrianLateralDeltaMeters: 0.3,
+      pedestrianPlanarDistanceMeters: 12,
+    }),
+  ]
+
+  const markers = buildDrivingDynamicsEventMarkers(samples)
+
+  assert.deepEqual(
+    markers.map(marker => ({
+      kind: marker.kind,
+      label: marker.label,
+      t: marker.t,
+      sampleIndex: marker.sampleIndex,
+      project: marker.project,
+    })),
+    [
+      {
+        kind: 'sudden-brake',
+        label: '前车急刹',
+        t: 0.4,
+        sampleIndex: 2,
+        project: 'subject3',
+      },
+      {
+        kind: 'cut-in',
+        label: '电动车加塞',
+        t: 5.4,
+        sampleIndex: 5,
+        project: 'subject3',
+      },
+      {
+        kind: 'pedestrian',
+        label: '行人横穿',
+        t: 10.4,
+        sampleIndex: 8,
+        project: 'subject3',
+      },
+    ],
+  )
+})
+
+test('dynamics event markers stay empty when coaching reports have no analyzable event', () => {
+  const markers = buildDrivingDynamicsEventMarkers([
+    eventSample(0),
+    eventSample(0.2),
+  ])
+
+  assert.deepEqual(markers, [])
 })
