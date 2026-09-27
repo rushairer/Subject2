@@ -7,6 +7,7 @@ import { useCollisionBody } from '../sim/useCollisionBody'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import { localPoseToWorld, worldPoseToLocal, type CoursePlacement } from './courseTransform'
 import { TRAFFIC_CONE, trafficConeContactCircles, trafficConeGroundLift } from '../sim/trafficConeGeometry'
+import type { DrivingIncidentDraft } from '../session/drivingIncident'
 
 export interface TrafficConeProps {
   x: number
@@ -16,7 +17,8 @@ export interface TrafficConeProps {
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
   color?: string
-  onImpact?: () => void
+  incident?: DrivingIncidentDraft
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 export function TrafficCone({
@@ -27,7 +29,8 @@ export function TrafficCone({
   audioContext,
   audioState,
   color = '#df6a31',
-  onImpact,
+  incident,
+  onIncident,
 }: TrafficConeProps): ReactElement {
   const groupRef = useRef<THREE.Group>(null)
   const collision = useCollisionBody({
@@ -35,7 +38,7 @@ export function TrafficCone({
     player: vehicle,
     audioContext,
     audioState,
-    onImpact: onImpact ? () => onImpact() : undefined,
+    onImpact: incident && onIncident ? () => onIncident(incident) : undefined,
   })
   const baseWorld = placement ? localPoseToWorld({ x, z, heading: 0 }, placement) : { x, z, heading: 0 }
 

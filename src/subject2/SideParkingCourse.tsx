@@ -4,6 +4,7 @@ import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
 import { TrafficCone } from './TrafficCone'
+import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
   SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
@@ -290,7 +291,7 @@ export interface SideParkingCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
-  onConeImpact?: (index: number) => void
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 export function SideParkingCourse({
@@ -298,7 +299,7 @@ export function SideParkingCourse({
   placement,
   audioContext,
   audioState,
-  onConeImpact,
+  onIncident,
 }: SideParkingCourseProps = {}): ReactElement {
   const g = SIDE_PARKING_GEOMETRY
   const laneCenterZ = (g.laneStartZ + g.laneEndZ) / 2
@@ -335,7 +336,14 @@ export function SideParkingCourse({
         placement={placement}
         audioContext={audioContext}
         audioState={audioState}
-        onImpact={() => onConeImpact?.(i)}
+        incident={subject2CollisionIncident({
+          id: `side-parking-cone-${i}`,
+          kind: 'cone',
+          object: 'traffic-cone',
+          label: '锥桶',
+          course: 'side-parking',
+        })}
+        onIncident={onIncident}
       />
     ))}
 

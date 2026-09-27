@@ -4,6 +4,7 @@ import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
 import { TrafficCone } from './TrafficCone'
+import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
   SUBJECT2_BOUNDARY_LINE_WIDTH_METERS,
@@ -237,7 +238,7 @@ export interface RightAngleCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
-  onConeImpact?: (index: number) => void
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 export function RightAngleCourse({
@@ -245,7 +246,7 @@ export function RightAngleCourse({
   placement,
   audioContext,
   audioState,
-  onConeImpact,
+  onIncident,
 }: RightAngleCourseProps = {}): ReactElement {
   const g = RIGHT_ANGLE_GEOMETRY
   const entryLength = g.entryMaxZ - (g.cornerCenterZ - g.half)
@@ -277,7 +278,14 @@ export function RightAngleCourse({
       placement={placement}
       audioContext={audioContext}
       audioState={audioState}
-      onImpact={() => onConeImpact?.(0)}
+      incident={subject2CollisionIncident({
+        id: 'right-angle-cone-0',
+        kind: 'cone',
+        object: 'traffic-cone',
+        label: '锥桶',
+        course: 'right-angle',
+      })}
+      onIncident={onIncident}
     />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>

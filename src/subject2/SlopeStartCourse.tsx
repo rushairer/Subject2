@@ -5,6 +5,7 @@ import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
 import { SignPost } from './SignPost'
+import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
@@ -249,6 +250,7 @@ export interface SlopeStartCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 export function SlopeStartCourse({
@@ -256,6 +258,7 @@ export function SlopeStartCourse({
   placement,
   audioContext,
   audioState,
+  onIncident,
 }: SlopeStartCourseProps = {}): ReactElement {
   const terrain = useMemo(() => surfaceGeometry(SUBJECT2_GROUNDS['slope-start'].width, -0.07), [])
   const road = useMemo(() => surfaceGeometry(SLOPE_START.roadWidth, 0), [])
@@ -280,6 +283,14 @@ export function SlopeStartCourse({
         placement={placement}
         audioContext={audioContext}
         audioState={audioState}
+        incident={subject2CollisionIncident({
+          id: 'slope-start-sign-post',
+          kind: 'pole',
+          object: 'sign-post',
+          label: '坡道停车标志杆',
+          course: 'slope-start',
+        })}
+        onIncident={onIncident}
       />
     </group>
   </group>
