@@ -1,4 +1,5 @@
 import type { SessionResultStatus } from './sessionResult'
+import type { CollisionObjectRole, DrivingIncident } from './drivingIncident'
 
 export type ResultCommentInput = {
   examTitle: string
@@ -8,6 +9,7 @@ export type ResultCommentInput = {
   resultLabel: string
   infractionTitles: readonly string[]
   incidentTitles?: readonly string[]
+  incidents?: readonly Pick<DrivingIncident, 'title' | 'category' | 'collision'>[]
   fatalCount: number
 }
 
@@ -642,6 +644,148 @@ function contextualHeadline(titles: readonly string[], seed: string) {
   return null
 }
 
+type CollisionCoachCopy = {
+  badges: readonly string[]
+  headlines: readonly string[]
+  roasts: readonly string[]
+}
+
+const POLE_COACH_COPY: CollisionCoachCopy = {
+  badges: ['准头用错地方', '杆：谢谢关注', '精准碰杆'],
+  headlines: [
+    '这么细一根杆都能精准命中，准头值得用在别处。',
+    '教练说盯点，不是盯着杆子开过去。',
+    '杆子没挡路，你主动去找它了。',
+  ],
+  roasts: [
+    '杆子确实细，但也不是让你验证碰撞箱的。',
+    '这根杆今天什么都没做，就完成了一次被动教学。',
+    '避障没避开，倒是把精准度证明了。',
+    '杆：谢谢关注，下次远观就行。',
+  ],
+}
+
+const COLLISION_COACH_COPY: Partial<Record<CollisionObjectRole, CollisionCoachCopy>> = {
+  'traffic-cone': {
+    badges: ['精准命中', '锥桶受害者协会', '点位很特别', '现场有桶'],
+    headlines: [
+      '点位没找准，雪糕桶倒是找得挺准。',
+      '100 分归 100 分，锥桶有不同意见。',
+      '别人绕桩，你负责和桩建立联系。',
+      '锥桶都穿荧光橙了，还是没躲过你的精准打击。',
+      '这不是绕桩，是线下见面。',
+    ],
+    roasts: [
+      '锥桶：我就站这儿上个班，怎么还算工伤了。',
+      '雪糕桶的工作是站着，不是陪你做碰撞测试。',
+      '绕开它本来是选择题，你硬是做成了接触题。',
+      '教练让你看点位，没让你去和锥桶线下见面。',
+      '这么大一片路，偏偏和最小的那个障碍物有缘。',
+    ],
+  },
+  'sign-post': POLE_COACH_COPY,
+  'course-gate-post': POLE_COACH_COPY,
+  pole: POLE_COACH_COPY,
+  tree: {
+    badges: ['绿化亲密接触', '树：我没动', '路线过于自然'],
+    headlines: [
+      '树没动，你动了；责任划分相当清晰。',
+      '路这么宽，最后还是和树双向奔赴。',
+      '树都不会横穿马路，这次确实很难让它背锅。',
+      '绿化验收通过，驾驶路线需要复审。',
+    ],
+    roasts: [
+      '树站那儿这么多年，今天终于等到你来打招呼。',
+      '绿化做得挺好，就是不建议用车头近距离验收。',
+      '这棵树唯一的操作，就是没动。',
+      '树没考驾照，但今天被迫参加了你的考试。',
+    ],
+  },
+  building: {
+    badges: ['建筑质检员', '靠边过头', '物业预警'],
+    headlines: [
+      '这是驾驶考试，不是建筑质量抽检。',
+      '教练让你靠边，没让你靠墙。',
+      '建筑一直没动，今天路线倒挺有想法。',
+    ],
+    roasts: [
+      '建筑物没有突然横穿马路的习惯，这锅它不接。',
+      '路线这么宽，你偏偏去研究建筑材料。',
+      '再靠近一点，物业都要出来问你找谁了。',
+    ],
+  },
+  vehicle: {
+    badges: ['强行会师', '距离归零', '保险公司预警'],
+    headlines: [
+      '跟车不是跟到一起，你把“保持距离”做成了反义词。',
+      '两辆车各走各的，你硬是安排了一场会师。',
+      '道路社交可以有，车身握手就免了。',
+    ],
+    roasts: [
+      '别人是交通参与者，不是移动靶。',
+      '保险公司看了这段回放，可能比教练更紧张。',
+      '这不是并线，是把两个车道的故事强行合并了。',
+    ],
+  },
+  pedestrian: {
+    badges: ['刹车必修课', '安全第一', '先把刹车认熟'],
+    headlines: [
+      '这段先别秀技术，刹车得比剧情反转更快。',
+      '行人不是考试道具，这一题只能用安全意识答。',
+      '成绩可以重来，遇到行人先把车稳稳停下来。',
+    ],
+    roasts: [
+      '看到行人先收油收心，别把模拟器开成反应测试。',
+      '这时候该踩的是刹车，不是剧情加速键。',
+      '路权判断可以慢半拍，刹车不能慢半拍。',
+    ],
+  },
+  scooter: {
+    badges: ['强行认识', '安全距离失踪', '碰撞图鉴 +1'],
+    headlines: [
+      '两轮车不是收集品，不用靠车头解锁图鉴。',
+      '安全距离被你压缩成了社交距离。',
+      '这不是会车，是强行认识。',
+    ],
+    roasts: [
+      '电动车不是保龄球瓶，别拿车头找击中感。',
+      '道路上车型很多，不代表都要逐一近距离体验。',
+      '教练让你观察交通，不是收集碰撞图鉴。',
+    ],
+  },
+}
+
+function contextualIncidentHeadline(
+  incidents: readonly Pick<DrivingIncident, 'title' | 'collision'>[],
+  seed: string,
+) {
+  const priority: readonly CollisionObjectRole[] = [
+    'pedestrian', 'vehicle', 'scooter', 'tree', 'building',
+    'sign-post', 'course-gate-post', 'pole', 'traffic-cone',
+  ]
+  for (const object of priority) {
+    const incident = incidents.find(item => item.collision.object === object)
+    const copy = COLLISION_COACH_COPY[object]
+    if (!incident || !copy) continue
+    return {
+      title: incident.title,
+      badge: pick(copy.badges, seed + '|incident-badge|' + object),
+      headline: pick(copy.headlines, seed + '|incident-headline|' + object),
+    }
+  }
+  return null
+}
+
+function collisionIncidentRoast(
+  incident: Pick<DrivingIncident, 'title' | 'collision'>,
+  seed: string,
+) {
+  const copy = COLLISION_COACH_COPY[incident.collision.object]
+  return copy
+    ? pick(copy.roasts, seed + '|incident-roast|' + incident.collision.object)
+    : infractionRoast(incident.title, seed)
+}
+
 const DEFAULT_INFRACTION_ROASTS = [
   '这个失误不一定致命，但很会抢镜。',
   '教练看完没说话，先把回放往前拖了五秒。',
@@ -662,18 +806,25 @@ function buildDetail({
   passLine,
   infractionTitles,
   incidentTitles = [],
+  incidents = [],
   fatalCount,
-}: Pick<ResultCommentInput, 'status' | 'score' | 'passLine' | 'infractionTitles' | 'incidentTitles' | 'fatalCount'>) {
+}: Pick<ResultCommentInput, 'status' | 'score' | 'passLine' | 'infractionTitles' | 'incidentTitles' | 'incidents' | 'fatalCount'>) {
   const highlightedInfraction = contextualHeadline(infractionTitles, [status, score, passLine, 'detail'].join('|'))
   const primaryInfraction = highlightedInfraction?.title ?? infractionTitles[0]
-  const primaryIncident = incidentTitles[0]
+  const effectiveIncidentTitles = incidents.length > 0 ? incidents.map(item => item.title) : incidentTitles
+  const primaryTypedIncident = incidents[0]
+  const primaryIncidentTitle = primaryTypedIncident?.title ?? effectiveIncidentTitles[0]
   const gap = Math.max(0, passLine - score)
-  const coneIncidents = incidentTitles.filter(title => /锥桶|雪糕桶|路锥|锥形桶/.test(title))
-  const incidentNote = coneIncidents.length > 1
-    ? `现场花絮：本次共与 ${coneIncidents.length} 个锥桶发生接触。教练让你绕桩，你这是来给锥桶点名的。`
-    : primaryIncident
-      ? `现场花絮：${primaryIncident}。 ${infractionRoast(primaryIncident, [status, score, passLine, 'incident'].join('|'))}`
-      : ''
+  const coneIncidentCount = incidents.length > 0
+    ? incidents.filter(item => item.collision.object === 'traffic-cone').length
+    : effectiveIncidentTitles.filter(title => /锥桶|雪糕桶|路锥|锥形桶/.test(title)).length
+  const incidentNote = coneIncidentCount > 1
+    ? `现场花絮：本次共与 ${coneIncidentCount} 个锥桶发生接触。教练让你绕桩，你这是来给锥桶点名的。`
+    : primaryTypedIncident
+      ? `现场花絮：${primaryTypedIncident.title}。 ${collisionIncidentRoast(primaryTypedIncident, [status, score, passLine, 'incident'].join('|'))}`
+      : primaryIncidentTitle
+        ? `现场花絮：${primaryIncidentTitle}。 ${infractionRoast(primaryIncidentTitle, [status, score, passLine, 'incident'].join('|'))}`
+        : ''
   const appendIncident = (text: string) => incidentNote ? `${text} ${incidentNote}` : text
 
   if (status === 'incomplete') {
@@ -696,7 +847,7 @@ function buildDetail({
   }
 
   if (score === 100 && infractionTitles.length === 0) {
-    return incidentTitles.length > 0
+    return effectiveIncidentTitles.length > 0
       ? appendIncident('成绩单确实是零扣分，但现场并不算无事发生。')
       : '零扣分事件。今天的方向盘和你意见高度一致。'
   }
@@ -726,16 +877,23 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     resultLabel,
     infractionTitles,
     incidentTitles = [],
+    incidents = [],
     fatalCount,
   } = input
-  const seed = [examTitle, score, passLine, status, fatalCount, ...infractionTitles, ...incidentTitles].join('|')
+  const effectiveIncidentTitles = incidents.length > 0 ? incidents.map(item => item.title) : incidentTitles
+  const seed = [
+    examTitle, score, passLine, status, fatalCount,
+    ...infractionTitles,
+    ...effectiveIncidentTitles,
+    ...incidents.map(item => item.collision.object),
+  ].join('|')
   const gap = Math.max(0, passLine - score)
 
   let badge: string
   let headline: string
 
   const context = contextualHeadline(
-    incidentTitles.length > 0 ? incidentTitles : infractionTitles,
+    effectiveIncidentTitles.length > 0 ? incidentTitles : infractionTitles,
     seed,
   )
 
@@ -752,7 +910,7 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     const close = gap <= 10
     badge = pick(close ? CLOSE_BADGES : FAR_BADGES, seed + '|badge')
     headline = pick(close ? FAILED_CLOSE : FAILED_FAR, seed)
-  } else if (score === 100 && infractionTitles.length === 0 && incidentTitles.length === 0) {
+  } else if (score === 100 && infractionTitles.length === 0 && effectiveIncidentTitles.length === 0) {
     badge = pick(PERFECT_BADGES, seed + '|badge')
     headline = pick(PASSED_PERFECT, seed)
   } else if (score >= 95) {
@@ -766,7 +924,7 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     headline = pick(PASSED_EDGE, seed)
   }
 
-  const detail = buildDetail({ status, score, passLine, infractionTitles, incidentTitles, fatalCount })
+  const detail = buildDetail({ status, score, passLine, infractionTitles, incidentTitles, incidents, fatalCount })
 
   return {
     badge,
