@@ -1157,6 +1157,11 @@ function Result({
   const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
   const trainingPack = session.trainingPack ? trainingPackById(session.trainingPack.id) : null
   const nextPackState = session.trainingPack ? nextTrainingPackState(session.trainingPack) : null
+  const resultLabel = status === 'incomplete'
+    ? '未完成'
+    : passed
+      ? trainingPack ? '达标' : '合格'
+      : trainingPack ? '需继续练习' : '未合格'
   const resultComment = buildResultComment({
     examTitle: sessionTitle(session),
     score,
@@ -1182,11 +1187,6 @@ function Result({
       setShareState('copied')
     }
   }, [resultComment.shareText])
-  const resultLabel = status === 'incomplete'
-    ? '未完成'
-    : passed
-      ? trainingPack ? '达标' : '合格'
-      : trainingPack ? '需继续练习' : '未合格'
 
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">{trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
