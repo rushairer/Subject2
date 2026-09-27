@@ -109,7 +109,7 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('cross-project training pack persists a round and compares it with prior evidence', async ({ page }) => {
+test('personalized plan prioritizes evidence and training pack persists the next round', async ({ page }) => {
   // Two pack stages mount two full software-WebGL scenes, persist the round,
   // then compare it with one prior round for the same candidate/license/pack.
   test.setTimeout(90_000)
@@ -133,7 +133,14 @@ test('cross-project training pack persists a round and compares it with prior ev
   })
   await createC2Candidate(page, '训练包E2E')
 
-  await page.locator('.training-pack-card').filter({ hasText: '观察与信号' }).click()
+  const plan = page.getByRole('region', { name: '个性化训练建议' })
+  await expect(plan).toContainText('长期训练建议')
+  await expect(plan).toContainText('当前最值得练')
+  await expect(plan).toContainText('观察与信号')
+  await expect(plan).toContainText('优先巩固')
+  await expect(plan).toContainText('不合格 1')
+  await plan.getByRole('button', { name: '按建议开始 · 观察与信号' }).click()
+
   await expectHealthyDrivingScene(page)
   await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/2 · 直角转弯')
   await expect(page.locator('.project-status')).toContainText(/直角|转向灯|靠右/)
