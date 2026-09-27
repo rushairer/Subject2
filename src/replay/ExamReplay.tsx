@@ -15,6 +15,7 @@ import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
 import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
+import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
 
 export interface TrajectorySample {
   t: number
@@ -32,6 +33,11 @@ export interface TrajectorySample {
   engineOn?: boolean
   engineRpm?: number
   clutch?: number
+  leadVehicleId?: string
+  leadGapMeters?: number
+  leadTimeGapSeconds?: number
+  leadClosingSpeedMps?: number
+  leadTimeToCollisionSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -563,6 +569,15 @@ export function ExamReplay({
       samples={samples}
       onSelect={(project, t) => setFocusRequest(previous => ({
         project,
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <FollowingDistanceCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
         t,
         token: (previous?.token ?? 0) + 1,
       }))}
