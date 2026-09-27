@@ -14,6 +14,7 @@ import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
+import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
 
 export interface TrajectorySample {
   t: number
@@ -28,6 +29,9 @@ export interface TrajectorySample {
   rightIndicator?: boolean
   handbrake?: boolean
   automatic?: boolean
+  engineOn?: boolean
+  engineRpm?: number
+  clutch?: number
 }
 
 export interface ReplayInfraction {
@@ -553,6 +557,15 @@ export function ExamReplay({
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
       onStartSubject3Practice={onStartSubject3Practice}
+    />
+
+    <GearSpeedCoachingPanel
+      samples={samples}
+      onSelect={(project, t) => setFocusRequest(previous => ({
+        project,
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
     />
 
     <div className="replay-projects">
