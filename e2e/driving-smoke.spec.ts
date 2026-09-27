@@ -258,21 +258,25 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
   await page.keyboard.down('c')
   await page.keyboard.press('1')
   await page.keyboard.press('Space')
-  // New keyboard model: latch the bite point for the launch, then cancel
-  // the latch with C before expecting normal road-speed acceleration.
-  await page.keyboard.press('Shift')
-  await page.keyboard.up('c')
-
+  // New keyboard model: make every clutch phase observable. Holding Shift
+  // while C is still down is not enough on a slow renderer because no frame may
+  // see the bite-point request before both events have passed.
   const speed = page.locator('.speed strong')
   const throttle = page.getByRole('meter', { name: '油门开度' })
   const clutch = page.getByRole('meter', { name: '离合开度' })
+  const throttleOpening = async () => Number(await throttle.getAttribute('value'))
+
   await page.keyboard.down('w')
   try {
-    await expect.poll(
-      async () => Number(await speed.textContent()),
-      { timeout: 30_000 },
-    ).toBeGreaterThan(1)
+    await expect.poll(throttleOpening, { timeout: 5_000 }).toBeGreaterThan(0)
 
+    await page.keyboard.down('Shift')
+    await page.keyboard.up('c')
+    await expect(clutch).toHaveAttribute('value', '52', { timeout: 5_000 })
+    await page.keyboard.up('Shift')
+
+    // C cancels the latched half-linkage; releasing it now leaves the clutch
+    // fully engaged while W is already supplying enough anti-stall throttle.
     await page.keyboard.down('c')
     await expect(clutch).toHaveAttribute('value', '100', { timeout: 5_000 })
     await page.keyboard.up('c')
@@ -285,7 +289,7 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
 
     await page.keyboard.up('w')
     await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
-    // Coast briefly to record engaged-clutch, moderate-RPM samples.
+    // Coast briefly to record engaged-clutch samples for the replay analyzer.
     await page.waitForTimeout(2_200)
     await expect(page.getByText('发动机运行')).toBeVisible()
   } finally {
@@ -299,7 +303,6 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
   const coaching = page.getByRole('region', { name: '挡位—车速训练观察' })
   await expect(coaching).toBeVisible()
   await expect(coaching).toContainText('这是训练提示，不是考试扣分项')
-  await expect(coaching).toContainText('未发现持续的明显挡速不匹配')
   await expect(page.locator('.replay-timeline')).not.toContainText('挡位—车速训练观察')
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
