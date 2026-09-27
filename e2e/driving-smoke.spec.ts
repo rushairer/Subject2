@@ -22,6 +22,18 @@ function captureRuntimeErrors(page: Page) {
   return errors
 }
 
+test.afterEach(async ({ page }) => {
+  if (page.isClosed()) return
+  const finish = page.getByRole('button', { name: '结束并查看结果' })
+  if (await finish.count() === 0) return
+  try {
+    await finish.first().click({ timeout: 3_000 })
+    await page.locator('canvas').waitFor({ state: 'detached', timeout: 3_000 })
+  } catch {
+    // Preserve the original test failure; cleanup is best-effort only.
+  }
+})
+
 async function expectHealthyDrivingScene(page: Page) {
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
@@ -86,6 +98,7 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   await expectHealthyDrivingScene(page)
   await expect(page.getByText(/夜间/).first()).toBeVisible()
   await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
 
   await page.keyboard.press('t')
   await page.keyboard.press('i')
