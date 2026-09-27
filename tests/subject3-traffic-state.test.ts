@@ -28,21 +28,9 @@ test('traffic state starts clear with an empty deterministic vehicle registry', 
 
 test('traffic vehicle telemetry updates in place and can be removed', () => {
   const traffic = createSubject3TrafficState()
-  const first = updateSubject3TrafficVehicle(traffic, {
-    id: 'flow-b',
-    progress: 1540,
-    lateral: 0,
-    speedMps: 7.5,
-    opposite: false,
-  })
+  const first = updateSubject3TrafficVehicle(traffic, 'flow-b', 1540, 0, 7.5, false)
 
-  const second = updateSubject3TrafficVehicle(traffic, {
-    id: 'flow-b',
-    progress: 1543.25,
-    lateral: 0,
-    speedMps: 6.4,
-    opposite: false,
-  })
+  const second = updateSubject3TrafficVehicle(traffic, 'flow-b', 1543.25, 0, 6.4, false)
 
   assert.equal(second, first, 'per-frame publication should mutate stable telemetry objects')
   assert.deepEqual(traffic.vehicles['flow-b'], {
@@ -60,20 +48,8 @@ test('traffic vehicle telemetry updates in place and can be removed', () => {
 test('traffic registry keeps same-direction and opposing actors distinguishable', () => {
   const traffic = createSubject3TrafficState()
 
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'flow-a',
-    progress: 620,
-    lateral: -3.5,
-    speedMps: 9.2,
-    opposite: false,
-  })
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'oncoming-a',
-    progress: 1900,
-    lateral: -8.75,
-    speedMps: 10.5,
-    opposite: true,
-  })
+  updateSubject3TrafficVehicle(traffic, 'flow-a', 620, -3.5, 9.2, false)
+  updateSubject3TrafficVehicle(traffic, 'oncoming-a', 1900, -8.75, 10.5, true)
 
   assert.equal(traffic.vehicles['flow-a'].opposite, false)
   assert.equal(traffic.vehicles['oncoming-a'].opposite, true)
