@@ -32,6 +32,7 @@ import { advanceExamProgress, completeExamProject, createExamProgress, enterExam
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
+import { DrivingRendererLifecycle } from './ui/DrivingRendererLifecycle'
 
 type Gender = '男' | '女' | '其他'
 type LicenseType = 'C1' | 'C2'
@@ -845,7 +846,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
 
   return <div className="driving-shell">
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     <div className="hud">
       <div className="hud-top">
