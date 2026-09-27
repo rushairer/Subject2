@@ -132,6 +132,9 @@ test('personalized plan prioritizes evidence and training pack persists the next
     }]))
   })
   await createC2Candidate(page, '训练包E2E')
+  // Keep this persistence/daily-plan scenario independent from the timed
+  // simulated light-test preflight used by daytime Subject 3.
+  await page.getByRole('button', { name: '夜间', exact: true }).click()
 
   const plan = page.getByRole('region', { name: '个性化训练建议' })
   await expect(plan).toContainText('长期训练建议')
