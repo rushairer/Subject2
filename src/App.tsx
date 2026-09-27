@@ -8,7 +8,7 @@ import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './s
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
 import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
-import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
+import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose, subject2ProjectJudgingEnabled } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { DrivingLighting } from './cockpit/DrivingLighting'
@@ -977,10 +977,14 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         engineOn: v.engineOn,
         engineRpm: v.engineRpm,
         clutch: v.clutch,
+        throttle: v.throttle,
+        brake: v.brake,
         night: session.time === 'night',
         lowBeam: v.lowBeam,
         highBeam: v.highBeam,
         leadVehicleId: leadVehicle?.vehicleId,
+        leadScenario: leadVehicle?.scenario,
+        leadSpeedMps: leadVehicle?.leadSpeedMps,
         leadGapMeters: leadVehicle?.bumperGapMeters,
         leadTimeGapSeconds: leadVehicle?.timeGapSeconds,
         leadClosingSpeedMps: leadVehicle?.closingSpeedMps,
@@ -1079,7 +1083,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     }}
   >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">

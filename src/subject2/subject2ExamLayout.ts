@@ -16,6 +16,13 @@ import {
   type CoursePose,
 } from './courseTransform'
 
+export function subject2ProjectJudgingEnabled(
+  continuousExam: boolean,
+  entryReached: boolean,
+) {
+  return !continuousExam || entryReached
+}
+
 export const SUBJECT2_C1_SEQUENCE: Subject2ProjectId[] = [
   'reverse-parking',
   'slope-start',

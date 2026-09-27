@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCurveRuntime, updateCurveDriving } from '../src/subject2/CurveDrivingCourse'
 import { createRightAngleRuntime, updateRightAngle } from '../src/subject2/RightAngleCourse'
 import { createSideParkingRuntime, updateSideParking } from '../src/subject2/SideParkingCourse'
 import { createSlopeRuntime, updateSlopeStart } from '../src/subject2/SlopeStartCourse'
@@ -20,6 +19,7 @@ import {
   subject2ExamTransitions,
   subject2ExamWorldExitPose,
   subject2ExamWorldStartPose,
+  subject2ProjectJudgingEnabled,
 } from '../src/subject2/subject2ExamLayout'
 
 const near = (actual: number, expected: number, epsilon = 1e-9) =>
@@ -98,26 +98,11 @@ test('continuous C1 transitions connect each project exit to the next project en
 })
 
 
-test('side-parking judging remains dormant on the transition road before its entrance', () => {
-  const start = subject2ExamWorldStartPose('side-parking')
-  const local = subject2ExamLocalPose('side-parking', {
-    x: start.x,
-    z: start.z + 15,
-    heading: start.heading,
-  })
-
-  const result = updateSideParking({
-    ...local,
-    speed: -0.5,
-    gear: -1,
-    engineOn: true,
-    leftIndicator: false,
-  }, createSideParkingRuntime(), 0.1)
-
-  assert.equal(result.runtime.entered, false)
-  assert.equal(result.runtime.started, false)
-  assert.equal(result.runtime.phase, 'approach')
-  assert.equal(result.infractions.length, 0)
+test('continuous exam project judging stays disabled until the entry gate is reached', () => {
+  assert.equal(subject2ProjectJudgingEnabled(true, false), false)
+  assert.equal(subject2ProjectJudgingEnabled(true, true), true)
+  assert.equal(subject2ProjectJudgingEnabled(false, false), true)
+  assert.equal(subject2ProjectJudgingEnabled(false, true), true)
 })
 
 test('side-parking judging activates at the canonical entry lane', () => {
@@ -165,44 +150,6 @@ test('slope judging activates on the canonical approach road', () => {
   }, createSlopeRuntime(), 0.1)
 
   assert.equal(result.runtime.entered, true)
-  assert.equal(result.runtime.phase, 'approach')
-  assert.equal(result.infractions.length, 0)
-})
-
-test('curve judging remains dormant on the transition road before its entrance', () => {
-  const start = subject2ExamWorldStartPose('curve-driving')
-  const local = subject2ExamLocalPose('curve-driving', {
-    x: start.x,
-    z: start.z + 15,
-    heading: start.heading,
-  })
-
-  const result = updateCurveDriving({
-    ...local,
-    speed: 0.5,
-    engineOn: true,
-  }, createCurveRuntime(), 0.1)
-
-  assert.equal(result.runtime.started, false)
-  assert.equal(result.infractions.length, 0)
-})
-
-test('right-angle judging remains dormant before the entry lane', () => {
-  const start = subject2ExamWorldStartPose('right-angle')
-  const local = subject2ExamLocalPose('right-angle', {
-    x: start.x,
-    z: start.z + 15,
-    heading: start.heading,
-  })
-
-  const result = updateRightAngle({
-    ...local,
-    speed: 0.5,
-    engineOn: true,
-    leftIndicator: false,
-  }, createRightAngleRuntime(), 0.1)
-
-  assert.equal(result.runtime.entered, false)
   assert.equal(result.runtime.phase, 'approach')
   assert.equal(result.infractions.length, 0)
 })

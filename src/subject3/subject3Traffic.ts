@@ -26,12 +26,15 @@ export const SUBJECT3_CROSSING_DURATION_SECONDS = 4.8
 export const SUBJECT3_CROSSING_START_LATERAL = 3.4
 export const SUBJECT3_CROSSING_END_LATERAL = -5.7
 
+export type Subject3TrafficVehicleScenario = 'sudden-brake'
+
 export interface Subject3TrafficVehicleState {
   id: string
   progress: number
   lateral: number
   speedMps: number
   opposite: boolean
+  scenario?: Subject3TrafficVehicleScenario
 }
 
 export interface Subject3TrafficState {
@@ -53,6 +56,7 @@ export function updateSubject3TrafficVehicle(
   lateral: number,
   speedMps: number,
   opposite: boolean,
+  scenario?: Subject3TrafficVehicleScenario,
 ) {
   const current = state.vehicles[id]
   if (current) {
@@ -60,6 +64,8 @@ export function updateSubject3TrafficVehicle(
     current.lateral = lateral
     current.speedMps = speedMps
     current.opposite = opposite
+    if (scenario) current.scenario = scenario
+    else delete current.scenario
     return current
   }
 
@@ -69,6 +75,7 @@ export function updateSubject3TrafficVehicle(
     lateral,
     speedMps,
     opposite,
+    ...(scenario ? { scenario } : {}),
   }
   state.vehicles[id] = next
   return next
