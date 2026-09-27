@@ -223,6 +223,21 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
 - Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
 
+## Subject 3 cut-in response coaching
+
+`src/subject3/subject3Traffic.ts` publishes scripted hazard actors and `src/subject3/subject3HazardObservation.ts` owns route-relative cut-in observation. `src/coaching/cutInResponseCoaching.ts` owns advisory replay analysis.
+
+- Hazard actors that affect replay coaching must publish deterministic route progress, lateral position, longitudinal/lateral velocity, active state and conflict state into `Subject3TrafficState.hazards`; replay code must never inspect Three.js transforms.
+- Keep hazard kinds explicit. A cut-in scooter and a crosswalk pedestrian are different scenarios even when both occupy the candidate carriageway.
+- Cut-in conflict combines the actor's modeled lane occupancy with the candidate's actual lateral position. Do not label an actor in another same-direction lane as a direct cut-in conflict.
+- Cut-in response coaching is advisory only. It must never emit `Infraction`, change score/pass-fail, terminate an exam, or feed training-priority penalty aggregation.
+- Detect the response trigger from a continuous false→true cut-in conflict transition. Large trajectory gaps must not manufacture an event.
+- `DRIVING_RULES.subject3.cutInCoaching` values are simulator evidence heuristics, not statutory reaction-time, clearance or exam-scoring thresholds.
+- Report only observed response evidence: throttle release, brake input, steering-wheel change and route-relative separation. Missing one operation must not automatically be called an error because defensive action can use different combinations.
+- Keep all cut-in trajectory fields optional so older replay/history records remain readable.
+- Replay evidence jumps must reuse the existing project/time focus path and expose the recorded cut-in distance state in the project readout.
+- Hazard publication changes require deterministic coverage in `tests/subject3-traffic-state.test.ts`; observer changes require `tests/subject3-hazard-observation.test.ts`; response timing changes require `tests/cut-in-response-coaching.test.ts`.
+
 ## Subject 3 sudden-brake response coaching
 
 `src/coaching/suddenBrakeCoaching.ts` owns advisory replay analysis for the scripted same-lane sudden-brake vehicle.
