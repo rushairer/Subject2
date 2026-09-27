@@ -270,3 +270,18 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 - A targeted-training destination should come from the representative infraction's evidence project. For continuous-exam `transition:from:to` samples, resolve to the upcoming `to` project; never expose an internal transition ID or `subject2-exam` as a standalone training destination.
 - Keep “查看轨迹证据” and “专项训练” as separate actions. Evidence navigation stays inside the result replay; targeted training intentionally leaves the result and starts a new driving session.
 - Browser coverage must exercise the full result → priority habit → evidence → targeted-practice path so coaching navigation cannot silently rot.
+
+## Cross-project training packs
+
+`src/training/trainingPacks.ts` is the single source of truth for replay-driven cross-project coaching sequences.
+
+- Training packs are coaching playlists, not a new scoring system. Every stage must use the existing project's real state machine, scoring matrix, geometry, completion event and replay evidence.
+- A pack always runs in `practice` mode. Starting or continuing a pack must never rewrite the source result, convert a prior exam into practice, or fabricate a synthetic pass/fail score across stages.
+- `space-position` currently sequences reverse parking → side parking → curve driving → right-angle turn. `observation-signal` currently sequences right-angle turn → Subject 3. Change these only in `trainingPacks.ts`.
+- Only habits explicitly mapped in `trainingPacks.ts` may show a cross-project pack action. Unmapped habits must retain the evidence-project targeted-practice fallback instead of inventing a sequence.
+- When both actions exist, keep them distinct: the pack action trains the broader habit across projects; the project action returns to the representative evidence project.
+- Pack stage advancement must use `TrainingPackSessionState` and `trainingPackProject(...)`; never infer the next course from UI text or array indexes duplicated in React components.
+- Preserve the selected day/night environment and candidate license type when moving between pack stages.
+- A completed Subject 2 pack stage may auto-open its stage result only after the underlying project reports real completion. Manual “结束并查看结果” remains allowed and may continue the pack from an incomplete stage result.
+- Subject 3 remains a normal full-road training stage until event-level sub-route training is implemented; do not fake partial Subject 3 completion just to shorten a pack.
+- Browser coverage must verify at least one real pack transition across two WebGL scenes, including stage progress, result UI, next-stage routing and clean renderer lifecycle.

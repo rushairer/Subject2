@@ -45,7 +45,7 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
-  await page.getByRole('button', { name: /倒车入库/ }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await expect(page.getByText(/C2 自动挡/)).toBeVisible()
 
@@ -109,11 +109,39 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
+test('cross-project training pack advances from reverse parking to side parking', async ({ page }) => {
+  // A pack stage transition mounts a second full software-WebGL scene.
+  test.setTimeout(75_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '训练包E2E')
+
+  await page.getByRole('button', { name: /车身边线控制/ }).click()
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 车身边线控制 1/4 · 倒车入库')
+  await expect(page.locator('.project-status')).toContainText(/倒库|控制线|起始端/)
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
+  await expect(page.getByRole('region', { name: '专项训练进度' })).toContainText('车身边线控制')
+  await expect(page.getByRole('region', { name: '专项训练进度' })).toContainText('1 / 4')
+  const nextStage = page.getByRole('button', { name: '继续下一项 · 侧方停车' })
+  await expect(nextStage).toBeEnabled()
+  await nextStage.click()
+
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 车身边线控制 2/4 · 侧方停车')
+  await expect(page.locator('.project-status')).toContainText(/侧方|库位|右侧边线|准备挂 R 挡/)
+  await expect(page.getByText('专项训练阶段结果')).toHaveCount(0)
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
 test('ending a training session reaches the incomplete result and replay surface', async ({ page }) => {
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '复盘E2E')
 
-  await page.getByRole('button', { name: /侧方停车/ }).click()
+  await page.locator('.task-card').filter({ hasText: '侧方停车' }).click()
   await expectHealthyDrivingScene(page)
 
   await page.getByRole('button', { name: '结束并查看结果' }).click()
@@ -134,7 +162,7 @@ test('replay coaching explains an infraction with before-after operation context
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '诊断E2E')
 
-  await page.getByRole('button', { name: /倒车入库/ }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
 

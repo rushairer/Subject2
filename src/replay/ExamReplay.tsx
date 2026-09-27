@@ -9,6 +9,7 @@ import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeomet
 import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
+import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
 
 export interface TrajectorySample {
   t: number
@@ -301,11 +302,13 @@ function TrainingFocusSummary({
   projects,
   onSelect,
   onStartTraining,
+  onStartTrainingPack,
 }: {
   items: ReplayTrainingFocus[]
   projects: Set<string>
   onSelect: (item: ReplayTrainingFocus) => void
   onStartTraining?: (project: ReplayTrainingProjectId) => void
+  onStartTrainingPack?: (packId: TrainingPackId) => void
 }) {
   if (items.length === 0) return null
 
@@ -315,7 +318,7 @@ function TrainingFocusSummary({
         <div className="eyebrow">TRAINING PRIORITIES</div>
         <h3 id="replay-focus-title">本次优先改进</h3>
       </div>
-      <p>先解决最影响成绩和安全的 2–3 个习惯；可以回看证据，也可以直接进入对应项目专项训练。</p>
+      <p>先解决最影响成绩和安全的 2–3 个习惯；有跨项目训练包时优先连续练习，也可以只回练本次证据所在项目。</p>
     </div>
 
     <div className="replay-focus-grid">
@@ -326,6 +329,8 @@ function TrainingFocusSummary({
           representative.project != null &&
           projects.has(representative.project)
         const canTrain = item.recommendedProject != null && onStartTraining != null
+        const pack = trainingPackForHabit(item.id)
+        const canStartPack = pack != null && onStartTrainingPack != null
 
         return <article
           key={item.id}
@@ -357,12 +362,19 @@ function TrainingFocusSummary({
               >
                 {canFocus ? '查看轨迹证据' : '查看下方明细'}
               </button>
+              {canStartPack && <button
+                type="button"
+                className="replay-focus-pack-btn"
+                onClick={() => onStartTrainingPack(pack!.id)}
+              >
+                训练包 · {pack!.title}（{pack!.projects.length}项）
+              </button>}
               {canTrain && <button
                 type="button"
                 className="replay-focus-training-btn"
                 onClick={() => onStartTraining(item.recommendedProject!)}
               >
-                专项训练 · {projectLabel(item.recommendedProject!)}
+                {canStartPack ? '回练' : '专项训练'} · {projectLabel(item.recommendedProject!)}
               </button>}
             </span>
           </span>
@@ -458,10 +470,12 @@ export function ExamReplay({
   samples,
   infractions,
   onStartTraining,
+  onStartTrainingPack,
 }: {
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   onStartTraining?: (project: ReplayTrainingProjectId) => void
+  onStartTrainingPack?: (packId: TrainingPackId) => void
 }): ReactElement | null {
   const [focusRequest, setFocusRequest] = useState<{
     project: string
@@ -503,6 +517,7 @@ export function ExamReplay({
         }))
       }}
       onStartTraining={onStartTraining}
+      onStartTrainingPack={onStartTrainingPack}
     />
 
     <div className="replay-projects">
