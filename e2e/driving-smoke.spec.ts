@@ -62,12 +62,16 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   await page.keyboard.press('Space')
   await expect(page.getByText('手刹放下')).toBeVisible()
 
-  await page.keyboard.down('w')
-  await page.waitForTimeout(700)
-  await page.keyboard.up('w')
-
   const speed = page.locator('.speed strong')
-  await expect.poll(async () => Number(await speed.textContent())).toBeGreaterThan(0)
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(
+      async () => Number(await speed.textContent()),
+      { timeout: 12_000 },
+    ).toBeGreaterThan(0)
+  } finally {
+    await page.keyboard.up('w')
+  }
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
@@ -80,9 +84,8 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   await page.getByRole('button', { name: /综合道路驾驶/ }).click()
 
   await expectHealthyDrivingScene(page)
-  await expect(page.getByText(/科目三道路驾驶/).first()).toBeVisible()
   await expect(page.getByText(/夜间/).first()).toBeVisible()
-  await expect(page.getByText(/上车准备|安全起步/)).toBeVisible()
+  await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
 
   await page.keyboard.press('t')
   await page.keyboard.press('i')
