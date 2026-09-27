@@ -13,6 +13,15 @@ import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { DrivingLighting } from './cockpit/DrivingLighting'
 import { DRIVER_EYE } from './cockpit/mirrorLayout'
 import { Subject3Course, SUBJECT3_START, createSubject3Runtime, updateSubject3 } from './subject3/Subject3Course'
+import {
+  SUBJECT3_PRACTICE_SLICES,
+  subject3PracticeInitialStatus,
+  subject3PracticeRuntimeSeed,
+  subject3PracticeSliceById,
+  subject3PracticeSliceTitle,
+  subject3PracticeStartPose,
+  type Subject3PracticeSliceId,
+} from './subject3/subject3Practice'
 import { createSubject3TrafficState } from './subject3/subject3Traffic'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
@@ -49,7 +58,8 @@ import {
   TRAINING_PACKS,
   nextTrainingPackState,
   trainingPackById,
-  trainingPackProject,
+  trainingPackStage,
+  trainingPackStageLabel,
   type TrainingPackId,
   type TrainingPackSessionState,
 } from './training/trainingPacks'
@@ -112,6 +122,7 @@ interface Session {
   mode: Mode
   time: TimeOfDay
   trainingPack?: TrainingPackSessionState
+  subject3Practice?: Subject3PracticeSliceId
 }
 
 function createTrainingPackSession(
@@ -120,11 +131,13 @@ function createTrainingPackSession(
   index = 0,
 ): Session {
   const trainingPack: TrainingPackSessionState = { id, index }
+  const stage = trainingPackStage(trainingPack)
   return {
-    examId: trainingPackProject(trainingPack),
+    examId: stage.project as ExamId,
     mode: 'practice',
     time,
     trainingPack,
+    subject3Practice: stage.subject3Practice,
   }
 }
 
@@ -146,7 +159,20 @@ const examTitle = (examId: ExamId) => ({
   'subject3': '科目三道路驾驶',
 }[examId])
 
-const initialProjectStatus = (examId: ExamId) => {
+const sessionTitle = (session: Session) => session.subject3Practice
+  ? `科目三专项 · ${subject3PracticeSliceById(session.subject3Practice).title}`
+  : examTitle(session.examId)
+
+const historyTitle = (examId: ExamId, subject3Practice?: string) => {
+  const sliceTitle = subject3PracticeSliceTitle(subject3Practice)
+  return sliceTitle ? `科目三专项 · ${sliceTitle}` : examTitle(examId)
+}
+
+const initialProjectStatus = (
+  examId: ExamId,
+  subject3Practice?: Subject3PracticeSliceId,
+) => {
+  if (subject3Practice) return subject3PracticeInitialStatus(subject3Practice)
   if (examId === 'reverse-parking') return '驶过起始端控制线后停车，挂 R 挡开始第一次倒库'
   if (examId === 'side-parking') return '向前驶过库位，调整车身与右侧边线距离，准备挂 R 挡'
   if (examId === 'right-angle') return '进入直角转弯前开启左转向灯，控制车身靠右低速行驶'
@@ -279,11 +305,11 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
           className="training-pack-card"
           onClick={() => onStartTrainingPack(pack.id, time)}
         >
-          <span className="training-pack-count">{pack.projects.length} 项</span>
+          <span className="training-pack-count">{pack.stages.length} 项</span>
           <h3>{pack.title}</h3>
           <p>{pack.summary}</p>
           <span className="training-pack-route">
-            {pack.projects.map(project => examTitle(project as ExamId)).join(' → ')}
+            {pack.stages.map(stage => stage.label).join(' → ')}
           </span>
           <span className="enter">开始训练包 →</span>
         </button>)}
@@ -293,7 +319,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
         {recentHistory.map(item => <div className="recent-result" key={item.id}>
-          <div><strong>{examTitle(item.examId as ExamId)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
+          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
           <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
         </div>)}
       </div>
@@ -314,6 +340,23 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <button className="subject3-card" onClick={() => onStart({ examId: 'subject3', mode, time })}>
         <div><span className="task-index">ROAD</span><h3>综合道路驾驶</h3><p>覆盖上车准备、起步、直线、加减挡、变道、靠边停车、路口、人行横道、学校、公交站、会车、超车、掉头、夜间行驶等训练场景。</p></div><span className="enter">进入 3D 道路 →</span>
       </button>
+      <div className="subject3-practice-grid" aria-label="科目三专项短练">
+        {SUBJECT3_PRACTICE_SLICES.map(slice => <button
+          key={slice.id}
+          className="subject3-practice-card"
+          onClick={() => onStart({
+            examId: 'subject3',
+            mode: 'practice',
+            time,
+            subject3Practice: slice.id,
+          })}
+        >
+          <span className="task-index">DRILL</span>
+          <strong>{slice.title}</strong>
+          <p>{slice.summary}</p>
+          <span className="enter">专项短练 →</span>
+        </button>)}
+      </div>
     </section>
     <aside className="legal-note">规则基线按现行中国大陆机动车驾驶人考试规范建模；实际考场路线、检测设备和地方执行细节可能不同。本项目用于模拟训练，不替代当地主管部门要求。</aside>
   </main>
@@ -364,7 +407,11 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const rightAngleRuntime = useRef(createRightAngleRuntime())
   const curveRuntime = useRef(createCurveRuntime())
   const slopeRuntime = useRef(createSlopeRuntime())
-  const subject3Runtime = useRef(createSubject3Runtime())
+  const subject3Runtime = useRef(createSubject3Runtime(
+    session.subject3Practice
+      ? subject3PracticeRuntimeSeed(session.subject3Practice)
+      : undefined,
+  ))
   const subject3Traffic = useRef(createSubject3TrafficState())
   const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
@@ -501,7 +548,11 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       rightAngleRuntime.current = createRightAngleRuntime()
       curveRuntime.current = createCurveRuntime()
       slopeRuntime.current = createSlopeRuntime()
-      subject3Runtime.current = createSubject3Runtime()
+      subject3Runtime.current = createSubject3Runtime(
+        session.subject3Practice
+          ? subject3PracticeRuntimeSeed(session.subject3Practice)
+          : undefined,
+      )
       lastProjectStatus.current = ''
       completionLatched.current = false
     }
@@ -703,6 +754,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
           dt,
           subject3Traffic.current,
           session.mode === 'exam',
+          session.subject3Practice,
         )
         subject3Runtime.current = update.runtime
         projectUpdate = update
@@ -803,11 +855,19 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const combinedStartPose = combinedExam
     ? subject2ExamWorldStartPose(examSequence[0] as Subject2ProjectId)
     : undefined
-  const vehicle = useRef(initialVehicle(activeExamId, combinedStartPose))
-  const [display, setDisplay] = useState(() => initialVehicle(activeExamId, combinedStartPose))
+  const subject3PracticePose = session.subject3Practice
+    ? subject3PracticeStartPose(session.subject3Practice)
+    : undefined
+  const sessionStartPose = combinedStartPose ?? subject3PracticePose
+  const vehicle = useRef(initialVehicle(activeExamId, sessionStartPose))
+  const [display, setDisplay] = useState(() => initialVehicle(activeExamId, sessionStartPose))
   const [infractions, setInfractions] = useState<Infraction[]>([])
-  const [projectStatus, setProjectStatus] = useState(initialProjectStatus(activeExamId))
-  const [lightTestDone, setLightTestDone] = useState(!(activeExamId === 'subject3' && session.time === 'day'))
+  const [projectStatus, setProjectStatus] = useState(
+    initialProjectStatus(activeExamId, session.subject3Practice),
+  )
+  const [lightTestDone, setLightTestDone] = useState(
+    !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
+  )
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
     mode === 'first' ? 'second'
@@ -843,15 +903,20 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
 
   useEffect(() => {
     if (!combinedExam) {
-      const resetVehicle = initialVehicle(activeExamId)
+      const resetPose = session.subject3Practice
+        ? subject3PracticeStartPose(session.subject3Practice)
+        : undefined
+      const resetVehicle = initialVehicle(activeExamId, resetPose)
       vehicle.current = resetVehicle
       setDisplay(resetVehicle)
     } else {
       setDisplay({ ...vehicle.current })
     }
-    setProjectStatus(initialProjectStatus(activeExamId))
-    setLightTestDone(!(activeExamId === 'subject3' && session.time === 'day'))
-  }, [activeExamId, combinedExam, session.time])
+    setProjectStatus(initialProjectStatus(activeExamId, session.subject3Practice))
+    setLightTestDone(
+      !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
+    )
+  }, [activeExamId, combinedExam, session.subject3Practice, session.time])
 
   const tick = () => {
     const now = performance.now()
@@ -972,8 +1037,10 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         <div className="status-chip">{candidate.name} · {combinedExam
           ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}`
           : trainingPack && session.trainingPack
-            ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.projects.length} · ${examTitle(activeExamId)}`
-            : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
+            ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
+            : session.subject3Practice
+              ? sessionTitle(session)
+              : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
           <button className="view-btn" onClick={cycleCameraMode}>
             M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
@@ -1023,7 +1090,9 @@ function Result({
   onBack,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
   onContinueTrainingPack,
+  onRetryTrainingPackStage,
   trainingPackStages,
 }: {
   candidate: Candidate
@@ -1035,7 +1104,9 @@ function Result({
   onBack: () => void
   onStartTraining: (examId: ReplayTrainingProjectId) => void
   onStartTrainingPack: (packId: TrainingPackId) => void
+  onStartSubject3Practice: (slice: Subject3PracticeSliceId) => void
   onContinueTrainingPack: (state: TrainingPackSessionState) => void
+  onRetryTrainingPackStage: (state: TrainingPackSessionState) => void
   trainingPackStages: readonly TrainingPackStageResult[]
 }) {
   const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
@@ -1050,20 +1121,20 @@ function Result({
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">{trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
-    <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{examTitle(session.examId)}</span><span>合格线 {passLine}</span></div>
+    <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>合格线 {passLine}</span></div>
 
     {trainingPack && session.trainingPack && <section className="training-pack-progress" aria-label="专项训练进度">
       <div className="training-pack-progress-head">
         <div><span>专项训练包</span><strong>{trainingPack.title}</strong></div>
-        <b>{session.trainingPack.index + 1} / {trainingPack.projects.length}</b>
+        <b>{session.trainingPack.index + 1} / {trainingPack.stages.length}</b>
       </div>
       <p>{trainingPack.summary}</p>
       <div className="training-pack-steps">
-        {trainingPack.projects.map((project, index) => <span
-          key={project}
+        {trainingPack.stages.map((stage, index) => <span
+          key={stage.label + '-' + index}
           className={index < session.trainingPack!.index ? 'done' : index === session.trainingPack!.index ? 'active' : ''}
         >
-          <i>{index + 1}</i>{examTitle(project as ExamId)}
+          <i>{index + 1}</i>{stage.label}
         </span>)}
       </div>
     </section>}
@@ -1074,7 +1145,7 @@ function Result({
       candidateName={candidate.name}
       licenseType={candidate.licenseType}
       onRestart={onStartTrainingPack}
-      onRetryProject={onStartTraining}
+      onRetryStage={onRetryTrainingPackStage}
     />}
 
     <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>{i.fatal ? '不合格' : `-${i.points}`}</b></div>)}</div>
@@ -1083,12 +1154,13 @@ function Result({
       infractions={infractions}
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
+      onStartSubject3Practice={onStartSubject3Practice}
     />
 
     {trainingPack && nextPackState
       ? <div className="training-pack-result-actions">
           <button className="primary" onClick={() => onContinueTrainingPack(nextPackState)}>
-            继续下一项 · {examTitle(trainingPackProject(nextPackState) as ExamId)}
+            继续下一项 · {trainingPackStageLabel(nextPackState)}
           </button>
           <button className="ghost-btn" onClick={onBack}>结束训练包</button>
         </div>
@@ -1135,6 +1207,7 @@ export default function App() {
       candidateName: candidate.name,
       licenseType: candidate.licenseType,
       examId: session.examId,
+      subject3Practice: session.subject3Practice,
       mode: session.mode,
       score,
       passed: outcome.passed,
@@ -1167,8 +1240,8 @@ export default function App() {
       setTrainingPackStages(nextStages)
 
       const pack = trainingPackById(session.trainingPack.id)
-      const reachedLastStage = session.trainingPack.index === pack.projects.length - 1
-      const hasEveryStage = nextStages.length === pack.projects.length
+      const reachedLastStage = session.trainingPack.index === pack.stages.length - 1
+      const hasEveryStage = nextStages.length === pack.stages.length
       if (reachedLastStage && hasEveryStage) {
         appendTrainingPackHistory(buildTrainingPackHistoryEntry({
           id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -1202,12 +1275,31 @@ export default function App() {
       time: session.time,
     })}
     onStartTrainingPack={packId => startTrainingPack(packId, session.time)}
-    onContinueTrainingPack={trainingPack => startSession({
-      examId: trainingPackProject(trainingPack),
+    onStartSubject3Practice={subject3Practice => startSession({
+      examId: 'subject3',
       mode: 'practice',
       time: session.time,
-      trainingPack,
+      subject3Practice,
     })}
+    onContinueTrainingPack={trainingPack => {
+      const stage = trainingPackStage(trainingPack)
+      startSession({
+        examId: stage.project as ExamId,
+        mode: 'practice',
+        time: session.time,
+        trainingPack,
+        subject3Practice: stage.subject3Practice,
+      })
+    }}
+    onRetryTrainingPackStage={trainingPack => {
+      const stage = trainingPackStage(trainingPack)
+      startSession({
+        examId: stage.project as ExamId,
+        mode: 'practice',
+        time: session.time,
+        subject3Practice: stage.subject3Practice,
+      })
+    }}
     trainingPackStages={trainingPackStages}
   />
   return null
