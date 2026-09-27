@@ -5,11 +5,18 @@ import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
 import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
+import {
+  subject3PracticeSliceTitle,
+  type Subject3PracticeSliceId,
+} from '../subject3/subject3Practice'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
+import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
+import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
+import { DrivingDynamicsTimeline } from './DrivingDynamicsTimelinePanel'
 
 export interface TrajectorySample {
   t: number
@@ -24,6 +31,14 @@ export interface TrajectorySample {
   rightIndicator?: boolean
   handbrake?: boolean
   automatic?: boolean
+  engineOn?: boolean
+  engineRpm?: number
+  clutch?: number
+  leadVehicleId?: string
+  leadGapMeters?: number
+  leadTimeGapSeconds?: number
+  leadClosingSpeedMps?: number
+  leadTimeToCollisionSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -314,12 +329,14 @@ function TrainingFocusSummary({
   onSelect,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
 }: {
   items: ReplayTrainingFocus[]
   projects: Set<string>
   onSelect: (item: ReplayTrainingFocus) => void
   onStartTraining?: (project: ReplayTrainingProjectId) => void
   onStartTrainingPack?: (packId: TrainingPackId) => void
+  onStartSubject3Practice?: (slice: Subject3PracticeSliceId) => void
 }) {
   if (items.length === 0) return null
 
@@ -339,7 +356,15 @@ function TrainingFocusSummary({
           representative.t != null &&
           representative.project != null &&
           projects.has(representative.project)
-        const canTrain = item.recommendedProject != null && onStartTraining != null
+        const sliceTitle = subject3PracticeSliceTitle(item.recommendedSubject3Practice ?? undefined)
+        const canTrainSlice =
+          item.recommendedSubject3Practice != null &&
+          sliceTitle != null &&
+          onStartSubject3Practice != null
+        const canTrain =
+          !canTrainSlice &&
+          item.recommendedProject != null &&
+          onStartTraining != null
         const pack = trainingPackForHabit(item.id)
         const canStartPack = pack != null && onStartTrainingPack != null
 
@@ -379,6 +404,13 @@ function TrainingFocusSummary({
                 onClick={() => onStartTrainingPack(pack!.id)}
               >
                 训练包 · {pack!.title}
+              </button>}
+              {canTrainSlice && <button
+                type="button"
+                className="replay-focus-training-btn"
+                onClick={() => onStartSubject3Practice(item.recommendedSubject3Practice!)}
+              >
+                {canStartPack ? '回练' : '专项训练'} · {sliceTitle}
               </button>}
               {canTrain && <button
                 type="button"
@@ -472,6 +504,11 @@ function ProjectReplay({
         <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
+        {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
+          <span>
+            <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
+            <small>前车时距 · {current.leadGapMeters.toFixed(1)} m</small>
+          </span>}
       </div>
     </div>
   </article>
@@ -482,11 +519,13 @@ export function ExamReplay({
   infractions,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
 }: {
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   onStartTraining?: (project: ReplayTrainingProjectId) => void
   onStartTrainingPack?: (packId: TrainingPackId) => void
+  onStartSubject3Practice?: (slice: Subject3PracticeSliceId) => void
 }): ReactElement | null {
   const [focusRequest, setFocusRequest] = useState<{
     project: string
@@ -529,6 +568,35 @@ export function ExamReplay({
       }}
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
+      onStartSubject3Practice={onStartSubject3Practice}
+    />
+
+    <GearSpeedCoachingPanel
+      samples={samples}
+      onSelect={(project, t) => setFocusRequest(previous => ({
+        project,
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <FollowingDistanceCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <DrivingDynamicsTimeline
+      samples={samples}
+      projectLabel={projectLabel}
+      onSelect={(project, t) => setFocusRequest(previous => ({
+        project,
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
     />
 
     <div className="replay-projects">

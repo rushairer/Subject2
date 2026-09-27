@@ -3,7 +3,7 @@ import test from 'node:test'
 import { buildDailyTrainingPlan } from '../src/training/dailyTrainingPlan'
 import { buildTrainingPlan } from '../src/training/trainingPlan'
 import type { TrainingPackRoundHistoryEntry } from '../src/training/trainingPackHistory'
-import type { TrainingPackId } from '../src/training/trainingPacks'
+import { trainingPackById, type TrainingPackId } from '../src/training/trainingPacks'
 
 const NOW = new Date(2026, 8, 27, 12, 0, 0).getTime()
 const YESTERDAY = new Date(2026, 8, 26, 12, 0, 0).getTime()
@@ -25,7 +25,7 @@ function round({
   candidateName?: string
   licenseType?: 'C1' | 'C2'
 }): TrainingPackRoundHistoryEntry {
-  const totalStages = packId === 'space-position' ? 4 : 2
+  const totalStages = trainingPackById(packId).stages.length
   return {
     id,
     createdAt,

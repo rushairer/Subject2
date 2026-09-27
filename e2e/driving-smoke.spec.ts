@@ -13,6 +13,18 @@ async function createC2Candidate(page: Page, name = 'E2E考生') {
   await expect(page.getByText('科目三 · 道路驾驶技能')).toBeVisible()
 }
 
+async function createC1Candidate(page: Page, name = 'C1 E2E考生') {
+  await page.goto('./')
+  await expect(page).toHaveTitle(/科目二/)
+
+  await page.getByLabel('姓名').fill(name)
+  await page.getByLabel('准驾车型').selectOption('C1')
+  await page.getByRole('button', { name: '进入训练中心' }).click()
+
+  await expect(page.getByRole('heading', { name: `${name}，选择训练任务` })).toBeVisible()
+  await expect(page.getByText('科目三 · 道路驾驶技能')).toBeVisible()
+}
+
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`))
@@ -62,19 +74,20 @@ async function expectProgressiveKeyboardPedals(page: Page) {
   } finally {
     await page.keyboard.up('w')
   }
-  await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+  // Exact release timing is covered in simulation tests; allow software-WebGL frames here.
+  await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
 
   await page.keyboard.down('w')
   try {
     await expect.poll(throttleOpening).toBeGreaterThan(0)
     await page.keyboard.down('s')
     await expect.poll(brakeOpening).toBeGreaterThan(0)
-    await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+    await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
   } finally {
     await page.keyboard.up('w')
     await page.keyboard.up('s')
   }
-  await expect(brake).toHaveAttribute('value', '0', { timeout: 1_000 })
+  await expect(brake).toHaveAttribute('value', '0', { timeout: 5_000 })
 
   await page.keyboard.down('w')
   try {
@@ -83,7 +96,7 @@ async function expectProgressiveKeyboardPedals(page: Page) {
     // Send the browser's blur event through the production input listener.
     await page.evaluate(() => window.dispatchEvent(new Event('blur')))
     // W is still held: only the focus-loss cleanup can clear this input.
-    await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+    await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
     await expect(brake).toHaveAttribute('value', '0')
   } finally {
     await page.keyboard.up('w')
@@ -124,7 +137,7 @@ test('C2 reverse-parking scene renders, accepts progressive pedals, and cycles a
   await expect(help).toHaveAttribute('aria-expanded', 'false')
   await page.keyboard.down('h')
   await expect(page.getByRole('button', { name: /H 收起说明/ })).toHaveAttribute('aria-expanded', 'true')
-  await page.keyboard.down('h') // OS repeat must not close the panel.
+  await page.keyboard.down('h')
   await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
   await page.keyboard.up('h')
   await expectPedalReadoutClearOfHelp(page)
@@ -207,10 +220,87 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('personalized plan prioritizes evidence and training pack persists the next round', async ({ page }) => {
-  // Two pack stages mount two full software-WebGL scenes, persist the round,
-  // then compare it with one prior round for the same candidate/license/pack.
+test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live driving', async ({ page }) => {
   test.setTimeout(90_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC1Candidate(page, '挡速复盘E2E')
+
+  const drill = page.locator('.subject3-practice-card').filter({ hasText: '变更车道' })
+  await drill.click()
+  await expectHealthyDrivingScene(page)
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+
+  await page.keyboard.press('t')
+  await page.keyboard.press('i')
+  await page.keyboard.down('c')
+  await page.keyboard.press('1')
+  await page.keyboard.press('Space')
+  // Launch through the real bite-point control before engaging the clutch.
+  // Softer keyboard throttle must not require a clutch-dump start to pass smoke.
+  await page.keyboard.down('Shift')
+  await page.keyboard.up('c')
+
+  const speed = page.locator('.speed strong')
+  const throttle = page.getByRole('meter', { name: '油门开度' })
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(
+      async () => Number(await speed.textContent()),
+      { timeout: 30_000 },
+    ).toBeGreaterThan(8)
+    await page.keyboard.up('Shift')
+    await page.keyboard.down('c')
+    await expect(page.getByRole('meter', { name: '离合开度' })).toHaveAttribute('value', '100')
+    await page.keyboard.up('c')
+    await expect(page.getByRole('meter', { name: '离合开度' })).toHaveAttribute('value', '0')
+    await page.keyboard.up('w')
+    await expect(throttle).toHaveAttribute('value', '0')
+    // Coast briefly to record engaged-clutch, moderate-RPM samples.
+    await page.waitForTimeout(2_200)
+    await expect(page.getByText('发动机运行')).toBeVisible()
+  } finally {
+    await page.keyboard.up('w')
+    await page.keyboard.up('Shift')
+    await page.keyboard.up('c')
+  }
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  const coaching = page.getByRole('region', { name: '挡位—车速训练观察' })
+  await expect(coaching).toBeVisible()
+  await expect(coaching).toContainText('这是训练提示，不是考试扣分项')
+  await expect(coaching).toContainText('未发现持续的明显挡速不匹配')
+  await expect(page.locator('.replay-timeline')).not.toContainText('挡位—车速训练观察')
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
+test('standalone Subject 3 lane-change drill starts at the targeted slice', async ({ page }) => {
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '科三专项E2E')
+
+  const drill = page.locator('.subject3-practice-card').filter({ hasText: '变更车道' })
+  await expect(drill).toBeVisible()
+  await drill.click()
+
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('科目三专项 · 变更车道')
+  await expect(page.locator('.status-chip')).toContainText('白天')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 变更车道|下一项目：变更车道/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+  await expect(page.locator('.result-meta')).toContainText('科目三专项 · 变更车道')
+  await expect(page.getByText('未完成', { exact: true })).toBeVisible()
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
+test('personalized plan routes through four targeted observation-signal stages', async ({ page }) => {
+  // The pack now mounts four real driving scenes, including three targeted
+  // Subject 3 slices. State-machine tests cover automatic event completion;
+  // this browser path verifies routing, labels, persistence and renderer cleanup.
+  test.setTimeout(180_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await page.addInitScript(() => {
     window.localStorage.setItem('subject2.trainingPackHistory.v1', JSON.stringify([{
@@ -219,8 +309,8 @@ test('personalized plan prioritizes evidence and training pack persists the next
       candidateName: '训练包E2E',
       licenseType: 'C2',
       packId: 'observation-signal',
-      recordedStages: 2,
-      totalStages: 2,
+      recordedStages: 4,
+      totalStages: 4,
       completedStages: 0,
       passedStages: 0,
       habitInfractions: 4,
@@ -230,9 +320,6 @@ test('personalized plan prioritizes evidence and training pack persists the next
     }]))
   })
   await createC2Candidate(page, '训练包E2E')
-  // Keep this persistence/daily-plan scenario independent from the timed
-  // simulated light-test preflight used by daytime Subject 3.
-  await page.getByRole('button', { name: '夜间', exact: true }).click()
 
   const plan = page.getByRole('region', { name: '个性化训练建议' })
   await expect(plan).toContainText('长期训练建议')
@@ -247,33 +334,57 @@ test('personalized plan prioritizes evidence and training pack persists the next
   await expect(today.getByRole('article', { name: '今日训练第 1 项：观察与信号' })).toContainText('待完成')
   await today.getByRole('button', { name: '开始今日下一项 · 观察与信号' }).click()
 
+  // Stage 1: Subject 2 right-angle turn.
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/2 · 直角转弯')
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/4 · 直角转弯')
   await expect(page.locator('.project-status')).toContainText(/直角|转向灯|靠右/)
-
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
-  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
-  const firstProgress = page.getByRole('region', { name: '专项训练进度' })
-  await expect(firstProgress).toContainText('观察与信号')
-  await expect(firstProgress).toContainText('1 / 2')
-  const nextStage = page.getByRole('button', { name: '继续下一项 · 科目三道路驾驶' })
-  await expect(nextStage).toBeEnabled()
+  let progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('1 / 4')
+  await expect(progress).toContainText('路口左右转弯')
+  let nextStage = page.getByRole('button', { name: '继续下一项 · 路口左右转弯' })
   await nextStage.click()
 
+  // Stage 2: Subject 3 intersection-turn slice. Daytime slices intentionally
+  // skip the unrelated simulated-light-test preflight.
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/2 · 科目三道路驾驶')
-  await expect(page.locator('.status-chip')).toContainText('夜间')
-  await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
-
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/4 · 路口左右转弯')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 路口左右转弯|下一项目：路口左转弯/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
-  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
+  progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('2 / 4')
+  nextStage = page.getByRole('button', { name: '继续下一项 · 变更车道' })
+  await nextStage.click()
+
+  // Stage 3: lane-change slice.
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 3/4 · 变更车道')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 变更车道|下一项目：变更车道/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('3 / 4')
+  nextStage = page.getByRole('button', { name: '继续下一项 · 靠边停车' })
+  await nextStage.click()
+
+  // Stage 4: pull-over slice.
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 4/4 · 靠边停车')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 靠边停车|下一项目：靠边停车/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
   await expect(page.getByRole('heading', { name: '训练包总复盘' })).toBeVisible()
   const report = page.getByRole('region', { name: '训练包总复盘' })
-  await expect(report).toContainText('2/2')
+  await expect(report).toContainText('4/4')
   await expect(report).toContainText('直角转弯')
-  await expect(report).toContainText('科目三道路驾驶')
+  await expect(report).toContainText('路口左右转弯')
+  await expect(report).toContainText('变更车道')
+  await expect(report).toContainText('靠边停车')
   await expect(report).toContainText('目标习惯错误')
   await expect(report.getByRole('button', { name: '再练一轮 · 观察与信号' })).toBeEnabled()
 
@@ -292,12 +403,11 @@ test('personalized plan prioritizes evidence and training pack persists the next
     candidateName: '训练包E2E',
     licenseType: 'C2',
     packId: 'observation-signal',
-    recordedStages: 2,
-    totalStages: 2,
+    recordedStages: 4,
+    totalStages: 4,
   })
 
   const returnToCenter = page.getByRole('button', { name: '训练包完成 · 返回训练中心' })
-  await expect(returnToCenter).toBeVisible()
   await returnToCenter.click()
 
   const refreshedToday = page.getByRole('region', { name: '今日训练计划' })
@@ -322,6 +432,18 @@ test('ending a training session reaches the incomplete result and replay surface
   await expect(page.getByText('未完成', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '驾驶轨迹复盘' })).toBeVisible()
   await expect(page.getByRole('button', { name: '返回训练中心' })).toBeVisible()
+
+  const dynamics = page.getByRole('region', { name: '速度 / 挡位时间轴' })
+  await expect(dynamics).toBeVisible()
+  await expect(dynamics.getByRole('slider', { name: '速度和挡位时间轴游标' })).toHaveValue('0')
+
+  const projectScrubber = page.getByRole('slider', { name: '侧方停车复盘时间轴' })
+  const projectMax = await projectScrubber.getAttribute('max')
+  if (projectMax == null) throw new Error('missing project replay max index')
+  await expect(projectScrubber).toHaveValue(projectMax)
+
+  await dynamics.getByRole('button', { name: '定位到这段轨迹' }).click()
+  await expect(projectScrubber).toHaveValue('0')
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })

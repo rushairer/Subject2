@@ -7,8 +7,10 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  removeSubject3TrafficVehicle,
   subject3TrafficCollision,
   subject3VehicleCollision,
+  updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
@@ -17,10 +19,41 @@ import {
   SUBJECT3_EVENTS,
 } from '../src/subject3/subject3Route'
 
-test('crosswalk traffic state starts clear', () => {
+test('traffic state starts clear with an empty deterministic vehicle registry', () => {
   assert.deepEqual(createSubject3TrafficState(), {
     crosswalkPedestrianConflict: false,
+    vehicles: {},
   })
+})
+
+test('traffic vehicle telemetry updates in place and can be removed', () => {
+  const traffic = createSubject3TrafficState()
+  const first = updateSubject3TrafficVehicle(traffic, 'flow-b', 1540, 0, 7.5, false)
+
+  const second = updateSubject3TrafficVehicle(traffic, 'flow-b', 1543.25, 0, 6.4, false)
+
+  assert.equal(second, first, 'per-frame publication should mutate stable telemetry objects')
+  assert.deepEqual(traffic.vehicles['flow-b'], {
+    id: 'flow-b',
+    progress: 1543.25,
+    lateral: 0,
+    speedMps: 6.4,
+    opposite: false,
+  })
+
+  removeSubject3TrafficVehicle(traffic, 'flow-b')
+  assert.deepEqual(traffic.vehicles, {})
+})
+
+test('traffic registry keeps same-direction and opposing actors distinguishable', () => {
+  const traffic = createSubject3TrafficState()
+
+  updateSubject3TrafficVehicle(traffic, 'flow-a', 620, -3.5, 9.2, false)
+  updateSubject3TrafficVehicle(traffic, 'oncoming-a', 1900, -8.75, 10.5, true)
+
+  assert.equal(traffic.vehicles['flow-a'].opposite, false)
+  assert.equal(traffic.vehicles['oncoming-a'].opposite, true)
+  assert.equal(Object.keys(traffic.vehicles).length, 2)
 })
 
 test('crossing pedestrian uses the rendered crosswalk progress', () => {

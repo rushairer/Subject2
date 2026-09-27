@@ -47,6 +47,7 @@ export interface TrainingPackReport {
   lastHabitInfractionCount: number | null
   stages: TrainingPackStageSummary[]
   recommendedRetryProject: ReplayTrainingProjectId | null
+  recommendedRetryStageIndex: number | null
 }
 
 function relevantHabitCount(
@@ -111,7 +112,7 @@ export function buildTrainingPackReport(
 
   return {
     packId,
-    totalStages: pack.projects.length,
+    totalStages: pack.stages.length,
     recordedStages: stages.length,
     completedStages: stages.filter(stage => stage.completed).length,
     passedStages: stages.filter(stage => stage.passed).length,
@@ -123,5 +124,6 @@ export function buildTrainingPackReport(
     lastHabitInfractionCount: stages.length > 0 ? stages[stages.length - 1].habitInfractionCount : null,
     stages,
     recommendedRetryProject: retryCandidate?.project ?? null,
+    recommendedRetryStageIndex: retryCandidate?.index ?? null,
   }
 }

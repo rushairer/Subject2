@@ -11,6 +11,12 @@ export const DRIVING_RULES = {
     trackWidthMeters: TRAINING_CAR.trackWidthMeters,
     rearAxleFromCenterMeters: TRAINING_CAR.rearAxleFromCenterMeters,
   },
+  turnSignal: {
+    // Mechanical steering-column cancellation: arm only after a real turn,
+    // then release when the wheel returns close to center.
+    autoCancelArmWheelAngleRadians: Math.PI / 2,
+    autoCancelReturnWheelAngleRadians: 0.18,
+  },
   manualTransmission: {
     highestForwardGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR,
     idleRpm: 820,
@@ -19,6 +25,16 @@ export const DRIVING_RULES = {
     biteClutchPosition: 0.52,
     stallThrottleThreshold: 0.16,
     stallSpeedThreshold: 0.62,
+    // Simulator coaching heuristics only. These values do not represent
+    // national exam scoring thresholds and must never emit infractions.
+    gearSpeedCoaching: {
+      minimumSpeedKmh: 3,
+      maximumClutchPosition: 0.18,
+      minimumRecommendedRpm: 1050,
+      maximumRecommendedRpm: 3400,
+      minimumSustainedSeconds: 1.5,
+      maximumSampleGapSeconds: 0.65,
+    },
   },
   subject3: {
     signalLeadSeconds: 3,
@@ -34,6 +50,14 @@ export const DRIVING_RULES = {
     overtakeReturnLateralMeters: -1.25,
     overtake: {
       passClearanceMeters: TRAINING_CAR.lengthMeters,
+    },
+    // Coaching reference only. The 3-second gap comes from public traffic
+    // safety guidance and is not a nationwide Subject 3 scoring threshold.
+    followingCoaching: {
+      referenceTimeGapSeconds: 3,
+      minimumSpeedKmh: 8,
+      minimumSustainedSeconds: 1.5,
+      maximumSampleGapSeconds: 0.65,
     },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
