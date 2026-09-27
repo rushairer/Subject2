@@ -5,6 +5,7 @@ import {
 } from './trainingPackReport'
 import {
   TRAINING_PACKS,
+  trainingPackById,
   type TrainingPackId,
 } from './trainingPacks'
 
@@ -59,6 +60,12 @@ const PACK_IDS = new Set(TRAINING_PACKS.map(pack => pack.id))
 
 function isFiniteNonNegative(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+export function trainingPackHistoryMatchesCurrentDefinition(
+  entry: Pick<TrainingPackRoundHistoryEntry, 'packId' | 'totalStages'>,
+) {
+  return entry.totalStages === trainingPackById(entry.packId).stages.length
 }
 
 function isHistoryEntry(value: unknown): value is TrainingPackRoundHistoryEntry {
@@ -144,6 +151,7 @@ export function loadTrainingPackHistory({
 
     return parsed
       .filter(isHistoryEntry)
+      .filter(trainingPackHistoryMatchesCurrentDefinition)
       .filter(entry => candidateName == null || entry.candidateName === candidateName)
       .filter(entry => licenseType == null || entry.licenseType === licenseType)
       .filter(entry => packId == null || entry.packId === packId)
