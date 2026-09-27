@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createCurveRuntime, updateCurveDriving } from '../src/subject2/CurveDrivingCourse'
 import { createRightAngleRuntime, updateRightAngle } from '../src/subject2/RightAngleCourse'
 import { createSideParkingRuntime, updateSideParking } from '../src/subject2/SideParkingCourse'
 import { createSlopeRuntime, updateSlopeStart } from '../src/subject2/SlopeStartCourse'
 import { SUBJECT2_START_POSES } from '../src/subject2/courseStartPoses'
-import { subject2ProjectJudgingEnabled } from '../src/subject2/Subject2ExamCourse'
 import {
   localPoseToWorld,
   placementAligningLocalPose,
@@ -21,6 +19,7 @@ import {
   subject2ExamTransitions,
   subject2ExamWorldExitPose,
   subject2ExamWorldStartPose,
+  subject2ProjectJudgingEnabled,
 } from '../src/subject2/subject2ExamLayout'
 
 const near = (actual: number, expected: number, epsilon = 1e-9) =>
