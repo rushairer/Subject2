@@ -48,19 +48,29 @@ export function createSubject3TrafficState(): Subject3TrafficState {
 
 export function updateSubject3TrafficVehicle(
   state: Subject3TrafficState,
-  vehicle: Subject3TrafficVehicleState,
+  id: string,
+  progress: number,
+  lateral: number,
+  speedMps: number,
+  opposite: boolean,
 ) {
-  const current = state.vehicles[vehicle.id]
+  const current = state.vehicles[id]
   if (current) {
-    current.progress = vehicle.progress
-    current.lateral = vehicle.lateral
-    current.speedMps = vehicle.speedMps
-    current.opposite = vehicle.opposite
+    current.progress = progress
+    current.lateral = lateral
+    current.speedMps = speedMps
+    current.opposite = opposite
     return current
   }
 
-  const next = { ...vehicle }
-  state.vehicles[vehicle.id] = next
+  const next: Subject3TrafficVehicleState = {
+    id,
+    progress,
+    lateral,
+    speedMps,
+    opposite,
+  }
+  state.vehicles[id] = next
   return next
 }
 
