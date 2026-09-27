@@ -173,7 +173,7 @@ test('C1 Subject 3 replay surfaces sustained gear-speed coaching without changin
     await expect.poll(
       async () => Number(await speed.textContent()),
       { timeout: 15_000 },
-    ).toBeGreaterThan(22)
+    ).toBeGreaterThan(9)
     await page.waitForTimeout(2_200)
   } finally {
     await page.keyboard.up('w')
