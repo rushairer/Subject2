@@ -36,6 +36,10 @@ import { DrivingRendererLifecycle } from './ui/DrivingRendererLifecycle'
 import { TrainingPackReport } from './training/TrainingPackReport'
 import type { TrainingPackStageResult } from './training/trainingPackReport'
 import {
+  appendTrainingPackHistory,
+  buildTrainingPackHistoryEntry,
+} from './training/trainingPackHistory'
+import {
   TRAINING_PACKS,
   nextTrainingPackState,
   trainingPackById,
@@ -1001,6 +1005,8 @@ function Result({
     {trainingPack && session.trainingPack && !nextPackState && <TrainingPackReport
       packId={session.trainingPack.id}
       stages={trainingPackStages}
+      candidateName={candidate.name}
+      licenseType={candidate.licenseType}
       onRestart={onStartTrainingPack}
       onRetryProject={onStartTraining}
     />}
@@ -1085,13 +1091,30 @@ export default function App() {
           fatal: item.fatal,
         })),
       }
-      setTrainingPackStages(current => [
-        ...current.filter(item => !(
+      const nextStages = [
+        ...trainingPackStages.filter(item => !(
           item.packId === stageResult.packId &&
           item.index === stageResult.index
         )),
         stageResult,
-      ].sort((a, b) => a.index - b.index))
+      ].sort((a, b) => a.index - b.index)
+      setTrainingPackStages(nextStages)
+
+      const pack = trainingPackById(session.trainingPack.id)
+      const reachedLastStage = session.trainingPack.index === pack.projects.length - 1
+      const hasEveryStage = nextStages.length === pack.projects.length
+      if (reachedLastStage && hasEveryStage) {
+        appendTrainingPackHistory(buildTrainingPackHistoryEntry({
+          id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `pack-${Date.now()}-${Math.random()}`,
+          createdAt: Date.now(),
+          candidateName: candidate.name,
+          licenseType: candidate.licenseType,
+          packId: session.trainingPack.id,
+          stages: nextStages,
+        }))
+      }
     }
     setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')
