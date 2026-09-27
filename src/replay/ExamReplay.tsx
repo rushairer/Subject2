@@ -7,6 +7,7 @@ import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
 import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 import { nearestReplaySample } from './replayContext'
+import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 
 export interface TrajectorySample {
   t: number
@@ -287,6 +288,13 @@ function indicatorLabel(sample: TrajectorySample) {
   return '关闭'
 }
 
+function operationOffsetLabel(offsetSeconds: number) {
+  if (offsetSeconds === 0) return '扣分时'
+  return offsetSeconds < 0
+    ? `前 ${Math.abs(offsetSeconds).toFixed(1)}s`
+    : `后 ${offsetSeconds.toFixed(1)}s`
+}
+
 function ProjectReplay({
   project,
   samples,
@@ -423,6 +431,8 @@ export function ExamReplay({
                 item.project != null &&
                 projects.includes(item.project)
               const context = nearestReplaySample(samples, item.project, item.t)
+              const operationSlice = replayOperationSlice(samples, item.project, item.t)
+              const diagnosis = replayDiagnosis(item)
               return <button
                 type="button"
                 className={`replay-event${canFocus ? ' interactive' : ''}`}
@@ -447,6 +457,21 @@ export function ExamReplay({
                     <i>方向盘 {steeringLabel(context.steeringWheelAngle)}</i>
                     <i>{indicatorLabel(context)}</i>
                     <i>手刹{context.handbrake ? '拉起' : '释放'}</i>
+                  </span>}
+                  <span className="replay-event-diagnosis">
+                    <span><b>原因</b>{diagnosis.reason}</span>
+                    <span><b>建议</b>{diagnosis.advice}</span>
+                  </span>
+                  {operationSlice.length > 0 && <span className="replay-operation-slice" aria-label="扣分前后操作切片">
+                    {operationSlice.map(point => <span
+                      className={point.offsetSeconds === 0 ? 'replay-operation-point event' : 'replay-operation-point'}
+                      key={point.offsetSeconds}
+                    >
+                      <em>{operationOffsetLabel(point.offsetSeconds)}</em>
+                      <strong>{(Math.abs(point.sample.speed) * 3.6).toFixed(1)} km/h · {gearLabel(point.sample)}</strong>
+                      <small>方向盘 {steeringLabel(point.sample.steeringWheelAngle)}</small>
+                      <small>{indicatorLabel(point.sample)} · 手刹{point.sample.handbrake ? '拉起' : '释放'}</small>
+                    </span>)}
                   </span>}
                 </span>
                 <b>{item.fatal ? '不合格' : `-${item.points}`}</b>
