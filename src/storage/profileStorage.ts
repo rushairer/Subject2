@@ -1,4 +1,5 @@
 import type { SessionResultStatus } from '../session/sessionResult'
+import type { Subject3PracticeSliceId } from '../subject3/subject3Practice'
 
 export interface StoredCandidate {
   name: string
@@ -13,6 +14,7 @@ export interface ExamHistoryEntry {
   candidateName: string
   licenseType: 'C1' | 'C2'
   examId: string
+  subject3Practice?: Subject3PracticeSliceId
   mode: 'practice' | 'exam'
   score: number
   passed: boolean
