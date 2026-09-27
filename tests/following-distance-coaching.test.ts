@@ -191,3 +191,33 @@ test('observed duration does not bridge a missing-lead sample', () => {
   assert.equal(report.observedSampleCount, 2)
   assert.equal(report.observedSeconds, 0)
 })
+
+
+test('reverse samples are excluded even if stale lead telemetry is present', () => {
+  const report = buildFollowingDistanceCoachingReport(series(
+    Array.from({ length: 8 }, () => ({
+      speed: -8,
+      leadTimeGapSeconds: 1.5,
+      leadGapMeters: 10,
+    })),
+  ))
+
+  assert.equal(report.observedSampleCount, 0)
+  assert.deepEqual(report.segments, [])
+})
+
+test('segment reports independent minimum distance and minimum time gap', () => {
+  const report = buildFollowingDistanceCoachingReport(series([
+    { leadTimeGapSeconds: 2.4, leadGapMeters: 9 },
+    { leadTimeGapSeconds: 2.0, leadGapMeters: 11 },
+    { leadTimeGapSeconds: 1.6, leadGapMeters: 13 },
+    { leadTimeGapSeconds: 1.8, leadGapMeters: 12 },
+    { leadTimeGapSeconds: 2.1, leadGapMeters: 10 },
+    { leadTimeGapSeconds: 2.3, leadGapMeters: 14 },
+    { leadTimeGapSeconds: 2.5, leadGapMeters: 15 },
+  ]))
+
+  assert.equal(report.segments.length, 1)
+  assert.equal(report.segments[0].minimumGapMeters, 9)
+  assert.equal(report.segments[0].minimumTimeGapSeconds, 1.6)
+})
