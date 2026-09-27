@@ -1,3 +1,5 @@
+import type { Subject3PracticeSliceId } from '../subject3/subject3Practice'
+
 export interface ReplayFocusInfraction {
   id: string
   title: string
@@ -39,6 +41,7 @@ export interface ReplayTrainingFocus extends ReplayHabitDefinition {
   evidenceTitles: string[]
   representative: ReplayFocusInfraction
   recommendedProject: ReplayTrainingProjectId | null
+  recommendedSubject3Practice: Subject3PracticeSliceId | null
 }
 
 const HABITS: Record<ReplayHabitId, ReplayHabitDefinition> = {
@@ -113,6 +116,18 @@ export function replayTrainingProject(
       return to as ReplayTrainingProjectId
     }
   }
+
+  return null
+}
+
+export function replaySubject3Practice(
+  item: Pick<ReplayFocusInfraction, 'id' | 'project'>,
+): Subject3PracticeSliceId | null {
+  if (item.project !== 'subject3') return null
+
+  if (/^subject3-lane-change-/.test(item.id)) return 'lane-change'
+  if (/^subject3-pull-over-/.test(item.id)) return 'pull-over'
+  if (/^subject3-(?:left-turn|right-turn)-/.test(item.id)) return 'intersection-turns'
 
   return null
 }
@@ -232,6 +247,7 @@ export function buildReplayTrainingFocus(
         evidenceTitles,
         representative,
         recommendedProject: replayTrainingProject(representative.project),
+        recommendedSubject3Practice: replaySubject3Practice(representative),
       }
     })
     .sort((a, b) => {
