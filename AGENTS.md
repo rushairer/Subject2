@@ -76,6 +76,15 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Use `src/input/drivingKeyboard.ts` for normalized physical keys and first-press detection. Toggle controls must not repeat while held.
 - Keyboard listeners must not depend on the selected camera mode. On window blur, hidden document or unmount, release held keyboard controls, observation flags and the horn.
 
+## Steering-column turn-signal behavior
+
+- `src/input/turnSignalAutoCancel.ts` owns the mechanical turn-signal cancellation state; keep it independent from React rendering and exam scoring.
+- A left/right signal may arm for automatic cancellation only after the steering wheel reaches the matching turn direction beyond `DRIVING_RULES.turnSignal.autoCancelArmWheelAngleRadians`, then cancel only after returning within the shared near-center threshold.
+- Keep the arm threshold high enough that ordinary lane-change steering does not silently cancel the signal. Lane-change signal cancellation remains an explicit driver task unless the wheel was turned far enough to engage the simulated column cam.
+- Hazard lights are not steering-cancelled and must clear any previously armed left/right cancellation state.
+- Reset the auto-cancel state when the active project changes so a previous maneuver cannot cancel a signal in the next course.
+- Changes to these thresholds or state transitions require deterministic coverage in `tests/turn-signal-auto-cancel.test.ts`.
+
 ## Results require actual completion
 
 `src/session/sessionResult.ts` is the shared outcome assessor for the result page and persisted history.
