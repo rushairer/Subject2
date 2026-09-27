@@ -1034,8 +1034,11 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     aria-busy={!drivingReady}
     onPointerDown={event => {
       if (event.target instanceof HTMLCanvasElement) {
+        const canvas = event.target
         const active = document.activeElement
-        if (active instanceof HTMLElement) active.blur()
+        if (active instanceof HTMLElement && active !== canvas) active.blur()
+        canvas.tabIndex = -1
+        canvas.focus({ preventScroll: true })
       }
     }}
   >
