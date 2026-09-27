@@ -1050,13 +1050,14 @@ function StaticCar({
   const actorHeading = pose.heading + (opposite ? Math.PI : 0)
 
   useEffect(() => {
-    updateSubject3TrafficVehicle(traffic.current, {
+    updateSubject3TrafficVehicle(
+      traffic.current,
       id,
-      progress: distance,
+      distance,
       lateral,
-      speedMps: 0,
+      0,
       opposite,
-    })
+    )
     return () => removeSubject3TrafficVehicle(traffic.current, id)
   }, [distance, id, lateral, opposite, traffic])
 
@@ -1374,13 +1375,14 @@ function MovingTrafficCar({
       if (progress.current < 60) progress.current = SUBJECT3_ROUTE_LENGTH - 80
     }
     const world = actorWorldPosition(progress.current, lateral)
-    updateSubject3TrafficVehicle(traffic.current, {
+    updateSubject3TrafficVehicle(
+      traffic.current,
       id,
-      progress: progress.current,
+      progress.current,
       lateral,
-      speedMps: isStopped.current ? 0 : speed,
+      isStopped.current ? 0 : speed,
       opposite,
-    })
+    )
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading) + (opposite ? Math.PI : 0)
@@ -1443,13 +1445,14 @@ function SuddenBrakeCar({
       wheelAngle.current += (speed.current / 0.28) * delta
     }
     const world = actorWorldPosition(progress.current, 0)
-    updateSubject3TrafficVehicle(traffic.current, {
-      id: 'sudden-brake',
-      progress: progress.current,
-      lateral: 0,
-      speedMps: isStopped.current ? 0 : speed.current,
-      opposite: false,
-    })
+    updateSubject3TrafficVehicle(
+      traffic.current,
+      'sudden-brake',
+      progress.current,
+      0,
+      isStopped.current ? 0 : speed.current,
+      false,
+    )
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
       group.current.rotation.y = sceneYawFromHeading(world.pose.heading)
