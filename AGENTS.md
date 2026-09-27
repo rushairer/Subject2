@@ -204,11 +204,13 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Require a sustained mismatch window before surfacing evidence so ordinary shifts, clutch transitions and brief RPM excursions do not become false coaching events.
 - Trajectory samples must retain optional `engineOn`, `engineRpm` and `clutch` fields for this analysis while remaining compatible with older samples that lack them.
 - Replay may show duration, gear, speed and RPM evidence and jump to the representative trajectory time. It must not add the coaching item to the error timeline or training-priority penalty aggregation.
+- A manual C1 Subject 3 replay with recorded trajectory but fewer than two applicable gear-speed samples must render an explicit “有效样本不足” state instead of hiding the module or treating missing evidence as a clean result.
+- Browser coverage may validate the gear-speed replay integration through that insufficient-evidence state. Exact speed/RPM thresholds, filtering and mismatch classification belong to deterministic `tests/gear-speed-coaching.test.ts`, not wall-clock WebGL driving speed.
 - Changes to classification, sustained-window logic or filtering require deterministic coverage in `tests/gear-speed-coaching.test.ts`.
 
 ## Subject 3 traffic telemetry and following-distance coaching
 
-`src/subject3/subject3Traffic.ts` owns the shared deterministic registry for rendered Subject 3 vehicles, and `src/subject3/subject3LeadVehicle.ts` owns nearest same-lane lead-vehicle observation.
+`src/subject3/subject3Traffic.ts` owns the shared deterministic registry for rendered Subject 3 vehicles, and `src/subject3/subject3LeadVehicle.ts` owns nearest same-lane lead-vehicle plus forward oncoming-vehicle observation.
 
 - Traffic that can influence coaching must publish route progress, lateral position, speed and travel direction into the shared traffic state. Never inspect Three.js mesh transforms from replay/scoring code.
 - Lead-vehicle selection must use route progress plus lateral lane geometry, not raw Euclidean center distance. Ignore opposing traffic, adjacent-lane traffic, vehicles behind the candidate and actors outside the observation horizon.
@@ -220,6 +222,21 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Trajectory samples keep lead-vehicle telemetry optional so old replay/history data remains compatible.
 - Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
 - Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
+
+## Subject 3 night-road lighting coaching
+
+`src/coaching/nightLightingCoaching.ts` owns advisory replay analysis for high-beam use in concrete traffic contexts.
+
+- This layer is coaching only. It must never emit `Infraction`, subtract points, terminate an exam, change completion/pass-fail, or feed training-priority penalty aggregation.
+- The 150 m meeting threshold comes from the road-traffic implementation regulation and applies here as a replay context boundary; do not relabel it as a simulator-invented value.
+- “Near following” has no single statutory distance in this implementation. Reuse `DRIVING_RULES.subject3.followingCoaching.referenceTimeGapSeconds` only as a training filter, and user-facing copy must keep that distinction explicit.
+- Never flag free-road high-beam use merely because high beam is active. Require a matching oncoming-within-boundary or close-following traffic context plus the sustained-duration window.
+- Oncoming observation must come from the deterministic Subject 3 traffic registry and route progress, not raw Three.js transforms or screen-space distance.
+- Subject 3 is an open route, not a closed loop. Oncoming lookahead must use forward route-progress difference without modulo/wraparound; a vehicle near route start is never implicitly ahead of a player near route end.
+- Trajectory samples keep `night`, `lowBeam`, `highBeam`, oncoming vehicle ID/distance and related fields optional so older replay/history data remains compatible.
+- Replay evidence jumps must show the recorded headlamp state in the existing project readout so the coaching card remains auditable.
+- Changes to oncoming observation require deterministic coverage in `tests/subject3-lead-vehicle.test.ts`; changes to lighting segmentation/filtering require `tests/night-lighting-coaching.test.ts`.
+- Browser coverage must exercise a real night Subject 3 scene through result/replay and verify both the night-lighting panel and headlamp readout.
 
 ## Replay driving dynamics timeline
 
@@ -315,6 +332,8 @@ Rendered driving behavior is release-critical and cannot be proven by Node-only 
 - Preserve Playwright failure artifacts (HTML report, trace, screenshot/video) in CI so WebGL, mirror, camera and interaction regressions are diagnosable.
 - A green TypeScript build is not sufficient evidence for changes to Three.js rendering, RenderTarget mirrors, camera placement, shadows, visible road geometry, dynamic actors or keyboard interaction.
 - Browser tests should interact through user-visible/accessibility semantics where practical. Do not add brittle test-only business branches or bypass the real control path.
+- Progressive pedal ramp timing belongs to deterministic input/physics tests. Software-WebGL browser smoke may verify pedal response, brake priority, focus-loss cleanup and next-frame release, but must not require a particular analogue opening or road speed after a fixed wall-clock delay.
+- C1 browser launch flows must respect the current half-linkage model: Shift latches the bite point; releasing Shift does not cancel that latch. Use C to cancel the latch before expecting fully engaged-clutch road-speed acceleration.
 - Keep the mirror reflection baseline rule above in force: browser smoke supplements, but does not replace, direct comparison with known-good commit `80094e7a` for reflection-layer changes.
 - `src/ui/DrivingRendererLifecycle.tsx` owns synchronous WebGL renderer release when a driving Canvas unmounts. Result → targeted-practice transitions must not briefly retain two heavyweight renderer contexts.
 - Do not remove renderer disposal/context-loss cleanup merely because React Three Fiber also performs delayed root cleanup; the explicit cleanup protects fast remounts and software-WebGL environments.

@@ -23,7 +23,7 @@ import {
   type Subject3PracticeSliceId,
 } from './subject3/subject3Practice'
 import { createSubject3TrafficState, type Subject3TrafficState } from './subject3/subject3Traffic'
-import { observeSubject3LeadVehicle } from './subject3/subject3LeadVehicle'
+import { observeSubject3LeadVehicle, observeSubject3OncomingVehicle } from './subject3/subject3LeadVehicle'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { subject3Infraction } from './rules/subject3Rules'
@@ -946,6 +946,10 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         activeExamId === 'subject3' && traffic
           ? observeSubject3LeadVehicle(v, traffic)
           : undefined
+      const oncomingVehicle =
+        activeExamId === 'subject3' && traffic
+          ? observeSubject3OncomingVehicle(v, traffic)
+          : undefined
       trajectory.current.push({
         t: (now - sessionStartedAt.current) / 1000,
         x: replayVehicle.x,
@@ -962,11 +966,17 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         engineOn: v.engineOn,
         engineRpm: v.engineRpm,
         clutch: v.clutch,
+        night: session.time === 'night',
+        lowBeam: v.lowBeam,
+        highBeam: v.highBeam,
         leadVehicleId: leadVehicle?.vehicleId,
         leadGapMeters: leadVehicle?.bumperGapMeters,
         leadTimeGapSeconds: leadVehicle?.timeGapSeconds,
         leadClosingSpeedMps: leadVehicle?.closingSpeedMps,
         leadTimeToCollisionSeconds: leadVehicle?.timeToCollisionSeconds,
+        oncomingVehicleId: oncomingVehicle?.vehicleId,
+        oncomingDistanceMeters: oncomingVehicle?.centerDistanceMeters,
+        oncomingTimeToMeetSeconds: oncomingVehicle?.timeToMeetSeconds,
       })
     }
   }

@@ -33,8 +33,12 @@ export function GearSpeedCoachingPanel({
     [samples],
   )
 
-  if (report.applicableSampleCount < 2) return null
+  const hasManualSubject3 = samples.some(
+    sample => sample.project === 'subject3' && sample.automatic === false,
+  )
+  if (!hasManualSubject3) return null
 
+  const insufficientEvidence = report.applicableSampleCount < 2
   const mismatchRatio = report.assessedSeconds > 0
     ? report.mismatchSeconds / report.assessedSeconds
     : 0
@@ -52,13 +56,32 @@ export function GearSpeedCoachingPanel({
     </div>
 
     <div className="replay-focus-meta">
-      <i>有效观察 {durationLabel(report.assessedSeconds)}</i>
-      <i>持续不匹配 {durationLabel(report.mismatchSeconds)}</i>
-      <i>占比 {(mismatchRatio * 100).toFixed(0)}%</i>
+      {insufficientEvidence
+        ? <>
+            <i>有效样本 {report.applicableSampleCount} 个</i>
+            <i>暂不判断挡速匹配</i>
+          </>
+        : <>
+            <i>有效观察 {durationLabel(report.assessedSeconds)}</i>
+            <i>持续不匹配 {durationLabel(report.mismatchSeconds)}</i>
+            <i>占比 {(mismatchRatio * 100).toFixed(0)}%</i>
+          </>}
     </div>
 
     <div className="replay-focus-grid">
-      {report.segments.length === 0
+      {insufficientEvidence
+        ? <article className="replay-focus-card" aria-label="挡位车速训练观察有效样本不足">
+            <span className="replay-focus-rank">—</span>
+            <span className="replay-focus-copy">
+              <strong>有效样本不足，暂不判断挡速匹配</strong>
+              <span>本次 C1 科三轨迹已记录，但满足“发动机运行、前进挡、离合基本结合且脱离起步瞬态”的片段还不够。</span>
+              <span className="replay-focus-practice">
+                <b>说明</b>
+                继续完成更长的正常道路行驶后再观察；样本不足不会被解释成正确或错误，更不会影响考试成绩。
+              </span>
+            </span>
+          </article>
+        : report.segments.length === 0
         ? <article className="replay-focus-card" aria-label="挡位车速匹配未发现持续异常">
             <span className="replay-focus-rank">✓</span>
             <span className="replay-focus-copy">
