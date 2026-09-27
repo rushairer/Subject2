@@ -63,7 +63,7 @@ export const DRIVING_RULES = {
     // simulator-side scoring rule because traffic telemetry remains approximate.
     nightLightingCoaching: {
       meetingLowBeamDistanceMeters: 150,
-      minimumSpeedKmh: 3,
+      minimumSpeedKmh: 1,
       minimumSustainedSeconds: 0.8,
       maximumSampleGapSeconds: 0.65,
     },
