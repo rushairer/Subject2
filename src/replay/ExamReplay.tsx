@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CURVE_CENTERLINE, CURVE_DRIVING } from '../subject2/CurveDrivingCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
@@ -8,6 +8,7 @@ import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
+import { buildReplayTrainingFocus, type ReplayTrainingFocus } from './replayTrainingFocus'
 
 export interface TrajectorySample {
   t: number
@@ -295,6 +296,66 @@ function operationOffsetLabel(offsetSeconds: number) {
     : `后 ${offsetSeconds.toFixed(1)}s`
 }
 
+function TrainingFocusSummary({
+  items,
+  projects,
+  onSelect,
+}: {
+  items: ReplayTrainingFocus[]
+  projects: Set<string>
+  onSelect: (item: ReplayTrainingFocus) => void
+}) {
+  if (items.length === 0) return null
+
+  return <section className="replay-focus" aria-labelledby="replay-focus-title">
+    <div className="replay-focus-head">
+      <div>
+        <div className="eyebrow">TRAINING PRIORITIES</div>
+        <h3 id="replay-focus-title">本次优先改进</h3>
+      </div>
+      <p>先解决最影响成绩和安全的 2–3 个习惯，再回看下面的具体轨迹证据。</p>
+    </div>
+
+    <div className="replay-focus-grid">
+      {items.map((item, index) => {
+        const representative = item.representative
+        const canFocus =
+          representative.t != null &&
+          representative.project != null &&
+          projects.has(representative.project)
+
+        return <button
+          key={item.id}
+          type="button"
+          className="replay-focus-card"
+          disabled={!canFocus}
+          onClick={() => {
+            if (canFocus) onSelect(item)
+          }}
+          aria-label={`优先改进 ${index + 1}：${item.title}`}
+        >
+          <span className="replay-focus-rank">{index + 1}</span>
+          <span className="replay-focus-copy">
+            <strong>{item.title}</strong>
+            <span>{item.summary}</span>
+            <span className="replay-focus-meta">
+              <i>{item.count} 条相关记录</i>
+              {item.fatalCount > 0
+                ? <i className="fatal">含 {item.fatalCount} 条不合格</i>
+                : <i>相关扣分 {item.totalPoints} 分</i>}
+            </span>
+            <span className="replay-focus-practice"><b>训练重点</b>{item.practice}</span>
+            <span className="replay-focus-evidence">
+              {item.evidenceTitles.map(title => <i key={title}>{title}</i>)}
+            </span>
+          </span>
+          <span className="replay-focus-action">{canFocus ? '查看证据 →' : '查看下方明细'}</span>
+        </button>
+      })}
+    </div>
+  </section>
+}
+
 function ProjectReplay({
   project,
   samples,
@@ -390,9 +451,17 @@ export function ExamReplay({
     token: number
   } | null>(null)
 
-  if (samples.length < 2) return null
+  const projects = useMemo(
+    () => Array.from(new Set(samples.map(item => item.project))),
+    [samples],
+  )
+  const projectSet = useMemo(() => new Set(projects), [projects])
+  const trainingFocus = useMemo(
+    () => buildReplayTrainingFocus(infractions, 3),
+    [infractions],
+  )
 
-  const projects = Array.from(new Set(samples.map(item => item.project)))
+  if (samples.length < 2) return null
 
   return <section className="replay-section">
     <div className="replay-heading">
@@ -402,6 +471,20 @@ export function ExamReplay({
       </div>
       <ReplayLegend />
     </div>
+
+    <TrainingFocusSummary
+      items={trainingFocus}
+      projects={projectSet}
+      onSelect={item => {
+        const representative = item.representative
+        if (representative.project == null || representative.t == null) return
+        setFocusRequest(previous => ({
+          project: representative.project!,
+          t: representative.t!,
+          token: (previous?.token ?? 0) + 1,
+        }))
+      }}
+    />
 
     <div className="replay-projects">
       {projects.map(project => {
