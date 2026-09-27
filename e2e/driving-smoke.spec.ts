@@ -36,18 +36,42 @@ test.afterEach(async ({ page }) => {
 
 async function expectHealthyDrivingScene(page: Page) {
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.driving-shell')).toHaveAttribute('aria-busy', 'false', { timeout: 20_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
   await expect(page.getByRole('button', { name: '结束并查看结果' })).toBeVisible()
+  await expect(page.locator('.project-status')).toBeVisible()
 }
 
 test('C2 reverse-parking scene renders, accepts controls, and cycles all four cameras', async ({ page }) => {
+  test.setTimeout(60_000) // Includes two viewport captures with software WebGL.
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
   await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await expect(page.getByText(/C2 自动挡/)).toBeVisible()
+
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+  const help = page.getByRole('button', { name: /H 展开说明/ })
+  await expect(help).toHaveAttribute('aria-expanded', 'false')
+  await page.keyboard.down('h')
+  await expect(page.getByRole('button', { name: /H 收起说明/ })).toHaveAttribute('aria-expanded', 'true')
+  await page.keyboard.down('h') // OS repeat must not close the panel.
+  await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
+  await page.keyboard.up('h')
+  await page.screenshot({ path: '/tmp/subject2-keyboard-help-desktop.png' })
+  await page.setViewportSize({ width: 800, height: 700 })
+  await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
+  const helpBounds = await page.getByRole('region', { name: '键盘操作说明' }).boundingBox()
+  expect(helpBounds!.x + helpBounds!.width).toBeLessThanOrEqual(800)
+  await page.screenshot({ path: '/tmp/subject2-keyboard-help-small.png' })
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await page.keyboard.press('h')
+  await expect(help).toHaveAttribute('aria-expanded', 'false')
+  await help.click()
+  await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
+  await page.keyboard.press('h')
 
   const view = page.getByRole('button', { name: /M · 第一人称/ })
   await view.click()
@@ -61,6 +85,13 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
 
   // Return focus to the driving surface: Space on a focused button must not be mistaken for the handbrake key.
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+
+  await page.keyboard.down('d')
+  await expect.poll(async () => await page.locator('.steering-hud > b').textContent()).toMatch(/右/)
+  await page.keyboard.up('d')
+  await page.keyboard.down('j')
+  await expect(page.locator('.steering-hud > b')).toContainText('方向盘正')
+  await page.keyboard.up('j')
 
   await page.keyboard.press('i')
   await expect(page.getByText('发动机运行')).toBeVisible()
@@ -165,6 +196,7 @@ test('personalized plan prioritizes evidence and training pack persists the next
 
   await expectHealthyDrivingScene(page)
   await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/2 · 科目三道路驾驶')
+  await expect(page.locator('.status-chip')).toContainText('夜间')
   await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
 
   await page.getByRole('button', { name: '结束并查看结果' }).click()
@@ -287,4 +319,36 @@ test('replay coaching explains an infraction with before-after operation context
   await expect(page.getByText('模拟考试成绩单')).toHaveCount(0)
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
+test('C1 sequential keys shift once per press and help preserves held steering', async ({ page }) => {
+  const errors = captureRuntimeErrors(page)
+  await page.goto('./')
+  await page.getByLabel('姓名').fill('键盘C1')
+  await page.getByLabel('准驾车型').selectOption('C1')
+  await page.getByRole('button', { name: '进入训练中心' }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+  await page.keyboard.down('c')
+  await page.keyboard.down(']')
+  await expect(page.locator('.gear')).toHaveText('1 挡')
+  await page.keyboard.down(']')
+  await expect(page.locator('.gear')).toHaveText('1 挡')
+  await page.keyboard.up(']')
+  await page.keyboard.press(']')
+  await expect(page.locator('.gear')).toHaveText('2 挡')
+  await page.keyboard.press('[')
+  await expect(page.locator('.gear')).toHaveText('1 挡')
+  await page.keyboard.up('c')
+  await page.keyboard.down('d')
+  await page.keyboard.press('h')
+  await expect(page.getByText('逐级降 / 升挡', { exact: false })).toBeVisible()
+  await expect.poll(async () => await page.locator('.steering-hud > b').textContent()).toMatch(/右/)
+  await page.keyboard.press('h')
+  await page.keyboard.up('d')
+  await page.keyboard.down('j')
+  await expect(page.locator('.steering-hud > b')).toHaveText('方向盘正')
+  await page.keyboard.up('j')
+  expect(errors).toEqual([])
 })

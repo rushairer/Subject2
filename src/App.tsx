@@ -24,7 +24,7 @@ import type { ReplayTrainingProjectId } from './replay/replayTrainingFocus'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
-import { clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
+import { clearDrivingKeys, sequentialDrivingGear, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { createKeyboardSteeringState, resetKeyboardSteering, stepKeyboardSteer } from './input/keyboardSteering'
 import { createPedalControlsState, resetPedalControls, stepPedalControls } from './input/pedalControls'
 import { createVehicleAudioState, updateTurnIndicatorAudio } from './audio/vehicleAudio'
@@ -32,8 +32,9 @@ import { advanceExamProgress, completeExamProject, createExamProgress, enterExam
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
+import { DrivingHelp } from './ui/DrivingHelp'
 import { DrivingRendererLifecycle } from './ui/DrivingRendererLifecycle'
-import { TrainingPackReport } from './training/TrainingPackReport'
+import { TrainingPackReport } from './training/TrainingPackReportPanel'
 import type { TrainingPackStageResult } from './training/trainingPackReport'
 import {
   appendTrainingPackHistory,
@@ -339,15 +340,19 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean,
   cameraMode: CameraMode,
   onCycleCameraMode: () => void,
+  onToggleHelp: () => void,
+  onReady: () => void,
   onInfraction: (i: Infraction) => void, onTick: () => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
 }) {
   const keys = useRef<DrivingKeys>({})
+  const inputReady = useRef(false)
+  const readyReported = useRef(false)
   const keyboardSteeringState = useRef(createKeyboardSteeringState())
   const pedalControlsState = useRef(createPedalControlsState())
   const vehicleAudioState = useRef(createVehicleAudioState())
@@ -418,7 +423,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       stopHorn()
     }
     const down = (e: KeyboardEvent) => {
-      if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) { releaseAll(); return }
       const target = e.target
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
       const k = drivingKey(e)
@@ -447,6 +452,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       if (k === 'v') v.hazard = !v.hazard
       if (k === 'l') { v.lowBeam = !v.lowBeam; v.highBeam = false }
       if (k === 'k') { v.highBeam = !v.highBeam; if (v.highBeam) v.lowBeam = true }
+      if (k === '[' || k === ']') v.gear = sequentialDrivingGear(v.gear, k === '[' ? -1 : 1, automatic)
+      if (k === 'h') onToggleHelp()
       if (k === 'n') v.gear = 0
       if (k === 'r') v.gear = -1
       if (automatic && k === 'g') v.gear = 1
@@ -469,7 +476,9 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     addEventListener('keyup', up)
     addEventListener('blur', releaseAll)
     document.addEventListener('visibilitychange', visibilityChanged)
+    inputReady.current = true
     return () => {
+      inputReady.current = false
       removeEventListener('keydown', down)
       removeEventListener('keyup', up)
       removeEventListener('blur', releaseAll)
@@ -478,7 +487,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       void audioContext.current?.close()
       audioContext.current = null
     }
-  }, [automatic, onCycleCameraMode, vehicle])
+  }, [automatic, onCycleCameraMode, onToggleHelp, vehicle])
 
   useFrame((_, rawDt) => {
     // Keep the world, cockpit, input and session counters mounted across courses.
@@ -516,6 +525,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const keyboardSteer = stepKeyboardSteer(keyboardSteeringState.current, {
       left: !controlsLocked && !wheel.deviceId && !!(keys.current['a'] || keys.current['arrowleft']),
       right: !controlsLocked && !wheel.deviceId && !!(keys.current['d'] || keys.current['arrowright']),
+      center: !controlsLocked && !wheel.deviceId && !!keys.current.j,
       currentAngle: v.steeringWheelAngle,
       speed: v.speed,
       dt,
@@ -712,6 +722,10 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     }
 
     onTick()
+    if (inputReady.current && !readyReported.current) {
+      readyReported.current = true
+      onReady()
+    }
   })
 
   const night = session.time === 'night'
@@ -769,6 +783,10 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
 }
 
 function Driving({ session, candidate, onDone, onExit }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
+  const [drivingReady, setDrivingReady] = useState(false)
+  const markDrivingReady = useCallback(() => setDrivingReady(true), [])
+  const [helpExpanded, setHelpExpanded] = useState(false)
+  const toggleHelp = useCallback(() => setHelpExpanded(value => !value), [])
   const combinedExam = session.examId === 'subject2-exam'
   const trainingPack = session.trainingPack ? trainingPackById(session.trainingPack.id) : null
   const automatic = candidate.licenseType === 'C2'
@@ -841,7 +859,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
       lastUi.current = now
       setDisplay({ ...vehicle.current })
     }
-    if (now - lastTrajectorySampleAt.current > 180) {
+    if (trajectory.current.length === 0 || now - lastTrajectorySampleAt.current > 180) {
       lastTrajectorySampleAt.current = now
       const v = vehicle.current
       const replayVehicle = activeReplayVehicle()
@@ -935,10 +953,11 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     </section>
   </div>
 
-  return <div className="driving-shell">
+  return <div className="driving-shell" aria-busy={!drivingReady}>
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
+    {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
       <div className="hud-top">
         <div className="status-chip">{candidate.name} · {combinedExam
@@ -966,7 +985,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         }}
       />}
       {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
-      <div className="instruction-card"><b>键盘驾驶 · {automatic ? 'C2 自动挡' : 'C1 手动挡'}</b><span>W 渐进油门 · S 渐进刹车（双击急刹）· A/D 转向（短按微调/长按加速/松开回正/A+D居中）{automatic ? '' : ' · Shift 半联动巡航(W/S微调) · C 踩死离合'}</span><span>{automatic ? 'G 前进(D) · N 空挡 · R 倒挡' : '1–5 / N / R 挡位'} · Space 手刹 · I 点火</span><span>Q/E 转向灯 · V 双闪 · L 近光 · K 远光 · B 喇叭 · T 安全带</span><span>Z/X 左右观察 · F 回头观察 · M 第一/第二/第三/垂直俯视视角</span></div>
+      <DrivingHelp automatic={automatic} expanded={helpExpanded} onToggle={toggleHelp} />
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>

@@ -1,6 +1,7 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 
 export interface PedalControlsState {
+  elapsedSeconds: number
   throttleHoldTime: number
   brakeHoldTime: number
   lastBrakeReleaseTime: number
@@ -45,6 +46,7 @@ export const PEDAL_CONFIG = {
 
   // Double-tap emergency brake threshold (seconds)
   doubleTapBrakeWindow: 0.26,
+  doubleTapBrakeMinSpeedMps: 2.5,
 
   // Base bite point from rules
   baseBitePosition: DRIVING_RULES.manualTransmission.biteClutchPosition, // 0.52
@@ -55,6 +57,7 @@ export const PEDAL_CONFIG = {
 
 export function createPedalControlsState(): PedalControlsState {
   return {
+    elapsedSeconds: 0,
     throttleHoldTime: 0,
     brakeHoldTime: 0,
     lastBrakeReleaseTime: -999,
@@ -65,6 +68,7 @@ export function createPedalControlsState(): PedalControlsState {
 }
 
 export function resetPedalControls(state: PedalControlsState) {
+  state.elapsedSeconds = 0
   state.throttleHoldTime = 0
   state.brakeHoldTime = 0
   state.lastBrakeReleaseTime = -999
@@ -106,9 +110,11 @@ export function stepPedalControls(
     }
   }
 
+  state.elapsedSeconds += dt
+
   // --- 1. Throttle Calculation ---
   let throttle = 0
-  if (throttleKey) {
+  if (throttleKey && !brakeKey) {
     state.throttleHoldTime += dt
     if (state.throttleHoldTime <= PEDAL_CONFIG.throttleRampDelay) {
       throttle = PEDAL_CONFIG.tapThrottle
@@ -128,8 +134,8 @@ export function stepPedalControls(
   if (brakeKey) {
     // Detect double-tap on brake
     if (state.brakeHoldTime === 0) {
-      const now = performance.now ? performance.now() / 1000 : Date.now() / 1000
-      if (now - state.lastBrakeReleaseTime <= PEDAL_CONFIG.doubleTapBrakeWindow) {
+      const now = state.elapsedSeconds
+      if (Math.abs(speed) >= PEDAL_CONFIG.doubleTapBrakeMinSpeedMps && now - state.lastBrakeReleaseTime <= PEDAL_CONFIG.doubleTapBrakeWindow) {
         state.isEmergencyBrake = true
       }
     }
@@ -158,7 +164,7 @@ export function stepPedalControls(
     }
   } else {
     if (state.brakeHoldTime > 0) {
-      const now = performance.now ? performance.now() / 1000 : Date.now() / 1000
+      const now = state.elapsedSeconds
       state.lastBrakeReleaseTime = now
     }
     state.brakeHoldTime = 0

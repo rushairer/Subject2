@@ -1,15 +1,17 @@
+import { DRIVING_RULES } from '../rules/drivingRules'
+
 export type DrivingKey =
   | 'w' | 's' | 'a' | 'd' | 'arrowup' | 'arrowdown' | 'arrowleft' | 'arrowright'
   | 'c' | 'shift' | 'space' | 'i' | 'q' | 'e' | 'v' | 'l' | 'k'
   | 'n' | 'r' | 'g' | '1' | '2' | '3' | '4' | '5' | 'b' | 't'
-  | 'z' | 'x' | 'f' | 'm'
+  | 'z' | 'x' | 'f' | 'm' | 'h' | 'j' | '[' | ']'
 
 export type DrivingKeys = Partial<Record<DrivingKey, boolean>>
 
 const recognizedKeys = new Set<string>([
   'w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright',
   'c', 'shift', 'space', 'i', 'q', 'e', 'v', 'l', 'k', 'n', 'r', 'g',
-  '1', '2', '3', '4', '5', 'b', 't', 'z', 'x', 'f', 'm',
+  '1', '2', '3', '4', '5', 'b', 't', 'z', 'x', 'f', 'm', 'h', 'j', '[', ']',
 ])
 
 /** Physical key codes keep Shift+digit and key-up after modifier changes consistent. */
@@ -17,6 +19,7 @@ export function drivingKey(event: { code?: string; key: string }): DrivingKey | 
   const code = event.code ?? ''
   const physical = /^(Key[A-Z]|Digit[1-5])$/.test(code)
     ? code.replace(/^(Key|Digit)/, '').toLowerCase()
+    : code === 'BracketLeft' ? '[' : code === 'BracketRight' ? ']'
     : code === 'ShiftLeft' || code === 'ShiftRight'
       ? 'shift'
       : code.toLowerCase()
@@ -47,4 +50,10 @@ export function drivingLook(keys: DrivingKeys) {
     lookBack: !!keys.f,
     yaw: keys.f ? Math.PI : keys.z ? 0.62 : keys.x ? -0.62 : 0,
   }
+}
+
+/** Sequential keys stop at neutral; reverse remains an explicit R selection. */
+export function sequentialDrivingGear(gear: number, direction: -1 | 1, automatic: boolean): number {
+  if (automatic || gear < 0) return gear
+  return Math.max(0, Math.min(DRIVING_RULES.manualTransmission.highestForwardGear, gear + direction))
 }

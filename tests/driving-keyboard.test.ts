@@ -64,3 +64,13 @@ test('releasing rear observation restores another direction still held', () => {
   releaseDrivingKey(keys, 'x')
   assert.equal(drivingLook(keys).yaw, 0)
 })
+
+test('help, center and sequential shifts normalize physical keys and ignore repeats', () => {
+  for (const [code, key, expected] of [['KeyH', 'H', 'h'], ['KeyJ', 'j', 'j'], ['BracketLeft', '{', '['], ['BracketRight', '}', ']']] as const) {
+    const normalized = drivingKey({ code, key })!
+    assert.equal(normalized, expected)
+    const held: DrivingKeys = {}
+    assert.equal(pressDrivingKey(held, normalized), true)
+    assert.equal(pressDrivingKey(held, normalized, true), false)
+  }
+})

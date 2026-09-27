@@ -289,7 +289,7 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 
 ## Training-pack aggregate review
 
-`src/training/trainingPackReport.ts` owns deterministic aggregation across stages of one active training-pack run; `src/training/TrainingPackReport.tsx` owns its final presentation.
+`src/training/trainingPackReport.ts` owns deterministic aggregation across stages of one active training-pack run; `src/training/TrainingPackReportPanel.tsx` owns its final presentation.
 
 - Never create a synthetic cross-project exam score. Pack review may show the existing per-stage scores, completion state and emitted infractions only.
 - Cross-stage trend compares target-habit infraction evidence conservatively. Because projects have different rule opportunities and difficulty, user-facing copy must state that this is an in-pack coaching trend, not a formal exam-performance equivalence.

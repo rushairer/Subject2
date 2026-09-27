@@ -249,3 +249,20 @@
   .today-plan-task{grid-template-columns:28px minmax(0,1fr)}
   .today-plan-task>button,.today-plan-done{grid-column:2;justify-self:start}
 }
+
+/* Help stays in the lower-left; expanded content scrolls inside the viewport. */
+.instruction-card{display:grid;pointer-events:auto;width:min(330px,calc(100vw - 36px));max-width:none;z-index:5;padding:12px;gap:9px;background:#07111cef}
+.instruction-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer;font-size:12px}
+.instruction-toggle span{white-space:nowrap;color:#83d5ff}
+.instruction-card kbd{font:inherit;font-weight:700;color:#e5f4ff;background:#223a50;border:1px solid #456078;border-radius:4px;padding:1px 5px;white-space:nowrap}
+.instruction-card.expanded{width:min(560px,calc(100vw - 36px));max-height:calc(100dvh - 150px)}
+.instruction-details{overflow-y:auto;overscroll-behavior:contain;display:grid;gap:16px;font-size:14px;line-height:1.7;padding:3px 4px}
+.instruction-details h3{font-size:14px;color:#83d5ff;margin:0 0 7px}
+.instruction-details p{margin:5px 0}
+.instruction-details small{display:block;color:#9bb0c2;font-size:12px;line-height:1.7}
+.instruction-toggle:focus-visible{outline:2px solid #83d5ff;outline-offset:5px;border-radius:4px}
+@media(max-width:900px){.instruction-card{bottom:148px;left:10px;width:min(310px,calc(100vw - 20px))}.instruction-card.expanded{width:min(560px,calc(100vw - 20px));max-height:calc(100dvh - 280px)}}
+.instruction-card.expanded{bottom:148px;max-height:calc(100dvh - 240px);grid-template-rows:auto minmax(0,1fr)}
+.instruction-details{min-height:0}
+@media(max-width:900px){.instruction-card.expanded{max-height:calc(100dvh - 280px)}}
+.driving-loading{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:#07111cf2;color:#bfe7ff;font-size:16px}

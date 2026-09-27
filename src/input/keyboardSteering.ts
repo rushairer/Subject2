@@ -6,6 +6,7 @@ export interface KeyboardSteeringState {
 }
 
 export interface KeyboardSteeringInput {
+  center?: boolean
   left: boolean
   right: boolean
   currentAngle: number
@@ -96,7 +97,7 @@ export function stepKeyboardSteer(
   } = KEYBOARD_STEERING_CONFIG
 
   // 1. Dual-key press (both A and D held): active fast return to center
-  if (left && right) {
+  if (input.center || (left && right)) {
     state.holdTime = 0
     state.lastDirection = 0
     if (Math.abs(currentAngle) < centeringDeadband) {

@@ -51,7 +51,7 @@ test('keyboard listeners stay independent of camera mode and clear on focus loss
   const inputEffect = app.slice(begin, end)
   assert.match(inputEffect, /addEventListener\('blur', releaseAll\)/)
   assert.match(inputEffect, /addEventListener\('visibilitychange', visibilityChanged\)/)
-  assert.match(inputEffect, /\[automatic, onCycleCameraMode, vehicle\]/)
+  assert.match(inputEffect, /\[automatic, onCycleCameraMode, onToggleHelp, vehicle\]/)
   assert.doesNotMatch(inputEffect, /\[automatic, cameraMode/)
 })
 
