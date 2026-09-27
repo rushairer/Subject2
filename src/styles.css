@@ -35,10 +35,8 @@
 .replay-focus-head h3{margin:4px 0 0}
 .replay-focus-head p{max-width:470px;margin:0;color:#8298a9;font-size:11px;line-height:1.55;text-align:right}
 .replay-focus-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.replay-focus-card{position:relative;display:grid;grid-template-columns:30px 1fr;gap:10px;min-width:0;padding:13px;border:1px solid #25465c;border-radius:14px;background:#0b2030;color:inherit;text-align:left;cursor:pointer;transition:transform .16s ease,border-color .16s ease,background .16s ease}
-.replay-focus-card:hover,.replay-focus-card:focus-visible{transform:translateY(-2px);border-color:#55a9d7;background:#0d2638;outline:none}
-.replay-focus-card:disabled{cursor:default;opacity:1}
-.replay-focus-card:disabled:hover{transform:none;border-color:#25465c;background:#0b2030}
+.replay-focus-card{position:relative;display:grid;grid-template-columns:30px 1fr;gap:10px;min-width:0;padding:13px;border:1px solid #25465c;border-radius:14px;background:#0b2030;color:inherit;text-align:left;transition:border-color .16s ease,background .16s ease}
+.replay-focus-card:hover{border-color:#3e6f8e;background:#0c2334}
 .replay-focus-rank{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#14344a;color:#79d6ff;font-weight:900;font-size:13px}
 .replay-focus-copy{display:grid;gap:6px;min-width:0}
 .replay-focus-copy>strong{font-size:13px;color:#eef9ff}
@@ -50,5 +48,11 @@
 .replay-focus-practice b{color:#d6edf9;font-size:8px;letter-spacing:.06em;white-space:nowrap}
 .replay-focus-evidence{display:flex;gap:4px;flex-wrap:wrap}
 .replay-focus-evidence i{max-width:100%;padding:2px 5px;border:1px solid #234155;border-radius:7px;color:#738d9f;font-size:8px;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.replay-focus-action{grid-column:2;justify-self:end;color:#67d0ff;font-size:9px;font-weight:900}
+.replay-focus-actions{display:flex!important;justify-content:flex-end;gap:6px;flex-wrap:wrap;margin-top:2px}
+.replay-focus-actions button{min-height:30px;padding:6px 9px;border-radius:8px;border:1px solid #315772;background:#0b1b28;color:#a7c2d3;font-size:9px;font-weight:900;cursor:pointer}
+.replay-focus-actions button:hover,.replay-focus-actions button:focus-visible{border-color:#69c9f2;color:#eaf9ff;outline:none}
+.replay-focus-actions button:disabled{cursor:default;opacity:.45}
+.replay-focus-actions .replay-focus-training-btn{border-color:#8b6737;background:#2a1d0f;color:#ffd18a}
+.replay-focus-actions .replay-focus-training-btn:hover,.replay-focus-actions .replay-focus-training-btn:focus-visible{border-color:#ffc56a;color:#fff3d7}
 @media(max-width:860px){.replay-focus-grid{grid-template-columns:1fr}.replay-focus-head{align-items:flex-start;flex-direction:column}.replay-focus-head p{text-align:left}.replay-focus-card{grid-template-columns:34px 1fr}}
+@media(max-width:520px){.replay-focus-actions{justify-content:stretch}.replay-focus-actions button{flex:1}}
