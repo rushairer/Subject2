@@ -47,6 +47,9 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   await page.keyboard.press('m')
   await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
 
+  // Return focus to the driving surface: Space on a focused button must not be mistaken for the handbrake key.
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+
   await page.keyboard.press('i')
   await expect(page.getByText('发动机运行')).toBeVisible()
 
@@ -77,7 +80,7 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   await page.getByRole('button', { name: /综合道路驾驶/ }).click()
 
   await expectHealthyDrivingScene(page)
-  await expect(page.getByText(/科目三道路驾驶/)).toBeVisible()
+  await expect(page.getByText(/科目三道路驾驶/).first()).toBeVisible()
   await expect(page.getByText(/夜间/).first()).toBeVisible()
   await expect(page.getByText(/上车准备|安全起步/)).toBeVisible()
 
