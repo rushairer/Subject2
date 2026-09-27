@@ -31,7 +31,7 @@ export const DRIVING_RULES = {
       minimumSpeedKmh: 6,
       maximumClutchPosition: 0.18,
       minimumRecommendedRpm: 1050,
-      maximumRecommendedRpm: 3400,
+      maximumRecommendedRpm: 3000,
       minimumSustainedSeconds: 1.5,
       maximumSampleGapSeconds: 0.65,
     },
