@@ -11,6 +11,12 @@ export const DRIVING_RULES = {
     trackWidthMeters: TRAINING_CAR.trackWidthMeters,
     rearAxleFromCenterMeters: TRAINING_CAR.rearAxleFromCenterMeters,
   },
+  turnSignal: {
+    // Mechanical steering-column cancellation: arm only after a real turn,
+    // then release when the wheel returns close to center.
+    autoCancelArmWheelAngleRadians: Math.PI / 2,
+    autoCancelReturnWheelAngleRadians: 0.18,
+  },
   manualTransmission: {
     highestForwardGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR,
     idleRpm: 820,

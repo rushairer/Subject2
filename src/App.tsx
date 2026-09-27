@@ -36,6 +36,7 @@ import { readRacingWheelControls } from './input/racingWheel'
 import { clearDrivingKeys, sequentialDrivingGear, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { createKeyboardSteeringState, resetKeyboardSteering, stepKeyboardSteer } from './input/keyboardSteering'
 import { createPedalControlsState, resetPedalControls, stepPedalControls } from './input/pedalControls'
+import { createTurnSignalAutoCancelState, resetTurnSignalAutoCancel, stepTurnSignalAutoCancel } from './input/turnSignalAutoCancel'
 import { createVehicleAudioState, updateTurnIndicatorAudio } from './audio/vehicleAudio'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
@@ -398,6 +399,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const readyReported = useRef(false)
   const keyboardSteeringState = useRef(createKeyboardSteeringState())
   const pedalControlsState = useRef(createPedalControlsState())
+  const turnSignalAutoCancelState = useRef(createTurnSignalAutoCancelState())
   const vehicleAudioState = useRef(createVehicleAudioState())
   const cameraYaw = useRef(0)
   const { camera } = useThree()
@@ -543,6 +545,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       runtimeProject.current = session.examId
       resetKeyboardSteering(keyboardSteeringState.current)
       resetPedalControls(pedalControlsState.current)
+      resetTurnSignalAutoCancel(turnSignalAutoCancelState.current)
       reverseParkingRuntime.current = createReverseParkingRuntime()
       sideParkingRuntime.current = createSideParkingRuntime()
       rightAngleRuntime.current = createRightAngleRuntime()
@@ -618,6 +621,14 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         points: 10,
       })
     }
+    const turnSignal = stepTurnSignalAutoCancel(turnSignalAutoCancelState.current, {
+      steeringWheelAngle: v.steeringWheelAngle,
+      leftIndicator: v.leftIndicator,
+      rightIndicator: v.rightIndicator,
+      hazard: v.hazard,
+    })
+    v.leftIndicator = turnSignal.leftIndicator
+    v.rightIndicator = turnSignal.rightIndicator
     v.leftSignalAge = v.leftIndicator ? v.leftSignalAge + dt : 0
     v.rightSignalAge = v.rightIndicator ? v.rightSignalAge + dt : 0
     const indicatorActive = v.leftIndicator || v.rightIndicator || v.hazard
@@ -1023,8 +1034,11 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     aria-busy={!drivingReady}
     onPointerDown={event => {
       if (event.target instanceof HTMLCanvasElement) {
+        const canvas = event.target
         const active = document.activeElement
-        if (active instanceof HTMLElement) active.blur()
+        if (active instanceof HTMLElement && active !== canvas) active.blur()
+        canvas.tabIndex = -1
+        canvas.focus({ preventScroll: true })
       }
     }}
   >
