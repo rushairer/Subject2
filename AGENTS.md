@@ -208,7 +208,7 @@ Standalone course geometry and judging remain defined in each course's **local f
 
 ## Subject 3 traffic telemetry and following-distance coaching
 
-`src/subject3/subject3Traffic.ts` owns the shared deterministic registry for rendered Subject 3 vehicles, and `src/subject3/subject3LeadVehicle.ts` owns nearest same-lane lead-vehicle observation.
+`src/subject3/subject3Traffic.ts` owns the shared deterministic registry for rendered Subject 3 vehicles, and `src/subject3/subject3LeadVehicle.ts` owns nearest same-lane lead-vehicle plus forward oncoming-vehicle observation.
 
 - Traffic that can influence coaching must publish route progress, lateral position, speed and travel direction into the shared traffic state. Never inspect Three.js mesh transforms from replay/scoring code.
 - Lead-vehicle selection must use route progress plus lateral lane geometry, not raw Euclidean center distance. Ignore opposing traffic, adjacent-lane traffic, vehicles behind the candidate and actors outside the observation horizon.
