@@ -87,6 +87,8 @@ C1 科目二模型包含倒车入库、坡道定点停车和起步、侧方停�
 6. **P5 完整评判与复盘 🚧**：规则矩阵、轨迹回放、扣分时间轴、操作上下文、优先改进建议、证据回跳、跨项目专项训练包、训练包总复盘、最近多轮改善趋势、长期训练建议与今日平衡训练计划均已落地；继续完善训练包颗粒度、训练节奏与更细粒度个性化闭环。
 7. **P6 考场包 ⏳**：按城市/驾校/考场复刻真实场地与路线，同时保持全国规则基线独立。
 
-## GitHub Pages
+## 部署
+
+Vite 生产构建使用相对资源基址 `./`，因此同一份 `dist` 可部署在 GitHub Pages 仓库子路径，也可直接部署到一级自定义域名根路径（例如 `https://kemu2.aben.io/`），构建后的 CSS / JS 不依赖 `/Subject2/` 绝对前缀。
 
 工作流位于 `.github/workflows/pages.yml`。发布链路为：Node 回归 → TypeScript/Vite build → Chromium/WebGL2 E2E smoke → Pages artifact → deploy。浏览器 smoke 失败时不会部署，并会上传 Playwright report、trace、截图/视频等失败证据。仓库首次发布时请在 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
