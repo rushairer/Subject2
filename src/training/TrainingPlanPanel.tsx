@@ -34,7 +34,9 @@ export function TrainingPlanPanel({
       </div>
       <p>
         基于当前浏览器中同一考生、同一准驾车型的完整训练包记录。
-        {plan.totalRounds > 0 ? ` 已纳入 ${plan.totalRounds} 轮历史。` : ' 先建立训练基线，再逐轮调整优先级。'}
+        {plan.totalRounds > 0
+          ? ` 本机已有 ${plan.totalRounds} 轮记录；每个训练包取最近最多 5 轮判断趋势。`
+          : ' 先建立训练基线，再逐轮调整优先级。'}
       </p>
     </div>
 
