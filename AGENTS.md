@@ -221,6 +221,19 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
 - Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
 
+## Replay driving dynamics timeline
+
+`src/replay/drivingDynamicsTimeline.ts` owns the session-wide speed/gear timeline model and `DrivingDynamicsTimeline.tsx` owns its replay UI.
+
+- The dynamics timeline is replay evidence only. It must never emit infractions, modify score/pass-fail, or create hidden coaching penalties.
+- Build the chart from existing trajectory samples; do not introduce a second high-frequency recording stream.
+- Keep full-resolution samples available for the scrubber and evidence jump, but downsample only the SVG path when sessions are long.
+- Downsampling must preserve the first/last sample and both sides of every gear transition so shift timing is not visually erased.
+- Speed uses absolute vehicle speed for display while the original signed sample remains available to replay logic.
+- Timeline selection must route through the existing project/time focus mechanism rather than creating an independent replay cursor source of truth.
+- Changes to sorting, max-speed calculation, gear-transition detection or downsampling require deterministic coverage in `tests/driving-dynamics-timeline.test.ts`.
+- Browser coverage must prove the dynamics timeline can drive the existing project replay focus instead of only verifying that the chart renders.
+
 ## Subject 3 slow-zone judging
 
 - Straight-through intersections, pedestrian crossings, school zones, and bus-stop events must record both left- and right-side observation during the event.

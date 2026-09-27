@@ -348,6 +348,18 @@ test('ending a training session reaches the incomplete result and replay surface
   await expect(page.getByRole('heading', { name: '驾驶轨迹复盘' })).toBeVisible()
   await expect(page.getByRole('button', { name: '返回训练中心' })).toBeVisible()
 
+  const dynamics = page.getByRole('region', { name: '速度 / 挡位时间轴' })
+  await expect(dynamics).toBeVisible()
+  await expect(dynamics.getByRole('slider', { name: '速度和挡位时间轴游标' })).toHaveValue('0')
+
+  const projectScrubber = page.getByRole('slider', { name: '侧方停车复盘时间轴' })
+  const projectMax = await projectScrubber.getAttribute('max')
+  if (projectMax == null) throw new Error('missing project replay max index')
+  await expect(projectScrubber).toHaveValue(projectMax)
+
+  await dynamics.getByRole('button', { name: '定位到这段轨迹' }).click()
+  await expect(projectScrubber).toHaveValue('0')
+
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 

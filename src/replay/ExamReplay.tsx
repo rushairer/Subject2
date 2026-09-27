@@ -16,6 +16,7 @@ import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTraining
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
 import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
 import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
+import { DrivingDynamicsTimeline } from './DrivingDynamicsTimeline'
 
 export interface TrajectorySample {
   t: number
@@ -583,6 +584,16 @@ export function ExamReplay({
       samples={samples}
       onSelect={t => setFocusRequest(previous => ({
         project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <DrivingDynamicsTimeline
+      samples={samples}
+      projectLabel={projectLabel}
+      onSelect={(project, t) => setFocusRequest(previous => ({
+        project,
         t,
         token: (previous?.token ?? 0) + 1,
       }))}
