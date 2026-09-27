@@ -7,6 +7,14 @@ export interface ReplayFocusInfraction {
   project?: string
 }
 
+export type ReplayTrainingProjectId =
+  | 'reverse-parking'
+  | 'side-parking'
+  | 'slope-start'
+  | 'curve-driving'
+  | 'right-angle'
+  | 'subject3'
+
 export type ReplayHabitId =
   | 'safety-routine'
   | 'observation-signal'
@@ -30,6 +38,7 @@ export interface ReplayTrainingFocus extends ReplayHabitDefinition {
   firstTime: number
   evidenceTitles: string[]
   representative: ReplayFocusInfraction
+  recommendedProject: ReplayTrainingProjectId | null
 }
 
 const HABITS: Record<ReplayHabitId, ReplayHabitDefinition> = {
@@ -79,6 +88,33 @@ const HABITS: Record<ReplayHabitId, ReplayHabitDefinition> = {
 
 function matchesId(id: string, base: string) {
   return id === base || id.startsWith(`${base}-`)
+}
+
+const TRAINING_PROJECTS = new Set<ReplayTrainingProjectId>([
+  'reverse-parking',
+  'side-parking',
+  'slope-start',
+  'curve-driving',
+  'right-angle',
+  'subject3',
+])
+
+export function replayTrainingProject(
+  project: string | undefined,
+): ReplayTrainingProjectId | null {
+  if (project == null) return null
+  if (TRAINING_PROJECTS.has(project as ReplayTrainingProjectId)) {
+    return project as ReplayTrainingProjectId
+  }
+
+  if (project.startsWith('transition:')) {
+    const [, , to] = project.split(':')
+    if (TRAINING_PROJECTS.has(to as ReplayTrainingProjectId)) {
+      return to as ReplayTrainingProjectId
+    }
+  }
+
+  return null
 }
 
 export function replayHabitForInfraction(item: ReplayFocusInfraction): ReplayHabitId {
@@ -195,6 +231,7 @@ export function buildReplayTrainingFocus(
         firstTime: finiteTimes.length > 0 ? Math.min(...finiteTimes) : Number.POSITIVE_INFINITY,
         evidenceTitles,
         representative,
+        recommendedProject: replayTrainingProject(representative.project),
       }
     })
     .sort((a, b) => {
