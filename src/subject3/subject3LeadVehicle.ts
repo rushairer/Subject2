@@ -26,7 +26,7 @@ export function observeSubject3LeadVehicle(
   player: { x: number; z: number; speed: number },
   traffic: Readonly<Subject3TrafficState>,
 ): Subject3LeadVehicleObservation | undefined {
-  const playerSpeed = Math.abs(player.speed)
+  const playerSpeed = player.speed
   if (playerSpeed < SUBJECT3_LEAD_OBSERVATION.minimumPlayerSpeedMps) return undefined
 
   const projection = projectToSubject3Route(player.x, player.z)
