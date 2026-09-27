@@ -17,6 +17,7 @@ import {
   subject3PracticeInitialStatus,
   subject3PracticeRuntimeSeed,
   subject3PracticeSliceById,
+  subject3PracticeSliceTitle,
   subject3PracticeStartPose,
   type Subject3PracticeSliceId,
 } from './subject3/subject3Practice'
@@ -159,6 +160,11 @@ const examTitle = (examId: ExamId) => ({
 const sessionTitle = (session: Session) => session.subject3Practice
   ? `科目三专项 · ${subject3PracticeSliceById(session.subject3Practice).title}`
   : examTitle(session.examId)
+
+const historyTitle = (examId: ExamId, subject3Practice?: string) => {
+  const sliceTitle = subject3PracticeSliceTitle(subject3Practice)
+  return sliceTitle ? `科目三专项 · ${sliceTitle}` : examTitle(examId)
+}
 
 const initialProjectStatus = (
   examId: ExamId,
@@ -311,7 +317,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
         {recentHistory.map(item => <div className="recent-result" key={item.id}>
-          <div><strong>{examTitle(item.examId as ExamId)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
+          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
           <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
         </div>)}
       </div>
@@ -1150,6 +1156,7 @@ export default function App() {
       candidateName: candidate.name,
       licenseType: candidate.licenseType,
       examId: session.examId,
+      subject3Practice: session.subject3Practice,
       mode: session.mode,
       score,
       passed: outcome.passed,
