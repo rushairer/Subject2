@@ -330,3 +330,8 @@
 .result-comment p{margin:0;color:#9eb3c4;line-height:1.65}
 .result-share-btn{width:100%;margin-top:16px;padding:12px 16px;border:1px solid #ffffff1c;border-radius:12px;background:#ffffff0a;color:#e9f7ff;font-weight:900;cursor:pointer;transition:.18s ease}
 .result-share-btn:hover{transform:translateY(-1px);border-color:#65b8e6;background:#12304a}
+
+.result-incidents{display:flex;align-items:flex-start;gap:10px;margin:10px 0 20px;padding:11px 13px;border:1px dashed #a57d3f66;border-radius:12px;background:#241b0d88;text-align:left;color:#aebdca;font-size:12px;line-height:1.55}
+.result-incidents strong{flex:0 0 auto;color:#f1c66f}
+.result-incidents span{min-width:0}
+@media(max-width:560px){.result-incidents{flex-direction:column;gap:4px}}
