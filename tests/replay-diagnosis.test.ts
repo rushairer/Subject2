@@ -31,10 +31,16 @@ test('replayOperationSlice returns actual same-project samples around the event'
 })
 
 test('replayOperationSlice never fabricates unavailable before/after samples', () => {
-  const slice = replayOperationSlice(samples, 'reverse-parking', 1.5)
+  const atStart = replayOperationSlice(samples, 'reverse-parking', 0)
   assert.deepEqual(
-    slice.map(item => item.offsetSeconds),
+    atStart.map(item => item.offsetSeconds),
     [0, 1.5, 3],
+  )
+
+  const nearEnd = replayOperationSlice(samples, 'reverse-parking', 7.5)
+  assert.deepEqual(
+    nearEnd.map(item => item.offsetSeconds),
+    [-3, -1.5, 0, 1.5],
   )
 })
 
