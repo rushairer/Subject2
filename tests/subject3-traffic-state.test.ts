@@ -7,10 +7,13 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  removeSubject3TrafficHazard,
   removeSubject3TrafficVehicle,
   subject3TrafficCollision,
   subject3VehicleCollision,
   updateSubject3TrafficAfterImpact,
+  updateSubject3TrafficHazard,
+  updateSubject3TrafficHazardFromWorld,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
 import { createCollisionMotion } from '../src/sim/collisionResponse'
@@ -30,6 +33,7 @@ test('traffic state starts clear with an empty deterministic vehicle registry', 
   assert.deepEqual(createSubject3TrafficState(), {
     crosswalkPedestrianConflict: false,
     vehicles: {},
+    hazards: {},
   })
 })
 
@@ -71,6 +75,76 @@ test('traffic scenario tags are explicit and do not leak into ordinary flow acto
 
   updateSubject3TrafficVehicle(traffic, 'sudden-brake', 722, 0, 8.2, false)
   assert.equal(traffic.vehicles['sudden-brake'].scenario, undefined)
+})
+
+test('hazard telemetry updates in place, keeps scenario semantics explicit and can be removed', () => {
+  const traffic = createSubject3TrafficState()
+  const first = updateSubject3TrafficHazard(
+    traffic,
+    'cut-in-scooter',
+    'cut-in-scooter',
+    1400,
+    2.4,
+    3.2,
+    -0.9,
+    true,
+    false,
+  )
+  const second = updateSubject3TrafficHazard(
+    traffic,
+    'cut-in-scooter',
+    'cut-in-scooter',
+    1400.6,
+    1.4,
+    3.1,
+    -0.95,
+    true,
+    true,
+  )
+
+  assert.equal(second, first, 'per-frame hazard publication should preserve object identity')
+  assert.deepEqual(traffic.hazards['cut-in-scooter'], {
+    id: 'cut-in-scooter',
+    kind: 'cut-in-scooter',
+    progress: 1400.6,
+    lateral: 1.4,
+    longitudinalSpeedMps: 3.1,
+    lateralSpeedMps: -0.95,
+    active: true,
+    conflict: true,
+  })
+
+  removeSubject3TrafficHazard(traffic, 'cut-in-scooter')
+  assert.deepEqual(traffic.hazards, {})
+})
+
+test('world-space hazard publication projects position and velocity into route coordinates', () => {
+  const traffic = createSubject3TrafficState()
+  const route = poseAtRouteDistance(1250)
+  const point = worldPointFromVehicle(route.x, route.z, route.heading, 0.65, -0.9)
+  const forward = forwardFromHeading(route.heading)
+  const right = rightFromHeading(route.heading)
+  const velocity = {
+    x: forward.x * 4.2 + right.x * -1.1,
+    z: forward.z * 4.2 + right.z * -1.1,
+  }
+
+  const hazard = updateSubject3TrafficHazardFromWorld(
+    traffic,
+    'crosswalk-pedestrian',
+    'crosswalk-pedestrian',
+    point,
+    velocity,
+    true,
+    true,
+  )
+
+  near(hazard.progress, 1250.65)
+  near(hazard.lateral, -0.9)
+  near(hazard.longitudinalSpeedMps, 4.2)
+  near(hazard.lateralSpeedMps, -1.1)
+  assert.equal(hazard.active, true)
+  assert.equal(hazard.conflict, true)
 })
 
 test('traffic registry keeps same-direction and opposing actors distinguishable', () => {
