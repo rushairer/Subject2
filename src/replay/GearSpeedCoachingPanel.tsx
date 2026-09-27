@@ -39,7 +39,7 @@ export function GearSpeedCoachingPanel({
     ? report.mismatchSeconds / report.assessedSeconds
     : 0
 
-  return <section className="replay-focus" aria-labelledby="gear-speed-coaching-title">
+  return <section className="replay-focus gear-speed-coaching" aria-labelledby="gear-speed-coaching-title">
     <div className="replay-focus-head">
       <div>
         <div className="eyebrow">MANUAL GEAR COACHING</div>
