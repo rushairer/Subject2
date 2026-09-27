@@ -7,6 +7,7 @@ export type ResultCommentInput = {
   status: SessionResultStatus
   resultLabel: string
   infractionTitles: readonly string[]
+  incidentTitles?: readonly string[]
   fatalCount: number
 }
 
@@ -157,22 +158,331 @@ function pick<T>(items: readonly T[], seed: string) {
   return items[stableHash(seed) % items.length]
 }
 
-function infractionRoast(title: string) {
-  if (/压线|出线|越线/.test(title)) return '线就在那里，你也在那里，缘分确实有点过头。'
-  if (/熄火/.test(title)) return '发动机先下班了，留下你和成绩单面面相觑。'
-  if (/溜车|后溜|后退/.test(title)) return '重力今天存在感很强，坡道也没打算客气。'
-  if (/安全带/.test(title)) return '人还没开始秀操作，安全感先掉线了。'
-  if (/转向灯|灯光|远光|近光/.test(title)) return '灯没跟上剧情，属于演员到场了，道具还在路上。'
-  if (/超时|时间/.test(title)) return '路线还没急，计时器先替你急了。'
-  if (/超速|速度/.test(title)) return '车速上去了，分数下来的速度也没闲着。'
-  if (/停车|中途停车/.test(title)) return '车很有自己的节奏，说停就停，完全不看剧本。'
-  if (/倒车入库|入库/.test(title)) return '车库很大，但你和它的关系还需要再磨合一下。'
-  if (/侧方/.test(title)) return '侧方位今天有点高冷，没那么容易让你停进去。'
-  if (/曲线|S弯/.test(title)) return '弯道没为难你太久，主要是你们彼此不太熟。'
-  if (/直角/.test(title)) return '直角很直，路线很明确，剧情却拐得有点突然。'
-  if (/坡|起步/.test(title)) return '坡道起步这关，车和脚下配合还差一点默契。'
-  if (/方向|转向/.test(title)) return '方向盘这次有点自己的想法，下把记得开个会。'
-  return '这个失误不一定致命，但很会抢镜。'
+type RoastRule = {
+  pattern: RegExp
+  lines: readonly string[]
+}
+
+const INFRACTION_ROAST_RULES: readonly RoastRule[] = [
+  {
+    pattern: /锥桶|雪糕桶|路锥|锥形桶/,
+    lines: [
+      '锥桶：我就站这儿上个班，怎么还算工伤了。',
+      '全场最无辜的是那个锥桶，它甚至没有驾照。',
+      '雪糕桶的工作是站着，不是陪你做碰撞测试。',
+      '绕开它本来是选择题，你硬是做成了接触题。',
+      '教练让你看点位，没让你去和锥桶线下见面。',
+      '这个桶颜色已经够显眼了，再撞就属于主动社交。',
+      '锥桶没有闪现技能，下次只能麻烦你自己绕。',
+      '别人绕桩，你这是直接和桩建立合作关系。',
+      '锥桶都穿成荧光橙了，还没躲过你的精准打击。',
+      '今天点位没找准，桶倒是找得挺准。',
+      '这么大一片路，偏偏和最小的那个障碍物有缘。',
+      '锥桶本来负责提醒你别靠近，现在改负责实战教学。',
+      '教练让你绕过去，你用实际行动证明了什么叫不走寻常路。',
+    ],
+  },
+  {
+    pattern: /树木|撞树|树/,
+    lines: [
+      '树站那儿这么多年，今天终于等到你来打招呼。',
+      '方向盘：我以为要绕过去。你：不，我们去认识一下。',
+      '树不会横穿马路，所以这次很难让它背锅。',
+      '绿化做得挺好，就是不建议用车头近距离验收。',
+      '教练说看远一点，你直接把视线落在树干上了。',
+      '这棵树唯一的操作，就是没动。',
+      '树：我根都扎这儿了，你还能说是我突然出现？',
+      '下次记住，科目考试不包含“车辆与自然亲密接触”。',
+      '树都不会动，你还能和它会师，路线选择确实很有主见。',
+      '这么宽的路，最后和树达成了双向奔赴。',
+      '树没考驾照，但今天被迫参加了你的考试。',
+      '导航说沿路行驶，你理解成了沿树行驶。',
+      '教练看到这一幕，只想问一句：那棵树到底哪里吸引你？',
+    ],
+  },
+  {
+    pattern: /建筑|墙|围墙|房/,
+    lines: [
+      '建筑物没有突然横穿马路的习惯，这锅它不接。',
+      '墙一直很稳定，今天不稳定的是你和方向盘的关系。',
+      '路线这么宽，你偏偏去研究建筑材料。',
+      '这是驾驶考试，不是建筑质量抽检。',
+      '再靠近一点，物业都要出来问你找谁了。',
+      '教练让你靠边，没让你靠墙。',
+    ],
+  },
+  {
+    pattern: /立杆|灯杆|标志杆|桩杆|杆/,
+    lines: [
+      '杆子确实细，但也不是让你验证碰撞箱的。',
+      '这么细一根杆你都能精准命中，准头值得用在别处。',
+      '教练说盯点，不是盯着杆子开过去。',
+      '这根杆今天什么都没做，就完成了一次被动教学。',
+      '避障没避开，倒是把精准度证明了。',
+      '杆：谢谢关注，下次远观就行。',
+    ],
+  },
+  {
+    pattern: /与车辆发生碰撞|碰撞.*车辆|撞车|车辆碰撞/,
+    lines: [
+      '别人是交通参与者，不是移动靶。',
+      '跟车不是跟到一起，保持距离这四个字得拆开重学。',
+      '两辆车本来各走各的，你非要安排一次会师。',
+      '保险公司看了这段回放，可能比教练更紧张。',
+      '这不是并线，是把两个车道的故事强行合并了。',
+      '道路社交可以有，车身接触就免了。',
+    ],
+  },
+  {
+    pattern: /行人.*碰撞|碰撞.*行人|撞.*行人/,
+    lines: [
+      '看到行人先收油收心，别把模拟器开成反应测试。',
+      '行人不是路线上的障碍物，优先级比你的成绩高。',
+      '这时候该踩的是刹车，不是剧情加速键。',
+      '教练看到这里已经不毒舌了，只想让你先把刹车认熟。',
+      '路权判断可以慢半拍，刹车不能慢半拍。',
+    ],
+  },
+  {
+    pattern: /电动车.*碰撞|碰撞.*电动车|撞.*电动车|摩托车.*碰撞/,
+    lines: [
+      '电动车不是保龄球瓶，别拿车头找击中感。',
+      '道路上车型很多，不代表都要逐一近距离体验。',
+      '这波不是会车，是强行认识。',
+      '看到两轮车先留空间，别把安全距离压缩成社交距离。',
+      '教练让你观察交通，不是收集碰撞图鉴。',
+    ],
+  },
+  {
+    pattern: /安全带/,
+    lines: [
+      '安全带就在肩膀旁边，你选择和它保持社交距离。',
+      '车还没开明白，安全带先被你冷落明白了。',
+      '这题没有技术含量，唯一要求就是记得伸手。',
+      '安全带：我功能都写名字上了，你还是没用我。',
+      '方向盘可以慢慢学，安全带真不用练到第二把。',
+      '教练最怕这种扣分：不是不会，是压根忘了。',
+      '人都坐进驾驶位了，安全意识还在候车区。',
+      '这一分丢得很纯粹——没有操作难度，只有遗忘难度。',
+      '系安全带只要两秒，你用一整张成绩单记住了它。',
+      '先别研究走线，先把自己固定在线内。',
+      '这本来是送分题，你成功把分送回去了。',
+      '安全带不会考点位，不会考半联动，只考记性——结果记性先熄火了。',
+      '驾考里最便宜的保险，你选择暂时不用。',
+      '忘系安全带这种失误，连教练的毒舌都显得多余：扣分理由已经够毒了。',
+      '上车第一件事没做，后面的技术展示多少有点抢跑。',
+    ],
+  },
+  {
+    pattern: /熄火|发动机停止/,
+    lines: [
+      '发动机先下班了，留下你和成绩单面面相觑。',
+      '车：今天先练到这儿。你：我还没同意呢。',
+      '油离配合还没谈拢，发动机选择退出群聊。',
+      '这把最果断的是发动机，说熄就熄。',
+      '教练还没喊停，发动机先替教练执行了。',
+      '脚下稍微温柔一点，发动机不是开关题。',
+      '半联动没找到，倒是精准找到了熄火点。',
+    ],
+  },
+  {
+    pattern: /溜车|后溜|倒溜|后退/,
+    lines: [
+      '重力今天存在感很强，坡道也没打算客气。',
+      '别人坡起向前，你先给历史倒了个带。',
+      '车没想回家，是你的脚让它产生了这个念头。',
+      '坡道：我只负责有坡，往哪儿走是你的事。',
+      '前进挡的目标很明确，车辆的实际行动略有不同。',
+      '这把不是起步，是先撤退再说。',
+      '教练让你松手刹，不是放弃抵抗。',
+    ],
+  },
+  {
+    pattern: /压线|出线|越线|触线|轧线|车身出/,
+    lines: [
+      '线就在那里，你也在那里，缘分确实有点过头。',
+      '考试线不是磁吸充电器，不用贴那么近。',
+      '别人看点位，你在和边线培养感情。',
+      '这条线存在的意义，就是提醒你别压；你选择亲自验证。',
+      '车轮和边线成功会师，成绩顺便表示遗憾。',
+      '线没动，车动了，所以责任划分比较清晰。',
+      '能把线压得这么准，说明精准度不是没有，只是用错地方。',
+      '离线远一点不会扣分，真的不用贴脸输出。',
+    ],
+  },
+  {
+    pattern: /转向灯|方向灯/,
+    lines: [
+      '转向灯最大的作用不是装饰，是提前告诉别人你要干什么。',
+      '车都准备转了，灯还在思考人生。',
+      '动作已经发生，信号还没发出去，这叫先斩后奏。',
+      '转向灯不是考试彩蛋，想起来再点没有加成。',
+      '方向盘已经表态了，转向灯还保持中立。',
+      '教练最怕你这种：心里知道往哪儿转，就是不告诉别人。',
+    ],
+  },
+  {
+    pattern: /远光|近光|灯光|照明/,
+    lines: [
+      '灯光不是氛围组，什么时候开什么得讲规矩。',
+      '这不是舞台灯控，远近光不用靠感觉切。',
+      '车灯很亮，规则记忆稍微有点暗。',
+      '灯开得挺积极，时机选得比较有个人风格。',
+      '夜间驾驶不是谁亮谁有理。',
+      '灯光操作没跟上路况，属于设备在线、判断离线。',
+    ],
+  },
+  {
+    pattern: /超速|超过.*速度|速度过高/,
+    lines: [
+      '车速上去了，分数下来的速度也没闲着。',
+      '这是驾考模拟，不是排位赛。',
+      '油门很有事业心，可惜考试不看圈速。',
+      '你负责提速，系统负责提醒你冷静。',
+      '开得快不等于开得好，尤其成绩单已经举证。',
+      '教练还没来得及说慢点，系统先把分扣了。',
+      '油门踩得像后面有外卖要凉了，可这是考试，不是配送。',
+      '限速牌负责提醒，你负责当没看见，系统负责结算。',
+    ],
+  },
+  {
+    pattern: /未按.*减速|合理减速|减速/,
+    lines: [
+      '该慢的时候没慢，属于把“提前量”全留给了后悔。',
+      '刹车不是最后一秒的剧情反转工具。',
+      '路况已经暗示得很明显了，你选择保持原节奏。',
+      '教练嘴里的“慢一点”不是背景音乐。',
+      '速度控制这块，油门的发言权暂时有点大。',
+    ],
+  },
+  {
+    pattern: /超时|超过.*秒|时间/,
+    lines: [
+      '路线还没急，计时器先替你急了。',
+      '动作可以稳，不能稳到系统开始催更。',
+      '考试不是无限时副本，计时器是真的会结算。',
+      '你在精雕细琢，倒计时只想按时下班。',
+      '教练允许你想一下，系统没允许你想这么久。',
+      '这把最大的问题不是不会，是流程进入了慢放模式。',
+    ],
+  },
+  {
+    pattern: /未完整观察|未完成.*观察|未观察|观察.*不足/,
+    lines: [
+      '镜子不是内饰，路口也不是开盲盒。',
+      '车往前走了，观察流程还停在上一页。',
+      '教练让你左右看，不是做颈椎操，是怕真有东西。',
+      '这波属于勇气有余，信息收集不足。',
+      '路况没看全就开始操作，多少有点凭感觉开副本。',
+      '先看再动四个字，今天执行成了先动再说。',
+      '后视镜不是付费 DLC，装了就得用。',
+      '别人开车靠观察，你这段更像靠信念。',
+    ],
+  },
+  {
+    pattern: /驻车制动|手刹/,
+    lines: [
+      '手刹还在上班，你已经准备带着它一起出发了。',
+      '车想走，手刹想留，内部意见完全没统一。',
+      '起步前少开了一个会：问问手刹同不同意。',
+      '油门负责前进，手刹负责反对，你负责夹在中间。',
+      '教练听发动机声音就知道：有人忘了松手刹。',
+    ],
+  },
+  {
+    pattern: /挡位|档位|换挡|加挡|减挡|挂挡/,
+    lines: [
+      '挡位不是抽卡，得按车速和场景来。',
+      '发动机转速已经给提示了，你和挡把还没达成共识。',
+      '这波换挡有想法，就是和车况不太熟。',
+      '挡位选得比较自由，车辆反馈得比较诚实。',
+      '教练看你摸挡把的样子，就知道下一秒有剧情。',
+    ],
+  },
+  {
+    pattern: /倒车入库|入库/,
+    lines: [
+      '车库很大，但你和它的关系还需要再磨合一下。',
+      '库位不会跑，慢一点它还是在那里。',
+      '倒库不是俄罗斯方块，塞进去不算，姿势也得对。',
+      '后视镜已经尽力了，剩下的得方向盘配合。',
+      '库角都看见了，路线还是走出了自己的理解。',
+    ],
+  },
+  {
+    pattern: /侧方/,
+    lines: [
+      '侧方位今天有点高冷，没那么容易让你停进去。',
+      '车位就在旁边，你们今天主打一个擦肩而过。',
+      '侧方停车不要求一见钟情，但至少得停进去。',
+      '点位都认识，组合起来还有点陌生。',
+      '教练看完表示：步骤都有，合成效果待优化。',
+    ],
+  },
+  {
+    pattern: /曲线|S弯/,
+    lines: [
+      '弯道没为难你太久，主要是你们彼此不太熟。',
+      'S 弯不是让你写草书，轨迹不用这么自由。',
+      '弯道很有规律，你的路线更有创意。',
+      '方向盘打得挺忙，车身未必完全理解。',
+      '教练说顺着弯走，你给弯道重新设计了一版。',
+    ],
+  },
+  {
+    pattern: /直角/,
+    lines: [
+      '直角很直，路线很明确，剧情却拐得有点突然。',
+      '这个弯只有九十度，你开出了更多可能性。',
+      '点位到了再打方向，不是方向到了再找点位。',
+      '直角转弯本来线条很硬，你的路线更抽象。',
+      '教练说一把过，你理解成了一把方向打到底。',
+    ],
+  },
+  {
+    pattern: /坡|起步/,
+    lines: [
+      '坡道起步这关，车和脚下配合还差一点默契。',
+      '坡不背锅，它每一把都长这样。',
+      '油门、离合、刹车三方会议今天没开成功。',
+      '坡道没有针对你，它对每个人都一样斜。',
+      '教练最熟悉的表情，往往就出现在坡起这一段。',
+    ],
+  },
+  {
+    pattern: /中途停车|不应停车|停车/,
+    lines: [
+      '车很有自己的节奏，说停就停，完全不看剧本。',
+      '这里不是服务区，临时休息不计入考试流程。',
+      '路线还没结束，你先给自己插了段广告。',
+      '该连续的时候停下来，属于主动给难度加码。',
+      '教练没喊停，车先进入了思考模式。',
+    ],
+  },
+  {
+    pattern: /方向|转向|路线/,
+    lines: [
+      '方向盘这次有点自己的想法，下把记得开个会。',
+      '路线是固定的，你开出了自定义皮肤。',
+      '导航没让你自由发挥，方向盘倒是挺支持。',
+      '车头去哪儿这件事，最好由你提前决定。',
+      '教练看得出来你有方向，只是方向比较多。',
+    ],
+  },
+]
+
+const DEFAULT_INFRACTION_ROASTS = [
+  '这个失误不一定致命，但很会抢镜。',
+  '教练看完没说话，先把回放往前拖了五秒。',
+  '这一项操作很有个人风格，可惜评分标准不吃这一套。',
+  '系统没有情绪，所以它只是安静地把分扣了。',
+  '这一下属于练车时很有价值，考试时最好别再见。',
+  '复盘建议很简单：这段再看一遍，然后假装没发生过。',
+] as const
+
+function infractionRoast(title: string, seed = title) {
+  const matched = INFRACTION_ROAST_RULES.find(rule => rule.pattern.test(title))
+  return pick(matched?.lines ?? DEFAULT_INFRACTION_ROASTS, seed + '|infraction-roast|' + title)
 }
 
 function buildDetail({
@@ -180,48 +490,54 @@ function buildDetail({
   score,
   passLine,
   infractionTitles,
+  incidentTitles = [],
   fatalCount,
-}: Pick<ResultCommentInput, 'status' | 'score' | 'passLine' | 'infractionTitles' | 'fatalCount'>) {
+}: Pick<ResultCommentInput, 'status' | 'score' | 'passLine' | 'infractionTitles' | 'incidentTitles' | 'fatalCount'>) {
   const primaryInfraction = infractionTitles[0]
+  const primaryIncident = incidentTitles[0]
   const gap = Math.max(0, passLine - score)
+  const incidentNote = primaryIncident
+    ? `现场花絮：${primaryIncident}。 ${infractionRoast(primaryIncident, [status, score, passLine, 'incident'].join('|'))}`
+    : ''
+  const appendIncident = (text: string) => incidentNote ? `${text} ${incidentNote}` : text
 
   if (status === 'incomplete') {
-    return `${score} 分只是当前已记录的操作。先把全程跑完，再让合格线正式出场。`
+    return appendIncident(`${score} 分只是当前已记录的操作。先把全程跑完，再让合格线正式出场。`)
   }
 
   if (status === 'failed' && fatalCount > 0) {
-    return primaryInfraction
-      ? `主要剧情转折：${primaryInfraction}。 ${infractionRoast(primaryInfraction)}`
-      : '出现了不合格项目。好在这里是模拟器，问题暴露得越早越值。'
+    return appendIncident(primaryInfraction
+      ? `主要剧情转折：${primaryInfraction}。 ${infractionRoast(primaryInfraction, [status, score, passLine].join('|'))}`
+      : '出现了不合格项目。好在这里是模拟器，问题暴露得越早越值。')
   }
 
   if (status === 'failed') {
     if (primaryInfraction) {
-      return `距合格线还差 ${gap} 分。主要失误：${primaryInfraction}。 ${infractionRoast(primaryInfraction)}`
+      return appendIncident(`距合格线还差 ${gap} 分。主要失误：${primaryInfraction}。 ${infractionRoast(primaryInfraction, [status, score, passLine].join('|'))}`)
     }
-    return gap > 0
+    return appendIncident(gap > 0
       ? `距合格线还差 ${gap} 分。别和分数讲道理，下一把把细节拿回来。`
-      : '分数不是主要问题，先把已记录的关键失误处理掉。'
+      : '分数不是主要问题，先把已记录的关键失误处理掉。')
   }
 
   if (score === 100 && infractionTitles.length === 0) {
-    return '零扣分事件。今天的方向盘和你意见高度一致。'
+    return appendIncident('零扣分事件。今天的方向盘和你意见高度一致。')
   }
 
   if (infractionTitles.length === 0) {
-    return score >= 95
+    return appendIncident(score >= 95
       ? '全程没有记录到扣分事件，这把可以放心截图。'
-      : '没有扣分事件，属于安安静静把事情办成了。'
+      : '没有扣分事件，属于安安静静把事情办成了。')
   }
 
-  const roast = infractionRoast(primaryInfraction)
+  const roast = infractionRoast(primaryInfraction, [status, score, passLine].join('|'))
   if (score >= 95) {
-    return `${infractionTitles.length} 个扣分点来过，但没有把你从高分区拽下来。代表作：${primaryInfraction}。 ${roast}`
+    return appendIncident(`${infractionTitles.length} 个扣分点来过，但没有把你从高分区拽下来。代表作：${primaryInfraction}。 ${roast}`)
   }
   if (score >= passLine + 5) {
-    return `${infractionTitles.length} 个扣分点已经记账，但没拦住你过线。代表作：${primaryInfraction}。 ${roast}`
+    return appendIncident(`${infractionTitles.length} 个扣分点已经记账，但没拦住你过线。代表作：${primaryInfraction}。 ${roast}`)
   }
-  return `${infractionTitles.length} 个扣分点陪你一起过线。代表作：${primaryInfraction}。 ${roast}`
+  return appendIncident(`${infractionTitles.length} 个扣分点陪你一起过线。代表作：${primaryInfraction}。 ${roast}`)
 }
 
 export function buildResultComment(input: ResultCommentInput): ResultComment {
@@ -232,9 +548,10 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     status,
     resultLabel,
     infractionTitles,
+    incidentTitles = [],
     fatalCount,
   } = input
-  const seed = [examTitle, score, passLine, status, fatalCount, ...infractionTitles].join('|')
+  const seed = [examTitle, score, passLine, status, fatalCount, ...infractionTitles, ...incidentTitles].join('|')
   const gap = Math.max(0, passLine - score)
 
   let badge: string
@@ -250,7 +567,7 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     const close = gap <= 10
     badge = pick(close ? CLOSE_BADGES : FAR_BADGES, seed + '|badge')
     headline = pick(close ? FAILED_CLOSE : FAILED_FAR, seed)
-  } else if (score === 100 && infractionTitles.length === 0) {
+  } else if (score === 100 && infractionTitles.length === 0 && incidentTitles.length === 0) {
     badge = pick(PERFECT_BADGES, seed + '|badge')
     headline = pick(PASSED_PERFECT, seed)
   } else if (score >= 95) {
@@ -264,12 +581,12 @@ export function buildResultComment(input: ResultCommentInput): ResultComment {
     headline = pick(PASSED_EDGE, seed)
   }
 
-  const detail = buildDetail({ status, score, passLine, infractionTitles, fatalCount })
+  const detail = buildDetail({ status, score, passLine, infractionTitles, incidentTitles, fatalCount })
 
   return {
     badge,
     headline,
     detail,
-    shareText: `科目二模拟成绩：${score} 分 · ${resultLabel}\n${headline}\n${detail}\n—— ${examTitle}`,
+    shareText: `驾考模拟成绩：${score} 分 · ${resultLabel}\n${headline}\n${detail}\n—— ${examTitle}`,
   }
 }
