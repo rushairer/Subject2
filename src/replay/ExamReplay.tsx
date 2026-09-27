@@ -16,6 +16,7 @@ import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTraining
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
 import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
 import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
+import { NightLightingCoachingPanel } from './NightLightingCoachingPanel'
 import { DrivingDynamicsTimeline } from './DrivingDynamicsTimeline'
 
 export interface TrajectorySample {
@@ -34,11 +35,17 @@ export interface TrajectorySample {
   engineOn?: boolean
   engineRpm?: number
   clutch?: number
+  night?: boolean
+  lowBeam?: boolean
+  highBeam?: boolean
   leadVehicleId?: string
   leadGapMeters?: number
   leadTimeGapSeconds?: number
   leadClosingSpeedMps?: number
   leadTimeToCollisionSeconds?: number
+  oncomingVehicleId?: string
+  oncomingDistanceMeters?: number
+  oncomingTimeToMeetSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -581,6 +588,15 @@ export function ExamReplay({
     />
 
     <FollowingDistanceCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <NightLightingCoachingPanel
       samples={samples}
       onSelect={t => setFocusRequest(previous => ({
         project: 'subject3',
