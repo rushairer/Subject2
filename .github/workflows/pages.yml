@@ -13,7 +13,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Keep cancellation local to the same PR/ref so a stuck PR smoke run
+  # can never block a main-branch Pages deployment.
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
