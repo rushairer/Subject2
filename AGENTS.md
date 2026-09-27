@@ -320,3 +320,18 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Compare at most the recent bounded window used by `compareTrainingPackRounds`; preserve older stored rounds only up to the storage limit.
 - User-facing copy must distinguish an observed coaching trend from proof of driving skill. One better round is “improved versus earlier evidence”, not “habit mastered”.
 - The final-pack browser smoke must verify that a real round is persisted and that a seeded prior round is filtered/matched into the visible cross-round trend.
+
+
+## Personalized long-term training plan
+
+`src/training/trainingPlan.ts` owns deterministic training-center recommendations derived from persisted training-pack history. `src/training/TrainingPlanPanel.tsx` owns presentation only.
+
+- Scope evidence by candidate name + license type before comparing or ranking packs. Never let another candidate or C1/C2 history affect the current plan.
+- Do not create a hidden coaching score. Recommendation ordering is categorical and evidence-driven: urgent evidence first, then reinforcement, then missing-baseline work, then maintenance.
+- “Priority” is reserved for current severe evidence such as fatal records, incomplete stages, or a worsening cross-round trend.
+- A pack with remaining target-habit errors must stay in reinforcement even when its trend is improving. Stable improvement does not erase unresolved evidence.
+- “Lower priority / maintain” is allowed only when the latest round has no target-habit errors, no fatal evidence, and no incomplete stages, with enough history to support the wording.
+- No-history and single-clean-round states must ask for baseline/confirmation rather than claiming stability.
+- User-facing advice must explain the concrete evidence behind the recommendation and state that reduced training priority is not proof of real-road driving competence.
+- Menu recommendations must launch the configured pack through the same `onStartTrainingPack` path as the normal pack card. Do not invent a recommendation-only session type or bypass pack state.
+- The browser smoke must seed evidence, verify the expected training-center recommendation, and enter a real WebGL pack from the recommendation CTA.
