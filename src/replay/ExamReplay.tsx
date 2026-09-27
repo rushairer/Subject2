@@ -18,6 +18,7 @@ import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
 import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
 import { NightLightingCoachingPanel } from './NightLightingCoachingPanel'
 import { SuddenBrakeCoachingPanel } from './SuddenBrakeCoachingPanel'
+import { CutInResponseCoachingPanel } from './CutInResponseCoachingPanel'
 import { DrivingDynamicsTimeline } from './DrivingDynamicsTimelinePanel'
 
 export interface TrajectorySample {
@@ -51,6 +52,14 @@ export interface TrajectorySample {
   oncomingVehicleId?: string
   oncomingDistanceMeters?: number
   oncomingTimeToMeetSeconds?: number
+  cutInHazardId?: string
+  cutInConflict?: boolean
+  cutInProgressDeltaMeters?: number
+  cutInLateralDeltaMeters?: number
+  cutInLongitudinalSpeedMps?: number
+  cutInLateralSpeedMps?: number
+  cutInClosingSpeedMps?: number
+  cutInTimeToLongitudinalMeetSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -534,6 +543,14 @@ function ProjectReplay({
             <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
             <small>前车时距 · {current.leadGapMeters.toFixed(1)} m</small>
           </span>}
+        {current.cutInHazardId && current.cutInProgressDeltaMeters != null &&
+          current.cutInLateralDeltaMeters != null &&
+          <span>
+            <b>{current.cutInConflict ? '已切入' : '接近中'}</b>
+            <small>
+              加塞目标 · 纵向 {current.cutInProgressDeltaMeters.toFixed(1)} m · 横向 {Math.abs(current.cutInLateralDeltaMeters).toFixed(1)} m
+            </small>
+          </span>}
       </div>
     </div>
   </article>
@@ -615,6 +632,15 @@ export function ExamReplay({
     />
 
     <SuddenBrakeCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <CutInResponseCoachingPanel
       samples={samples}
       onSelect={t => setFocusRequest(previous => ({
         project: 'subject3',
