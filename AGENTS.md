@@ -349,3 +349,14 @@ The “本次优先改进” block must remain readable inside the result-card c
 - When one pack has already been repeated multiple times today while another planned pack is still pending, surface an explicit anti-bias notice rather than silently rewarding repetition.
 - “Today complete” means the configured daily sequence has been covered once; it is not a statement that driving skill is mastered.
 - The browser smoke must seed prior evidence, enter the first daily recommendation, finish that real WebGL training pack, return to the training center, and verify the second distinct pack becomes the next task.
+
+
+## Portable production asset base
+
+`vite.config.ts` must keep the production `base` relative (`'./'`) so one build works both under the GitHub Pages repository subpath and at a custom-domain root such as `https://kemu2.aben.io/`.
+
+- Do not hard-code `/Subject2/`, `/`, or another absolute asset base into the production Vite config.
+- Built CSS/JS/font/image references emitted by Vite must remain relative to the deployed `index.html`.
+- Playwright production preview must exercise the build from the server root; it must not depend on the historical `/Subject2/` preview path.
+- Keep `tests/vite-base.test.ts` as the regression lock for this portability requirement.
+- If client-side routes are introduced later, re-evaluate deep-link handling separately; do not solve routing by reverting static asset URLs to a repository-specific absolute prefix.
