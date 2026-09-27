@@ -86,6 +86,86 @@ test('recorded infractions can add a contextual roast without changing the score
     fatalCount: 0,
   })
   assert.match(comment.detail, /车轮压线/)
-  assert.match(comment.detail, /缘分确实有点过头/)
+  assert.match(comment.detail, /线|边线|车轮|考试线|精准度|贴脸/)
   assert.match(comment.shareText, /82 分 · 合格/)
+})
+
+
+test('tree collisions get a tree-specific coach roast', () => {
+  const comment = buildResultComment({
+    examTitle: '科目三道路驾驶',
+    score: 0,
+    passLine: 90,
+    status: 'failed',
+    resultLabel: '未合格',
+    infractionTitles: ['道路驾驶过程中与树木发生碰撞'],
+    fatalCount: 1,
+  })
+  assert.match(comment.detail, /树木发生碰撞/)
+  assert.match(comment.detail, /树|绿化|自然/)
+})
+
+test('cone collisions support both official cone wording and the common snow-cone nickname', () => {
+  for (const title of [
+    '道路驾驶过程中与锥桶发生碰撞',
+    '倒车时撞到雪糕桶',
+  ]) {
+    const comment = buildResultComment({
+      examTitle: '科目二模拟考试',
+      score: 70,
+      passLine: 80,
+      status: 'failed',
+      resultLabel: '未合格',
+      infractionTitles: [title],
+      fatalCount: 0,
+    })
+    assert.match(comment.detail, /锥桶|雪糕桶|路锥|工伤|碰撞测试|线下见面|主动社交|闪现|绕桩/)
+  }
+})
+
+test('seatbelt infractions get a specific reminder rather than a generic failure line', () => {
+  const comment = buildResultComment({
+    examTitle: '科目三道路驾驶',
+    score: 0,
+    passLine: 90,
+    status: 'failed',
+    resultLabel: '未合格',
+    infractionTitles: ['科目三道路驾驶过程中未按规定使用安全带'],
+    fatalCount: 1,
+  })
+  assert.match(comment.detail, /安全带/)
+  assert.match(comment.detail, /肩膀|伸手|功能|两秒|安全意识|遗忘|固定/)
+})
+
+test('vehicle collisions read like a driving-specific coach comment', () => {
+  const comment = buildResultComment({
+    examTitle: '科目三道路驾驶',
+    score: 0,
+    passLine: 90,
+    status: 'failed',
+    resultLabel: '未合格',
+    infractionTitles: ['道路驾驶过程中与车辆发生碰撞'],
+    fatalCount: 1,
+  })
+  assert.match(comment.detail, /车辆发生碰撞/)
+  assert.match(comment.detail, /交通参与者|跟车|会师|保险公司|并线|车身接触/)
+})
+
+
+test('non-scoring cone incidents still influence the shareable coach comment', () => {
+  const comment = buildResultComment({
+    examTitle: '侧方停车',
+    score: 100,
+    passLine: 80,
+    status: 'passed',
+    resultLabel: '合格',
+    infractionTitles: [],
+    incidentTitles: ['侧方停车时撞到锥桶'],
+    fatalCount: 0,
+  })
+  assert.match(comment.detail, /现场花絮/)
+  assert.match(comment.detail, /撞到锥桶/)
+  assert.match(comment.detail, /锥桶|雪糕桶|工伤|碰撞测试|线下见面|主动社交|闪现|绕桩/)
+  assert.doesNotMatch(comment.detail, /零扣分事件。今天的方向盘和你意见高度一致。$/)
+  assert.match(comment.shareText, /100 分 · 合格/)
 })
