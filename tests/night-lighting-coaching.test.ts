@@ -30,7 +30,7 @@ function series(
 test('daytime and low-speed samples are excluded from night lighting coaching', () => {
   const report = buildNightLightingCoachingReport([
     sample(0, { night: false, speed: 10, highBeam: true, oncomingVehicleId: 'a', oncomingDistanceMeters: 80 }),
-    sample(0.3, { speed: 0.5, highBeam: true, oncomingVehicleId: 'a', oncomingDistanceMeters: 80 }),
+    sample(0.3, { speed: 0.1, highBeam: true, oncomingVehicleId: 'a', oncomingDistanceMeters: 80 }),
   ])
 
   assert.equal(report.observedSampleCount, 0)
