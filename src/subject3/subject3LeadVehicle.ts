@@ -1,5 +1,5 @@
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { LANE_WIDTH, SUBJECT3_ROUTE_LENGTH, projectToSubject3Route } from './subject3Route'
+import { LANE_WIDTH, projectToSubject3Route } from './subject3Route'
 import {
   SUBJECT3_TRAFFIC_CAR,
   type Subject3TrafficState,
@@ -91,11 +91,6 @@ export interface Subject3OncomingVehicleObservation {
   timeToMeetSeconds?: number
 }
 
-function forwardRouteDistance(fromProgress: number, toProgress: number) {
-  const raw = (toProgress - fromProgress) % SUBJECT3_ROUTE_LENGTH
-  return raw < 0 ? raw + SUBJECT3_ROUTE_LENGTH : raw
-}
-
 export function observeSubject3OncomingVehicle(
   player: { x: number; z: number; speed: number },
   traffic: Readonly<Subject3TrafficState>,
@@ -110,7 +105,7 @@ export function observeSubject3OncomingVehicle(
   for (const vehicle of Object.values(traffic.vehicles)) {
     if (!vehicle.opposite) continue
 
-    const distance = forwardRouteDistance(projection.progress, vehicle.progress)
+    const distance = vehicle.progress - projection.progress
     if (
       distance <= 0 ||
       distance > SUBJECT3_ONCOMING_OBSERVATION.maximumLookaheadMeters ||
