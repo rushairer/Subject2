@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { buildResultComment } from '../src/session/resultComment.ts'
+import { subject2CollisionIncident } from '../src/session/drivingIncident.ts'
 
 test('result commentary is deterministic for the same result', () => {
   const input = {
@@ -160,7 +161,13 @@ test('non-scoring cone incidents still influence the shareable coach comment', (
     status: 'passed',
     resultLabel: '合格',
     infractionTitles: [],
-    incidentTitles: ['侧方停车时撞到锥桶'],
+    incidents: [subject2CollisionIncident({
+      id: 'side-parking-cone-0',
+      kind: 'cone',
+      object: 'traffic-cone',
+      label: '锥桶',
+      course: 'side-parking',
+    })],
     fatalCount: 0,
   })
   assert.match(comment.detail, /现场花絮/)
@@ -179,7 +186,13 @@ test('a cone incident can take over the headline even when the score is perfect'
     status: 'passed',
     resultLabel: '合格',
     infractionTitles: [],
-    incidentTitles: ['侧方停车时撞到锥桶'],
+    incidents: [subject2CollisionIncident({
+      id: 'side-parking-cone-0',
+      kind: 'cone',
+      object: 'traffic-cone',
+      label: '锥桶',
+      course: 'side-parking',
+    })],
     fatalCount: 0,
   })
   assert.match(comment.badge, /精准命中|锥桶受害者协会|点位很特别|现场有桶/)
@@ -214,13 +227,59 @@ test('multiple cone contacts get a combined coach comment instead of hiding afte
     status: 'passed',
     resultLabel: '合格',
     infractionTitles: [],
-    incidentTitles: [
-      '倒车入库时撞到锥桶',
-      '侧方停车时撞到锥桶',
-      '直角转弯时撞到锥桶',
+    incidents: [
+      subject2CollisionIncident({
+        id: 'reverse-parking-cone-0',
+        kind: 'cone',
+        object: 'traffic-cone',
+        label: '锥桶',
+        course: 'reverse-parking',
+      }),
+      subject2CollisionIncident({
+        id: 'side-parking-cone-0',
+        kind: 'cone',
+        object: 'traffic-cone',
+        label: '锥桶',
+        course: 'side-parking',
+      }),
+      subject2CollisionIncident({
+        id: 'right-angle-cone-0',
+        kind: 'cone',
+        object: 'traffic-cone',
+        label: '锥桶',
+        course: 'right-angle',
+      }),
     ],
     fatalCount: 0,
   })
   assert.match(comment.detail, /共与 3 个锥桶发生接触/)
   assert.match(comment.detail, /给锥桶点名/)
+})
+
+
+test('structured collision object drives the roast even when the display title has no object keyword', () => {
+  const incident = {
+    ...subject2CollisionIncident({
+      id: 'reverse-parking-sign-post',
+      kind: 'pole',
+      object: 'sign-post',
+      label: '倒车入库标志杆',
+      course: 'reverse-parking',
+    }),
+    title: '现场发生了一次接触',
+  }
+  const comment = buildResultComment({
+    examTitle: '倒车入库',
+    score: 100,
+    passLine: 80,
+    status: 'passed',
+    resultLabel: '合格',
+    infractionTitles: [],
+    incidents: [incident],
+    fatalCount: 0,
+  })
+  assert.match(comment.badge, /准头用错地方|杆：谢谢关注|精准碰杆/)
+  assert.match(comment.headline, /杆|准头|盯点/)
+  assert.match(comment.detail, /现场发生了一次接触/)
+  assert.match(comment.detail, /杆|精准度|避障|关注/)
 })
