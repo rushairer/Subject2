@@ -2,15 +2,22 @@ import type {
   ReplayHabitId,
   ReplayTrainingProjectId,
 } from '../replay/replayTrainingFocus'
+import type { Subject3PracticeSliceId } from '../subject3/subject3Practice'
 
 export type TrainingPackId = 'space-position' | 'observation-signal'
+
+export interface TrainingPackStageDefinition {
+  project: ReplayTrainingProjectId
+  label: string
+  subject3Practice?: Subject3PracticeSliceId
+}
 
 export interface TrainingPackDefinition {
   id: TrainingPackId
   title: string
   summary: string
   habits: readonly ReplayHabitId[]
-  projects: readonly ReplayTrainingProjectId[]
+  stages: readonly TrainingPackStageDefinition[]
 }
 
 export interface TrainingPackSessionState {
@@ -24,14 +31,36 @@ export const TRAINING_PACKS: readonly TrainingPackDefinition[] = [
     title: '车身边线控制',
     summary: '连续训练库线、道路边线、后轮轨迹和车身余量判断。',
     habits: ['space-position'],
-    projects: ['reverse-parking', 'side-parking', 'curve-driving', 'right-angle'],
+    stages: [
+      { project: 'reverse-parking', label: '倒车入库' },
+      { project: 'side-parking', label: '侧方停车' },
+      { project: 'curve-driving', label: '曲线行驶' },
+      { project: 'right-angle', label: '直角转弯' },
+    ],
   },
   {
     id: 'observation-signal',
     title: '观察与信号',
     summary: '把观察、转向灯和车辆动作的先后关系练成稳定流程。',
     habits: ['observation-signal'],
-    projects: ['right-angle', 'subject3'],
+    stages: [
+      { project: 'right-angle', label: '直角转弯' },
+      {
+        project: 'subject3',
+        label: '路口左右转弯',
+        subject3Practice: 'intersection-turns',
+      },
+      {
+        project: 'subject3',
+        label: '变更车道',
+        subject3Practice: 'lane-change',
+      },
+      {
+        project: 'subject3',
+        label: '靠边停车',
+        subject3Practice: 'pull-over',
+      },
+    ],
   },
 ]
 
@@ -51,13 +80,23 @@ export function trainingPackForHabit(
   return TRAINING_PACKS.find(pack => pack.habits.includes(habit)) ?? null
 }
 
+export function trainingPackStage(
+  state: TrainingPackSessionState,
+): TrainingPackStageDefinition {
+  const pack = trainingPackById(state.id)
+  const stage = pack.stages[state.index]
+  if (!stage) throw new Error(`Invalid training pack stage: ${state.id}#${state.index}`)
+  return stage
+}
+
 export function trainingPackProject(
   state: TrainingPackSessionState,
 ): ReplayTrainingProjectId {
-  const pack = trainingPackById(state.id)
-  const project = pack.projects[state.index]
-  if (!project) throw new Error(`Invalid training pack stage: ${state.id}#${state.index}`)
-  return project
+  return trainingPackStage(state).project
+}
+
+export function trainingPackStageLabel(state: TrainingPackSessionState) {
+  return trainingPackStage(state).label
 }
 
 export function nextTrainingPackState(
@@ -65,7 +104,7 @@ export function nextTrainingPackState(
 ): TrainingPackSessionState | null {
   const pack = trainingPackById(state.id)
   const nextIndex = state.index + 1
-  return nextIndex < pack.projects.length
+  return nextIndex < pack.stages.length
     ? { id: state.id, index: nextIndex }
     : null
 }
