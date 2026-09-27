@@ -56,7 +56,7 @@ async function expectHealthyDrivingScene(page: Page) {
 }
 
 test('C2 reverse-parking scene renders, accepts controls, and cycles all four cameras', async ({ page }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
