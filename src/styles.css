@@ -133,3 +133,38 @@
   .training-pack-report-actions{display:grid}
   .training-pack-report-actions .primary,.training-pack-report-actions .ghost-btn{width:100%;min-width:0}
 }
+
+
+.training-pack-history{margin-top:14px;padding:14px;border:1px solid #284b62;border-radius:14px;background:#081722}
+.training-pack-history-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,360px);gap:12px;align-items:start}
+.training-pack-history-head>div{display:grid;gap:3px}
+.training-pack-history-head>div>span{color:#68d2ff;font-size:8px;font-weight:900;letter-spacing:.14em}
+.training-pack-history-head>div>strong{font-size:15px;color:#e8f7ff}
+.training-pack-history-head>div>small{font-size:9px;color:#7f99ab;line-height:1.45}
+.training-pack-history-status{display:grid;gap:3px;padding:9px 10px;border:1px solid #31536d;border-radius:10px;background:#0a1d2b}
+.training-pack-history-status b{font-size:10px;color:#e8f7ff}
+.training-pack-history-status small{font-size:8px;color:#839dad;line-height:1.45}
+.training-pack-history-status.improving{border-color:#2e674f;background:#0d241c}
+.training-pack-history-status.improving b{color:#9fe4be}
+.training-pack-history-status.needs-attention{border-color:#754238;background:#281411}
+.training-pack-history-status.needs-attention b{color:#ffb09a}
+.training-pack-history-status.mixed{border-color:#76613c;background:#241e11}
+.training-pack-history-status.mixed b{color:#f3cf83}
+.training-pack-history-rounds{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:7px;margin-top:12px}
+.training-pack-history-rounds article{display:grid;gap:3px;min-width:0;padding:10px;border:1px solid #213e52;border-radius:10px;background:#0a1a27}
+.training-pack-history-round-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.training-pack-history-round-title b{font-size:9px;color:#b9d5e5}
+.training-pack-history-round-title span{font-size:8px;color:#658297}
+.training-pack-history-rounds article>strong{font-size:22px;line-height:1;color:#eef9ff;font-variant-numeric:tabular-nums}
+.training-pack-history-rounds article>small{font-size:8px;color:#738fa2}
+.training-pack-history-rounds article>div:last-child{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+.training-pack-history-rounds i{padding:2px 5px;border-radius:999px;background:#102a3c;color:#87a7ba;font-size:7px;font-style:normal}
+.training-pack-history-delta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:9px}
+.training-pack-history-delta>span{display:grid;gap:2px;padding:8px 9px;border-radius:9px;background:#091925}
+.training-pack-history-delta small{font-size:7px;color:#6f899b}
+.training-pack-history-delta b{font-size:11px;color:#dceef7;font-variant-numeric:tabular-nums}
+.training-pack-history-note{margin:9px 0 0;color:#6f8797;font-size:8px;line-height:1.55}
+@media(max-width:760px){
+  .training-pack-history-head{grid-template-columns:1fr}
+  .training-pack-history-delta{grid-template-columns:1fr}
+}

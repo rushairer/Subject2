@@ -109,10 +109,28 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('cross-project training pack advances and ends with a total review', async ({ page }) => {
-  // Two pack stages mount two full software-WebGL scenes and then aggregate both results.
+test('cross-project training pack persists a round and compares it with prior evidence', async ({ page }) => {
+  // Two pack stages mount two full software-WebGL scenes, persist the round,
+  // then compare it with one prior round for the same candidate/license/pack.
   test.setTimeout(90_000)
   const runtimeErrors = captureRuntimeErrors(page)
+  await page.addInitScript(() => {
+    window.localStorage.setItem('subject2.trainingPackHistory.v1', JSON.stringify([{
+      id: 'seed-observation-round',
+      createdAt: Date.now() - 86_400_000,
+      candidateName: '训练包E2E',
+      licenseType: 'C2',
+      packId: 'observation-signal',
+      recordedStages: 2,
+      totalStages: 2,
+      completedStages: 0,
+      passedStages: 0,
+      habitInfractions: 4,
+      totalFatalInfractions: 1,
+      totalInfractions: 4,
+      stages: [],
+    }]))
+  })
   await createC2Candidate(page, '训练包E2E')
 
   await page.locator('.training-pack-card').filter({ hasText: '观察与信号' }).click()
@@ -144,6 +162,26 @@ test('cross-project training pack advances and ends with a total review', async 
   await expect(report).toContainText('科目三道路驾驶')
   await expect(report).toContainText('目标习惯错误')
   await expect(report.getByRole('button', { name: '再练一轮 · 观察与信号' })).toBeEnabled()
+
+  const history = page.getByRole('region', { name: '连续训练趋势' })
+  await expect(history).toContainText('最近 2 轮')
+  await expect(history).toContainText('较之前改善')
+  await expect(history).toContainText('4 → 0')
+  await expect(history).toContainText('1 → 0')
+
+  const persisted = await page.evaluate(() => {
+    const raw = window.localStorage.getItem('subject2.trainingPackHistory.v1')
+    return raw ? JSON.parse(raw) : []
+  })
+  expect(persisted).toHaveLength(2)
+  expect(persisted[0]).toMatchObject({
+    candidateName: '训练包E2E',
+    licenseType: 'C2',
+    packId: 'observation-signal',
+    recordedStages: 2,
+    totalStages: 2,
+  })
+
   await expect(page.getByRole('button', { name: '训练包完成 · 返回训练中心' })).toBeVisible()
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
