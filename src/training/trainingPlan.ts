@@ -45,6 +45,10 @@ const STATE_RANK: Record<TrainingPlanState, number> = {
   maintain: 3,
 }
 
+const PACK_ORDER = new Map(
+  TRAINING_PACKS.map((pack, index) => [pack.id, index] as const),
+)
+
 function latestIncompleteStages(entry: TrainingPackRoundHistoryEntry) {
   return Math.max(0, entry.recordedStages - entry.completedStages)
 }
@@ -101,7 +105,7 @@ function classifyPlanItem(
   if (
     comparison.trend === 'mixed' ||
     latest.habitInfractions > 0 ||
-    comparison.trend === 'improving'
+    (comparison.trend === 'improving' && !comparison.stableImprovement)
   ) {
     let detail = '已经出现改善，但还需要继续训练确认是否能稳定保持。'
 
@@ -178,7 +182,7 @@ export function buildTrainingPlan({
     entry.licenseType === licenseType
   ))
 
-  const items = TRAINING_PACKS.map((pack, index) => {
+  const items: TrainingPlanItem[] = TRAINING_PACKS.map(pack => {
     const entries = scopedHistory.filter(entry => entry.packId === pack.id)
     const classified = classifyPlanItem(entries)
 
@@ -187,7 +191,6 @@ export function buildTrainingPlan({
       title: pack.title,
       summary: pack.summary,
       totalStages: pack.projects.length,
-      sourceIndex: index,
       ...classified,
     }
   }).sort((a, b) => {
@@ -203,16 +206,17 @@ export function buildTrainingPlan({
     const habitDelta = evidenceValue(b.latestHabitInfractions) - evidenceValue(a.latestHabitInfractions)
     if (habitDelta !== 0) return habitDelta
 
-    return a.sourceIndex - b.sourceIndex
-  }).map(({ sourceIndex: _sourceIndex, ...item }) => item)
+    return (PACK_ORDER.get(a.packId) ?? 0) - (PACK_ORDER.get(b.packId) ?? 0)
+  })
 
-  if (items.length === 0) {
+  const recommended = items[0]
+  if (!recommended) {
     throw new Error('Training plan requires at least one configured training pack.')
   }
 
   return {
     items,
-    recommended: items[0],
+    recommended,
     totalRounds: scopedHistory.length,
   }
 }
