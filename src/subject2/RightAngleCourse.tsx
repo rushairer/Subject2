@@ -237,6 +237,7 @@ export interface RightAngleCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
+  onConeImpact?: (index: number) => void
 }
 
 export function RightAngleCourse({
@@ -244,6 +245,7 @@ export function RightAngleCourse({
   placement,
   audioContext,
   audioState,
+  onConeImpact,
 }: RightAngleCourseProps = {}): ReactElement {
   const g = RIGHT_ANGLE_GEOMETRY
   const entryLength = g.entryMaxZ - (g.cornerCenterZ - g.half)
@@ -275,6 +277,7 @@ export function RightAngleCourse({
       placement={placement}
       audioContext={audioContext}
       audioState={audioState}
+      onImpact={() => onConeImpact?.(0)}
     />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
