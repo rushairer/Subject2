@@ -306,3 +306,17 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Header description belongs in normal document flow under the title; it must never overlap the first row of cards.
 - Priority-card action buttons must allow wrapping and stay within the card's inline bounds. Prefer concise project action labels such as “科目三 / 倒库 / 侧方” over repeating long course titles inside narrow buttons.
 - When a cross-project training-pack action exists, keep it visually distinct from evidence navigation and single-project retry.
+
+
+## Cross-round training-pack history
+
+`src/training/trainingPackHistory.ts` owns local persistence and deterministic comparison of completed training-pack rounds.
+
+- Persist one round only after the candidate reaches the pack's final configured stage and every pack stage has a recorded result. Leaving a pack early must not create a fake complete round.
+- History identity is scoped by candidate name + license type + training-pack ID. Never compare C1 and C2 evidence, different candidates, or different packs as one trend.
+- Keep history local-only unless an explicit sync/account feature is added. Storage failure must never block the active result screen.
+- Cross-round comparison must remain evidence-based and lexicographic; do not synthesize a hidden aggregate score. Current priority is fatal evidence, then incomplete-stage count, then target-habit infraction count.
+- At least two rounds are required for a directional comparison. “Continuous/stable improvement” requires at least three rounds, no adjacent regression in the comparison evidence, and at least one actual improvement.
+- Compare at most the recent bounded window used by `compareTrainingPackRounds`; preserve older stored rounds only up to the storage limit.
+- User-facing copy must distinguish an observed coaching trend from proof of driving skill. One better round is “improved versus earlier evidence”, not “habit mastered”.
+- The final-pack browser smoke must verify that a real round is persisted and that a seeded prior round is filtered/matched into the visible cross-round trend.
