@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   SUBJECT3_CUT_IN_OBSERVATION,
   observeSubject3CutInHazard,
+  observeSubject3PedestrianHazard,
 } from '../src/subject3/subject3HazardObservation'
 import {
   createSubject3TrafficState,
@@ -124,5 +125,87 @@ test('very low candidate speed suppresses cut-in observation', () => {
       traffic,
     ),
     undefined,
+  )
+})
+
+
+test('pedestrian observation keeps active crossing evidence while the candidate stops', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficHazard(
+    traffic,
+    'crosswalk-pedestrian',
+    'crosswalk-pedestrian',
+    1020,
+    0.8,
+    0,
+    -1.4,
+    true,
+    true,
+  )
+
+  const moving = observeSubject3PedestrianHazard(playerAt(1000, 0, 10), traffic)
+  assert.ok(moving)
+  assert.equal(moving.hazardId, 'crosswalk-pedestrian')
+  assert.equal(moving.conflict, true)
+  assert.ok(Math.abs(moving.progressDeltaMeters - 20) < 0.01)
+  assert.ok(Math.abs((moving.timeToCrosswalkSeconds ?? 0) - 2) < 0.01)
+
+  const stopped = observeSubject3PedestrianHazard(playerAt(1000, 0, 0), traffic)
+  assert.ok(stopped, 'stopping must not erase pedestrian evidence from replay')
+  assert.equal(stopped.timeToCrosswalkSeconds, undefined)
+})
+
+test('pedestrian observation ignores inactive and out-of-horizon actors', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficHazard(
+    traffic,
+    'inactive',
+    'crosswalk-pedestrian',
+    1010,
+    0,
+    0,
+    -1,
+    false,
+    true,
+  )
+  assert.equal(observeSubject3PedestrianHazard(playerAt(1000), traffic), undefined)
+
+  updateSubject3TrafficHazard(
+    traffic,
+    'far',
+    'crosswalk-pedestrian',
+    1100,
+    0,
+    0,
+    -1,
+    true,
+    true,
+  )
+  assert.equal(observeSubject3PedestrianHazard(playerAt(1000), traffic), undefined)
+})
+
+test('pedestrian observation preserves conflict and route-relative lateral evidence', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficHazard(
+    traffic,
+    'crosswalk-pedestrian',
+    'crosswalk-pedestrian',
+    1015,
+    -2.2,
+    0,
+    -1.9,
+    true,
+    false,
+  )
+
+  const observation = observeSubject3PedestrianHazard(playerAt(1000, 0, 8), traffic)
+  assert.ok(observation)
+  assert.equal(observation.conflict, false)
+  assert.ok(Math.abs(observation.lateralDeltaMeters + 2.2) < 0.01)
+  assert.equal(observation.lateralSpeedMps, -1.9)
+  assert.ok(
+    Math.abs(
+      observation.planarDistanceMeters - Math.hypot(15, 2.2),
+    ) < 0.01,
   )
 })
