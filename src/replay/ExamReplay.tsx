@@ -503,6 +503,11 @@ function ProjectReplay({
         <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
+        {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
+          <span>
+            <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
+            <small>前车时距 · {current.leadGapMeters.toFixed(1)} m</small>
+          </span>}
       </div>
     </div>
   </article>
