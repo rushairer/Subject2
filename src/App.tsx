@@ -872,7 +872,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   </>
 }
 
-function Driving({ session, candidate, onDone, onExit }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], incidents: DrivingIncident[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
+function Driving({ session, candidate, onIncident, onDone, onExit }: { session: Session, candidate: Candidate, onIncident: (incident: DrivingIncident) => void, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
   const [drivingReady, setDrivingReady] = useState(false)
   const markDrivingReady = useCallback(() => setDrivingReady(true), [])
   const [helpExpanded, setHelpExpanded] = useState(false)
@@ -900,7 +900,6 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const vehicle = useRef(initialVehicle(activeExamId, sessionStartPose))
   const [display, setDisplay] = useState(() => initialVehicle(activeExamId, sessionStartPose))
   const [infractions, setInfractions] = useState<Infraction[]>([])
-  const [incidents, setIncidents] = useState<DrivingIncident[]>([])
   const [projectStatus, setProjectStatus] = useState(
     initialProjectStatus(activeExamId, session.subject3Practice),
   )
@@ -939,18 +938,17 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
       project: replayProjectId,
     }]
   })
-  const addIncident = (item: Pick<DrivingIncident, 'id' | 'title'>) => setIncidents(prev => {
-    if (prev.some(x => x.id === item.id)) return prev
+  const addIncident = (item: Pick<DrivingIncident, 'id' | 'title'>) => {
     const now = performance.now()
     const replayVehicle = activeReplayVehicle()
-    return [...prev, {
+    onIncident({
       ...item,
       t: (now - sessionStartedAt.current) / 1000,
       x: replayVehicle.x,
       z: replayVehicle.z,
       project: replayProjectId,
-    }]
-  })
+    })
+  }
 
   useEffect(() => {
     if (!combinedExam) {
@@ -1025,8 +1023,8 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const finishSession = useCallback(() => {
     if (finishLatched.current) return
     finishLatched.current = true
-    onDone(score, infractions, incidents, trajectory.current, sessionComplete)
-  }, [incidents, infractions, onDone, score, sessionComplete])
+    onDone(score, infractions, trajectory.current, sessionComplete)
+  }, [infractions, onDone, score, sessionComplete])
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
@@ -1300,12 +1298,14 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('profile')
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [result, setResult] = useState<{ score: number, infractions: Infraction[], incidents: DrivingIncident[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const [sessionIncidents, setSessionIncidents] = useState<DrivingIncident[]>([])
   const [trainingPackStages, setTrainingPackStages] = useState<TrainingPackStageResult[]>([])
   const startSession = useCallback((nextSession: Session) => {
     if (!nextSession.trainingPack) setTrainingPackStages([])
     setSession(nextSession)
     setResult(null)
+    setSessionIncidents([])
     setPhase('driving')
   }, [])
   const startTrainingPack = useCallback((id: TrainingPackId, time: TimeOfDay) => {
@@ -1324,7 +1324,14 @@ export default function App() {
       setPhase('profile')
     }}
   />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, incidents, trajectory, completed) => {
+  if (phase === 'driving' && session) return <Driving
+    candidate={candidate}
+    session={session}
+    onExit={() => setPhase('menu')}
+    onIncident={incident => setSessionIncidents(prev =>
+      prev.some(item => item.id === incident.id) ? prev : [...prev, incident]
+    )}
+    onDone={(score, infractions, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
@@ -1380,15 +1387,16 @@ export default function App() {
         }))
       }
     }
-    setResult({ score, infractions, incidents, trajectory: [...trajectory], completed })
+    setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')
-  }} />
+  }}
+  />
   if (phase === 'result' && session && result) return <Result
     candidate={candidate}
     session={session}
     score={result.score}
     infractions={result.infractions}
-    incidents={result.incidents}
+    incidents={sessionIncidents}
     trajectory={result.trajectory}
     completed={result.completed}
     onBack={() => {
