@@ -45,7 +45,7 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
-  await page.getByRole('button', { name: /倒车入库/ }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await expect(page.getByText(/C2 自动挡/)).toBeVisible()
 
@@ -141,7 +141,7 @@ test('ending a training session reaches the incomplete result and replay surface
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '复盘E2E')
 
-  await page.getByRole('button', { name: /侧方停车/ }).click()
+  await page.locator('.task-card').filter({ hasText: '侧方停车' }).click()
   await expectHealthyDrivingScene(page)
 
   await page.getByRole('button', { name: '结束并查看结果' }).click()
@@ -162,7 +162,7 @@ test('replay coaching explains an infraction with before-after operation context
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '诊断E2E')
 
-  await page.getByRole('button', { name: /倒车入库/ }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
 
