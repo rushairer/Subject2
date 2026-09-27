@@ -41,6 +41,7 @@ import { createTurnSignalAutoCancelState, resetTurnSignalAutoCancel, stepTurnSig
 import { createVehicleAudioState, updateTurnIndicatorAudio } from './audio/vehicleAudio'
 import { advanceExamProgress, completeExamProject, createExamProgress, enterExamProject, isExamComplete } from './session/examProgress'
 import { assessSessionResult, passLineForExam } from './session/sessionResult'
+import { buildResultComment } from './session/resultComment'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 import { DrivingHelp } from './ui/DrivingHelp'
@@ -1161,11 +1162,44 @@ function Result({
     : passed
       ? trainingPack ? '达标' : '合格'
       : trainingPack ? '需继续练习' : '未合格'
+  const resultComment = buildResultComment({
+    examTitle: sessionTitle(session),
+    score,
+    passLine,
+    status,
+    resultLabel,
+    infractionTitles: infractions.map(item => item.title),
+    fatalCount: infractions.filter(item => item.fatal).length,
+  })
+  const [shareState, setShareState] = useState<'idle' | 'shared' | 'copied'>('idle')
+  const shareResult = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: '科目二模拟成绩', text: resultComment.shareText })
+        setShareState('shared')
+        return
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(resultComment.shareText)
+      setShareState('copied')
+    }
+  }, [resultComment.shareText])
 
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">{trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
     <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>合格线 {passLine}</span></div>
+    <section className={'result-comment ' + status} aria-label="今日车评">
+      <div className="result-comment-topline"><span>今日车评</span><b>{resultComment.badge}</b></div>
+      <blockquote>{resultComment.headline}</blockquote>
+      <p>{resultComment.detail}</p>
+      <button className="result-share-btn" type="button" onClick={shareResult}>
+        {shareState === 'copied' ? '已复制 · 去分享' : shareState === 'shared' ? '已分享' : '分享这次成绩'}
+      </button>
+    </section>
 
     {trainingPack && session.trainingPack && <section className="training-pack-progress" aria-label="专项训练进度">
       <div className="training-pack-progress-head">
