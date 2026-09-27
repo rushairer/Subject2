@@ -5,6 +5,7 @@ import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
 import { TrafficCone } from './TrafficCone'
 import { SignPost } from './SignPost'
+import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
@@ -273,7 +274,7 @@ export interface ReverseParkingCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
-  onConeImpact?: (index: number) => void
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 export function ReverseParkingCourse({
@@ -281,7 +282,7 @@ export function ReverseParkingCourse({
   placement,
   audioContext,
   audioState,
-  onConeImpact,
+  onIncident,
 }: ReverseParkingCourseProps = {}): ReactElement {
   const g = REVERSE_PARKING_GEOMETRY
   return <group>
@@ -315,7 +316,14 @@ export function ReverseParkingCourse({
         placement={placement}
         audioContext={audioContext}
         audioState={audioState}
-        onImpact={() => onConeImpact?.(i)}
+        incident={subject2CollisionIncident({
+          id: `reverse-parking-cone-${i}`,
+          kind: 'cone',
+          object: 'traffic-cone',
+          label: '锥桶',
+          course: 'reverse-parking',
+        })}
+        onIncident={onIncident}
       />
     ))}
 
@@ -326,6 +334,14 @@ export function ReverseParkingCourse({
       placement={placement}
       audioContext={audioContext}
       audioState={audioState}
+      incident={subject2CollisionIncident({
+        id: 'reverse-parking-sign-post',
+        kind: 'pole',
+        object: 'sign-post',
+        label: '倒车入库标志杆',
+        course: 'reverse-parking',
+      })}
+      onIncident={onIncident}
     />
 
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.08, 0]} receiveShadow>
