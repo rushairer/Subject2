@@ -33,6 +33,8 @@ import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 import { DrivingRendererLifecycle } from './ui/DrivingRendererLifecycle'
+import { TrainingPackReport } from './training/TrainingPackReport'
+import type { TrainingPackStageResult } from './training/trainingPackReport'
 import {
   TRAINING_PACKS,
   nextTrainingPackState,
@@ -211,7 +213,7 @@ function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
   </section></main>
 }
 
-function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate, onStart: (s: Session) => void, onSwitchCandidate: () => void }) {
+function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { candidate: Candidate, onStart: (s: Session) => void, onStartTrainingPack: (id: TrainingPackId, time: TimeOfDay) => void, onSwitchCandidate: () => void }) {
   const [mode, setMode] = useState<Mode>('practice')
   const [time, setTime] = useState<TimeOfDay>('day')
   const visible = projects.filter(p => !(candidate.licenseType === 'C2' && p[0] === 'slope-start'))
@@ -232,7 +234,7 @@ function Menu({ candidate, onStart, onSwitchCandidate }: { candidate: Candidate,
         {TRAINING_PACKS.map(pack => <button
           key={pack.id}
           className="training-pack-card"
-          onClick={() => onStart(createTrainingPackSession(pack.id, time))}
+          onClick={() => onStartTrainingPack(pack.id, time)}
         >
           <span className="training-pack-count">{pack.projects.length} 项</span>
           <h3>{pack.title}</h3>
@@ -952,6 +954,7 @@ function Result({
   onStartTraining,
   onStartTrainingPack,
   onContinueTrainingPack,
+  trainingPackStages,
 }: {
   candidate: Candidate
   session: Session
@@ -963,6 +966,7 @@ function Result({
   onStartTraining: (examId: ReplayTrainingProjectId) => void
   onStartTrainingPack: (packId: TrainingPackId) => void
   onContinueTrainingPack: (state: TrainingPackSessionState) => void
+  trainingPackStages: readonly TrainingPackStageResult[]
 }) {
   const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
   const trainingPack = session.trainingPack ? trainingPackById(session.trainingPack.id) : null
@@ -994,6 +998,13 @@ function Result({
       </div>
     </section>}
 
+    {trainingPack && session.trainingPack && !nextPackState && <TrainingPackReport
+      packId={session.trainingPack.id}
+      stages={trainingPackStages}
+      onRestart={onStartTrainingPack}
+      onRetryProject={onStartTraining}
+    />}
+
     <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>{i.fatal ? '不合格' : `-${i.points}`}</b></div>)}</div>
     <ExamReplay
       samples={trajectory}
@@ -1021,18 +1032,29 @@ export default function App() {
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const [trainingPackStages, setTrainingPackStages] = useState<TrainingPackStageResult[]>([])
   const startSession = useCallback((nextSession: Session) => {
+    if (!nextSession.trainingPack) setTrainingPackStages([])
     setSession(nextSession)
     setResult(null)
     setPhase('driving')
   }, [])
   const startTrainingPack = useCallback((id: TrainingPackId, time: TimeOfDay) => {
+    setTrainingPackStages([])
     startSession(createTrainingPackSession(id, time))
   }, [startSession])
 
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
-  if (phase === 'menu') return <Menu candidate={candidate} onStart={startSession} onSwitchCandidate={() => setPhase('profile')} />
+  if (phase === 'menu') return <Menu
+    candidate={candidate}
+    onStart={startSession}
+    onStartTrainingPack={startTrainingPack}
+    onSwitchCandidate={() => {
+      setTrainingPackStages([])
+      setPhase('profile')
+    }}
+  />
   if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
@@ -1048,6 +1070,29 @@ export default function App() {
       completed,
       infractionCount: infractions.length,
     })
+    if (session.trainingPack) {
+      const stageResult: TrainingPackStageResult = {
+        packId: session.trainingPack.id,
+        index: session.trainingPack.index,
+        project: session.examId as ReplayTrainingProjectId,
+        score,
+        completed,
+        passed: outcome.passed,
+        infractions: infractions.map(item => ({
+          id: item.id,
+          title: item.title,
+          points: item.points,
+          fatal: item.fatal,
+        })),
+      }
+      setTrainingPackStages(current => [
+        ...current.filter(item => !(
+          item.packId === stageResult.packId &&
+          item.index === stageResult.index
+        )),
+        stageResult,
+      ].sort((a, b) => a.index - b.index))
+    }
     setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')
   }} />
@@ -1058,7 +1103,10 @@ export default function App() {
     infractions={result.infractions}
     trajectory={result.trajectory}
     completed={result.completed}
-    onBack={() => setPhase('menu')}
+    onBack={() => {
+      setTrainingPackStages([])
+      setPhase('menu')
+    }}
     onStartTraining={examId => startSession({
       examId,
       mode: 'practice',
@@ -1071,6 +1119,7 @@ export default function App() {
       time: session.time,
       trainingPack,
     })}
+    trainingPackStages={trainingPackStages}
   />
   return null
 }
