@@ -3,6 +3,7 @@ import { LANE_WIDTH, projectToSubject3Route } from './subject3Route'
 import {
   SUBJECT3_TRAFFIC_CAR,
   type Subject3TrafficState,
+  type Subject3TrafficVehicleScenario,
   type Subject3TrafficVehicleState,
 } from './subject3Traffic'
 
@@ -18,6 +19,7 @@ export interface Subject3LeadVehicleObservation {
   bumperGapMeters: number
   timeGapSeconds: number
   leadSpeedMps: number
+  scenario?: Subject3TrafficVehicleScenario
   closingSpeedMps: number
   timeToCollisionSeconds?: number
 }
@@ -72,6 +74,7 @@ export function observeSubject3LeadVehicle(
     bumperGapMeters,
     timeGapSeconds: bumperGapMeters / playerSpeed,
     leadSpeedMps: lead.speedMps,
+    scenario: lead.scenario,
     closingSpeedMps,
     timeToCollisionSeconds,
   }
