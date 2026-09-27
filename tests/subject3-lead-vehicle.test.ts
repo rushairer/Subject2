@@ -44,6 +44,23 @@ test('lead observation chooses the nearest same-lane vehicle ahead', () => {
   assert.ok(Math.abs((observation?.centerDistanceMeters ?? 0) - 30) < 0.01)
 })
 
+test('lead observation preserves the published traffic scenario tag', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(
+    traffic,
+    'sudden-brake',
+    1020,
+    0,
+    8,
+    false,
+    'sudden-brake',
+  )
+
+  const observation = observeSubject3LeadVehicle(playerAt(1000, 0, 10), traffic)
+  assert.equal(observation?.vehicleId, 'sudden-brake')
+  assert.equal(observation?.scenario, 'sudden-brake')
+})
+
 test('bumper gap subtracts both vehicle half-lengths from route-center distance', () => {
   const traffic = createSubject3TrafficState()
   updateSubject3TrafficVehicle(traffic, 'lead', 1020, 0, 8, false)
