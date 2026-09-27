@@ -61,6 +61,17 @@ function projectLabel(project: string) {
   return PROJECT_LABELS[project] ?? project
 }
 
+function projectActionLabel(project: ReplayTrainingProjectId) {
+  return ({
+    'reverse-parking': '倒库',
+    'side-parking': '侧方',
+    'slope-start': '坡道',
+    'curve-driving': 'S 弯',
+    'right-angle': '直角',
+    'subject3': '科目三',
+  } satisfies Record<ReplayTrainingProjectId, string>)[project]
+}
+
 function pathStats(samples: TrajectorySample[]) {
   let distance = 0
   let maxSpeed = 0
@@ -318,7 +329,7 @@ function TrainingFocusSummary({
         <div className="eyebrow">TRAINING PRIORITIES</div>
         <h3 id="replay-focus-title">本次优先改进</h3>
       </div>
-      <p>先解决最影响成绩和安全的 2–3 个习惯；有跨项目训练包时优先连续练习，也可以只回练本次证据所在项目。</p>
+      <p className="replay-focus-description">先解决最影响成绩和安全的 2–3 个习惯；有跨项目训练包时优先连续练习，也可以只回练本次证据所在项目。</p>
     </div>
 
     <div className="replay-focus-grid">
@@ -367,14 +378,14 @@ function TrainingFocusSummary({
                 className="replay-focus-pack-btn"
                 onClick={() => onStartTrainingPack(pack!.id)}
               >
-                训练包 · {pack!.title}（{pack!.projects.length}项）
+                训练包 · {pack!.title}
               </button>}
               {canTrain && <button
                 type="button"
                 className="replay-focus-training-btn"
                 onClick={() => onStartTraining(item.recommendedProject!)}
               >
-                {canStartPack ? '回练' : '专项训练'} · {projectLabel(item.recommendedProject!)}
+                {canStartPack ? '回练' : '专项训练'} · {projectActionLabel(item.recommendedProject!)}
               </button>}
             </span>
           </span>
