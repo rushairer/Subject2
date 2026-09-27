@@ -4,6 +4,12 @@ import {
   buildFollowingDistanceCoachingReport,
   type FollowingDistanceCoachingSample,
 } from '../src/coaching/followingDistanceCoaching'
+import { observeSubject3LeadVehicle } from '../src/subject3/subject3LeadVehicle'
+import {
+  createSubject3TrafficState,
+  updateSubject3TrafficVehicle,
+} from '../src/subject3/subject3Traffic'
+import { actorRoutePose } from '../src/subject3/subject3Route'
 
 function sample(
   t: number,
@@ -142,4 +148,30 @@ test('report preserves overall minimum observed gap even when it is not sustaine
   assert.equal(report.minimumTimeGapSeconds, 1.7)
   assert.equal(report.minimumGapMeters, 11)
   assert.deepEqual(report.segments, [])
+})
+
+
+test('live lead-vehicle geometry feeds the coaching report without scoring data', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'flow-b', 1020, 0, 8, false)
+  const pose = actorRoutePose(1000, 0)
+  const player = { x: pose.x, z: pose.z, speed: 10 }
+  const lead = observeSubject3LeadVehicle(player, traffic)
+  assert.ok(lead)
+  assert.ok(lead.timeGapSeconds < 3)
+
+  const samples = Array.from({ length: 8 }, (_, index) => ({
+    t: index * 0.3,
+    project: 'subject3',
+    speed: player.speed,
+    leadVehicleId: lead.vehicleId,
+    leadGapMeters: lead.bumperGapMeters,
+    leadTimeGapSeconds: lead.timeGapSeconds,
+    leadClosingSpeedMps: lead.closingSpeedMps,
+    leadTimeToCollisionSeconds: lead.timeToCollisionSeconds,
+  }))
+
+  const report = buildFollowingDistanceCoachingReport(samples)
+  assert.equal(report.segments.length, 1)
+  assert.equal(report.segments[0].vehicleId, 'flow-b')
 })
