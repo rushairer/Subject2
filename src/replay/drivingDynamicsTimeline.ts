@@ -14,13 +14,13 @@ export interface DrivingDynamicsGearChange {
   toGear: number
 }
 
-export interface DrivingDynamicsChartSample extends DrivingDynamicsSample {
+export type DrivingDynamicsChartSample<T extends DrivingDynamicsSample> = T & {
   sampleIndex: number
 }
 
-export interface DrivingDynamicsTimelineModel {
-  samples: DrivingDynamicsSample[]
-  chartSamples: DrivingDynamicsChartSample[]
+export interface DrivingDynamicsTimelineModel<T extends DrivingDynamicsSample> {
+  samples: T[]
+  chartSamples: DrivingDynamicsChartSample<T>[]
   startTime: number
   endTime: number
   durationSeconds: number
@@ -66,10 +66,10 @@ function sampleIndicesForChart(
   return [...required].sort((a, b) => a - b)
 }
 
-export function buildDrivingDynamicsTimeline(
-  input: readonly DrivingDynamicsSample[],
+export function buildDrivingDynamicsTimeline<T extends DrivingDynamicsSample>(
+  input: readonly T[],
   maximumChartPoints = 360,
-): DrivingDynamicsTimelineModel {
+): DrivingDynamicsTimelineModel<T> {
   const samples = input
     .filter(finiteSample)
     .slice()

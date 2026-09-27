@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
+  buildDrivingDynamicsEventMarkers,
+  type DrivingDynamicsEventKind,
+  type DrivingDynamicsEventMarker,
+  type DrivingDynamicsEventSample,
+} from './drivingDynamicsEvents'
+import {
   buildDrivingDynamicsTimeline,
   dynamicsGearLabel,
-  type DrivingDynamicsSample,
 } from './drivingDynamicsTimeline'
 
 const VIEW_WIDTH = 1000
@@ -11,6 +16,12 @@ const SPEED_TOP = 24
 const SPEED_BOTTOM = 132
 const GEAR_TOP = 158
 const GEAR_BOTTOM = 214
+
+const EVENT_OFFSETS: Record<DrivingDynamicsEventKind, number> = {
+  'sudden-brake': 16,
+  'cut-in': 32,
+  pedestrian: 48,
+}
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
@@ -24,6 +35,16 @@ function timeX(t: number, start: number, duration: number) {
 function speedY(speedKmh: number, speedScaleMax: number) {
   const ratio = clamp01(speedKmh / Math.max(1, speedScaleMax))
   return SPEED_BOTTOM - ratio * (SPEED_BOTTOM - SPEED_TOP)
+}
+
+function eventY(
+  kind: DrivingDynamicsEventKind,
+  curveY: number,
+) {
+  const offset = EVENT_OFFSETS[kind]
+  return curveY < (SPEED_TOP + SPEED_BOTTOM) / 2
+    ? Math.min(SPEED_BOTTOM - 8, curveY + offset)
+    : Math.max(SPEED_TOP + 8, curveY - offset)
 }
 
 function gearValue(gear: number) {
@@ -77,13 +98,17 @@ export function DrivingDynamicsTimeline({
   projectLabel,
   onSelect,
 }: {
-  samples: readonly DrivingDynamicsSample[]
+  samples: readonly DrivingDynamicsEventSample[]
   projectLabel: (project: string) => string
   onSelect: (project: string, time: number) => void
 }) {
   const model = useMemo(
     () => buildDrivingDynamicsTimeline(samples),
     [samples],
+  )
+  const events = useMemo(
+    () => buildDrivingDynamicsEventMarkers(model.samples),
+    [model.samples],
   )
   const [cursorIndex, setCursorIndex] = useState(0)
 
@@ -109,6 +134,11 @@ export function DrivingDynamicsTimeline({
   )
   const currentGearY = gearY(current.gear)
 
+  const focusEvent = (event: DrivingDynamicsEventMarker) => {
+    setCursorIndex(event.sampleIndex)
+    onSelect(event.project, event.t)
+  }
+
   return <section className="replay-dynamics" aria-labelledby="replay-dynamics-title">
     <div className="replay-dynamics-head">
       <div>
@@ -116,8 +146,8 @@ export function DrivingDynamicsTimeline({
         <h3 id="replay-dynamics-title">速度 / 挡位时间轴</h3>
       </div>
       <p>
-        沿整场轨迹查看速度与挡位变化。拖动游标后可直接定位到对应项目的轨迹证据；
-        该图用于复盘驾驶节奏，不参与考试评分。
+        沿整场轨迹查看速度与挡位变化；前车急刹、电动车加塞和行人横穿会直接标在速度曲线上。
+        拖动游标或点击事件均可定位轨迹证据，该图不参与考试评分。
       </p>
     </div>
 
@@ -125,13 +155,14 @@ export function DrivingDynamicsTimeline({
       <i>总时长 {durationLabel(model.durationSeconds)}</i>
       <i>最高速度 {model.maxSpeedKmh.toFixed(1)} km/h</i>
       <i>挡位变化 {model.gearChanges.length} 次</i>
+      <i>危险事件 {events.length} 个</i>
     </div>
 
     <div className="replay-dynamics-chart">
       <svg
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         role="img"
-        aria-label="整场训练速度曲线与挡位变化图"
+        aria-label="整场训练速度曲线、挡位变化与危险交通事件图"
       >
         <line className="replay-dynamics-grid" x1="0" x2={VIEW_WIDTH} y1={SPEED_BOTTOM} y2={SPEED_BOTTOM} />
         <line className="replay-dynamics-grid" x1="0" x2={VIEW_WIDTH} y1={SPEED_TOP} y2={SPEED_TOP} />
@@ -144,6 +175,22 @@ export function DrivingDynamicsTimeline({
           className="replay-dynamics-gear"
           d={gearPath(model.chartSamples, model.startTime, model.durationSeconds)}
         />
+        {events.map(event => {
+          const x = timeX(event.t, model.startTime, model.durationSeconds)
+          const curveY = speedY(event.speedKmh, speedScaleMax)
+          const markerY = eventY(event.kind, curveY)
+          return <g
+            key={event.id}
+            className={`replay-dynamics-event ${event.kind}`}
+            transform={`translate(${x.toFixed(2)} ${markerY.toFixed(2)})`}
+            onClick={() => focusEvent(event)}
+          >
+            <title>{event.label} · 点击查看轨迹证据</title>
+            <line x1="0" x2="0" y1="0" y2={(curveY - markerY).toFixed(2)} />
+            <circle r="11" />
+            <text x="0" y="4" textAnchor="middle">{event.glyph}</text>
+          </g>
+        })}
         <line
           className="replay-dynamics-cursor"
           x1={currentX}
@@ -163,6 +210,22 @@ export function DrivingDynamicsTimeline({
         </text>
       </svg>
     </div>
+
+    {events.length > 0 && <div className="replay-dynamics-events" aria-label="危险交通事件">
+      {events.map(event =>
+        <button
+          type="button"
+          key={event.id}
+          className={`replay-dynamics-event-chip ${event.kind}`}
+          onClick={() => focusEvent(event)}
+        >
+          <b>{event.label}</b>
+          <small>
+            {(event.t - model.startTime).toFixed(1)}s · {event.speedKmh.toFixed(1)} km/h
+          </small>
+        </button>,
+      )}
+    </div>}
 
     <input
       className="replay-dynamics-scrubber"
