@@ -75,6 +75,7 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Reset only the project judges and their completion latch, before judging the first frame of a new course. Keep project judging disabled during connection-road navigation; generic driving rules still apply there.
 - Use `src/input/drivingKeyboard.ts` for normalized physical keys and first-press detection. Toggle controls must not repeat while held.
 - Keyboard listeners must not depend on the selected camera mode. On window blur, hidden document or unmount, release held keyboard controls, observation flags and the horn.
+- Clicking the 3D driving canvas must actively focus the canvas (not merely blur a previously focused button), so Space/WASD and other controls have a deterministic keyboard target after help/camera UI interactions.
 
 ## Steering-column turn-signal behavior
 
