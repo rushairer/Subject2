@@ -16,6 +16,7 @@ export interface TrafficConeProps {
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
   color?: string
+  onImpact?: () => void
 }
 
 export function TrafficCone({
@@ -26,9 +27,16 @@ export function TrafficCone({
   audioContext,
   audioState,
   color = '#df6a31',
+  onImpact,
 }: TrafficConeProps): ReactElement {
   const groupRef = useRef<THREE.Group>(null)
-  const collision = useCollisionBody({ kind: 'cone', player: vehicle, audioContext, audioState })
+  const collision = useCollisionBody({
+    kind: 'cone',
+    player: vehicle,
+    audioContext,
+    audioState,
+    onImpact: onImpact ? () => onImpact() : undefined,
+  })
   const baseWorld = placement ? localPoseToWorld({ x, z, heading: 0 }, placement) : { x, z, heading: 0 }
 
   useEffect(() => {
