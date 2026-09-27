@@ -24,7 +24,7 @@ export interface Subject3LeadVehicleObservation {
 
 export function observeSubject3LeadVehicle(
   player: { x: number; z: number; speed: number },
-  traffic: Subject3TrafficState,
+  traffic: Readonly<Subject3TrafficState>,
 ): Subject3LeadVehicleObservation | undefined {
   const playerSpeed = Math.abs(player.speed)
   if (playerSpeed < SUBJECT3_LEAD_OBSERVATION.minimumPlayerSpeedMps) return undefined
