@@ -23,6 +23,7 @@ export default defineConfig({
           args: [
             '--enable-webgl',
             '--ignore-gpu-blocklist',
+            '--use-angle=swiftshader',
             '--enable-unsafe-swiftshader',
           ],
         },
