@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 async function createC2Candidate(page: Page, name = 'E2E考生') {
   await page.goto('./')
-  await expect(page).toHaveTitle(/Subject2/)
+  await expect(page).toHaveTitle(/科目二/)
 
   await page.getByLabel('姓名').fill(name)
   await page.getByLabel('准驾车型').selectOption('C2')
