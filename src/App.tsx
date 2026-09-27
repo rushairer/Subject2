@@ -20,6 +20,7 @@ import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
+import type { ReplayTrainingProjectId } from './replay/replayTrainingFocus'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
@@ -888,14 +889,14 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   </div>
 }
 
-function Result({ candidate, session, score, infractions, trajectory, completed, onBack }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean, onBack: () => void }) {
+function Result({ candidate, session, score, infractions, trajectory, completed, onBack, onStartTraining }: { candidate: Candidate, session: Session, score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean, onBack: () => void, onStartTraining: (examId: ReplayTrainingProjectId) => void }) {
   const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">模拟考试成绩单</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{status === 'incomplete' ? '未完成' : passed ? '合格' : '未合格'}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
     <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{examTitle(session.examId)}</span><span>合格线 {passLine}</span></div>
     <div className="infractions"><h3>评判记录</h3>{infractions.length === 0 ? <p>本次没有记录到扣分事件。</p> : infractions.map(i => <div key={i.id}><span>{i.title}</span><b>{i.fatal ? '不合格' : `-${i.points}`}</b></div>)}</div>
-    <ExamReplay samples={trajectory} infractions={infractions} />
+    <ExamReplay samples={trajectory} infractions={infractions} onStartTraining={onStartTraining} />
     <button className="primary" onClick={onBack}>返回训练中心</button><p className="disclaimer">成绩仅用于模拟训练，不具有真实机动车驾驶人考试效力。</p>
   </section></main>
 }
@@ -905,10 +906,15 @@ export default function App() {
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const startSession = useCallback((nextSession: Session) => {
+    setSession(nextSession)
+    setResult(null)
+    setPhase('driving')
+  }, [])
 
   if (phase === 'profile') return <Profile onSubmit={c => { setCandidate(c); setPhase('menu') }} />
   if (!candidate) return null
-  if (phase === 'menu') return <Menu candidate={candidate} onStart={s => { setSession(s); setResult(null); setPhase('driving') }} onSwitchCandidate={() => setPhase('profile')} />
+  if (phase === 'menu') return <Menu candidate={candidate} onStart={startSession} onSwitchCandidate={() => setPhase('profile')} />
   if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
@@ -927,6 +933,19 @@ export default function App() {
     setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')
   }} />
-  if (phase === 'result' && session && result) return <Result candidate={candidate} session={session} score={result.score} infractions={result.infractions} trajectory={result.trajectory} completed={result.completed} onBack={() => setPhase('menu')} />
+  if (phase === 'result' && session && result) return <Result
+    candidate={candidate}
+    session={session}
+    score={result.score}
+    infractions={result.infractions}
+    trajectory={result.trajectory}
+    completed={result.completed}
+    onBack={() => setPhase('menu')}
+    onStartTraining={examId => startSession({
+      examId,
+      mode: 'practice',
+      time: session.time,
+    })}
+  />
   return null
 }
