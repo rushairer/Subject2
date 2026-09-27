@@ -122,6 +122,14 @@ interface Infraction {
   z?: number
   project?: string
 }
+interface DrivingIncident {
+  id: string
+  title: string
+  t?: number
+  x?: number
+  z?: number
+  project?: string
+}
 interface Session {
   examId: ExamId
   mode: Mode
@@ -388,13 +396,14 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onTick, onProjectStatus, onProjectComplete }: {
+function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onIncident, onTick, onProjectStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean,
   cameraMode: CameraMode,
   onCycleCameraMode: () => void,
   onToggleHelp: () => void,
   onReady: () => void,
   onInfraction: (i: Infraction) => void,
+  onIncident: (incident: Pick<DrivingIncident, 'id' | 'title'>) => void,
   onTick: (traffic?: Readonly<Subject3TrafficState>) => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
@@ -816,24 +825,28 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
+        onIncident={onIncident}
       />
     ) : session.examId === 'reverse-parking' ? (
       <ReverseParkingCourse
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
+        onConeImpact={index => onIncident({ id: `reverse-parking-cone-${index}`, title: '倒车入库时撞到锥桶' })}
       />
     ) : session.examId === 'side-parking' ? (
       <SideParkingCourse
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
+        onConeImpact={index => onIncident({ id: `side-parking-cone-${index}`, title: '侧方停车时撞到锥桶' })}
       />
     ) : session.examId === 'right-angle' ? (
       <RightAngleCourse
         vehicle={vehicle}
         audioContext={audioContext.current}
         audioState={vehicleAudioState.current}
+        onConeImpact={index => onIncident({ id: `right-angle-cone-${index}`, title: '直角转弯时撞到锥桶' })}
       />
     ) : session.examId === 'curve-driving' ? (
       <CurveDrivingCourse />
@@ -859,7 +872,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   </>
 }
 
-function Driving({ session, candidate, onDone, onExit }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
+function Driving({ session, candidate, onDone, onExit }: { session: Session, candidate: Candidate, onDone: (score: number, infractions: Infraction[], incidents: DrivingIncident[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
   const [drivingReady, setDrivingReady] = useState(false)
   const markDrivingReady = useCallback(() => setDrivingReady(true), [])
   const [helpExpanded, setHelpExpanded] = useState(false)
@@ -887,6 +900,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const vehicle = useRef(initialVehicle(activeExamId, sessionStartPose))
   const [display, setDisplay] = useState(() => initialVehicle(activeExamId, sessionStartPose))
   const [infractions, setInfractions] = useState<Infraction[]>([])
+  const [incidents, setIncidents] = useState<DrivingIncident[]>([])
   const [projectStatus, setProjectStatus] = useState(
     initialProjectStatus(activeExamId, session.subject3Practice),
   )
@@ -914,6 +928,18 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
       ? subject2ExamLocalVehicle(activeExamId as Subject2ProjectId, vehicle.current)
       : vehicle.current
   const addInfraction = (item: Infraction) => setInfractions(prev => {
+    if (prev.some(x => x.id === item.id)) return prev
+    const now = performance.now()
+    const replayVehicle = activeReplayVehicle()
+    return [...prev, {
+      ...item,
+      t: (now - sessionStartedAt.current) / 1000,
+      x: replayVehicle.x,
+      z: replayVehicle.z,
+      project: replayProjectId,
+    }]
+  })
+  const addIncident = (item: Pick<DrivingIncident, 'id' | 'title'>) => setIncidents(prev => {
     if (prev.some(x => x.id === item.id)) return prev
     const now = performance.now()
     const replayVehicle = activeReplayVehicle()
@@ -999,8 +1025,8 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
   const finishSession = useCallback(() => {
     if (finishLatched.current) return
     finishLatched.current = true
-    onDone(score, infractions, trajectory.current, sessionComplete)
-  }, [infractions, onDone, score, sessionComplete])
+    onDone(score, infractions, incidents, trajectory.current, sessionComplete)
+  }, [incidents, infractions, onDone, score, sessionComplete])
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
@@ -1083,7 +1109,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     }}
   >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onIncident={addIncident} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
@@ -1144,6 +1170,7 @@ function Result({
   session,
   score,
   infractions,
+  incidents,
   trajectory,
   completed,
   onBack,
@@ -1158,6 +1185,7 @@ function Result({
   session: Session
   score: number
   infractions: Infraction[]
+  incidents: DrivingIncident[]
   trajectory: TrajectorySample[]
   completed: boolean
   onBack: () => void
@@ -1183,13 +1211,14 @@ function Result({
     status,
     resultLabel,
     infractionTitles: infractions.map(item => item.title),
+    incidentTitles: incidents.map(item => item.title),
     fatalCount: infractions.filter(item => item.fatal).length,
   })
   const [shareState, setShareState] = useState<'idle' | 'shared' | 'copied'>('idle')
   const shareResult = useCallback(async () => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: '科目二模拟成绩', text: resultComment.shareText })
+        await navigator.share({ title: '驾考模拟成绩', text: resultComment.shareText })
         setShareState('shared')
         return
       } catch (error) {
@@ -1214,6 +1243,10 @@ function Result({
         {shareState === 'copied' ? '已复制 · 去分享' : shareState === 'shared' ? '已分享' : '分享这次成绩'}
       </button>
     </section>
+    {incidents.length > 0 && <div className="result-incidents" aria-label="现场记录">
+      <strong>现场记录 · 不计分</strong>
+      <span>{incidents.map(item => item.title).join(' · ')}</span>
+    </div>}
 
     {trainingPack && session.trainingPack && <section className="training-pack-progress" aria-label="专项训练进度">
       <div className="training-pack-progress-head">
@@ -1267,7 +1300,7 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('profile')
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const [result, setResult] = useState<{ score: number, infractions: Infraction[], incidents: DrivingIncident[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
   const [trainingPackStages, setTrainingPackStages] = useState<TrainingPackStageResult[]>([])
   const startSession = useCallback((nextSession: Session) => {
     if (!nextSession.trainingPack) setTrainingPackStages([])
@@ -1291,7 +1324,7 @@ export default function App() {
       setPhase('profile')
     }}
   />
-  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, trajectory, completed) => {
+  if (phase === 'driving' && session) return <Driving candidate={candidate} session={session} onExit={() => setPhase('menu')} onDone={(score, infractions, incidents, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
@@ -1347,7 +1380,7 @@ export default function App() {
         }))
       }
     }
-    setResult({ score, infractions, trajectory: [...trajectory], completed })
+    setResult({ score, infractions, incidents, trajectory: [...trajectory], completed })
     setPhase('result')
   }} />
   if (phase === 'result' && session && result) return <Result
@@ -1355,6 +1388,7 @@ export default function App() {
     session={session}
     score={result.score}
     infractions={result.infractions}
+    incidents={result.incidents}
     trajectory={result.trajectory}
     completed={result.completed}
     onBack={() => {
