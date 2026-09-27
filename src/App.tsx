@@ -22,7 +22,8 @@ import {
   subject3PracticeStartPose,
   type Subject3PracticeSliceId,
 } from './subject3/subject3Practice'
-import { createSubject3TrafficState } from './subject3/subject3Traffic'
+import { createSubject3TrafficState, type Subject3TrafficState } from './subject3/subject3Traffic'
+import { observeSubject3LeadVehicle } from './subject3/subject3LeadVehicle'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { subject3Infraction } from './rules/subject3Rules'
@@ -390,7 +391,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   onCycleCameraMode: () => void,
   onToggleHelp: () => void,
   onReady: () => void,
-  onInfraction: (i: Infraction) => void, onTick: () => void,
+  onInfraction: (i: Infraction) => void,
+  onTick: (traffic?: Readonly<Subject3TrafficState>) => void,
   onProjectStatus: (status: string) => void,
   onProjectComplete: () => void
 }) {
@@ -784,7 +786,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       }
     }
 
-    onTick()
+    onTick(session.examId === 'subject3' ? subject3Traffic.current : undefined)
     if (inputReady.current && !readyReported.current) {
       readyReported.current = true
       onReady()
@@ -929,7 +931,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     )
   }, [activeExamId, combinedExam, session.subject3Practice, session.time])
 
-  const tick = () => {
+  const tick = (traffic?: Readonly<Subject3TrafficState>) => {
     const now = performance.now()
     if (now - lastUi.current > 80) {
       lastUi.current = now
@@ -939,6 +941,10 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
       lastTrajectorySampleAt.current = now
       const v = vehicle.current
       const replayVehicle = activeReplayVehicle()
+      const leadVehicle =
+        activeExamId === 'subject3' && traffic
+          ? observeSubject3LeadVehicle(v, traffic)
+          : undefined
       trajectory.current.push({
         t: (now - sessionStartedAt.current) / 1000,
         x: replayVehicle.x,
@@ -955,6 +961,11 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         engineOn: v.engineOn,
         engineRpm: v.engineRpm,
         clutch: v.clutch,
+        leadVehicleId: leadVehicle?.vehicleId,
+        leadGapMeters: leadVehicle?.bumperGapMeters,
+        leadTimeGapSeconds: leadVehicle?.timeGapSeconds,
+        leadClosingSpeedMps: leadVehicle?.closingSpeedMps,
+        leadTimeToCollisionSeconds: leadVehicle?.timeToCollisionSeconds,
       })
     }
   }
