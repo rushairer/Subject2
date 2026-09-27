@@ -131,7 +131,8 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('Subject 3 night scene opens directly into the live road without renderer failure', async ({ page }) => {
+test('Subject 3 night scene records lighting state and exposes replay coaching', async ({ page }) => {
+  test.setTimeout(75_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '科三E2E')
 
@@ -144,10 +145,33 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
 
   await page.keyboard.press('t')
+  await page.keyboard.press('l')
   await page.keyboard.press('i')
   await page.keyboard.press('q')
+  await page.keyboard.press('g')
+  await page.keyboard.press('Space')
   await expect(page.getByText('安全带已系')).toBeVisible()
   await expect(page.getByText('发动机运行')).toBeVisible()
+
+  const speed = page.locator('.speed strong')
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(
+      async () => Number(await speed.textContent()),
+      { timeout: 15_000 },
+    ).toBeGreaterThan(6)
+    await page.waitForTimeout(900)
+  } finally {
+    await page.keyboard.up('w')
+  }
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  const lighting = page.getByRole('region', { name: '夜间灯光训练观察' })
+  await expect(lighting).toBeVisible()
+  await expect(lighting).toContainText('未发现持续的不当远光交通上下文')
+  await expect(lighting).toContainText('不额外改变考试成绩')
+  await expect(page.locator('.replay-live-readout').first()).toContainText('近光')
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
