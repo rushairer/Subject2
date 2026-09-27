@@ -33,6 +33,7 @@ import { assessSessionResult, passLineForExam } from './session/sessionResult'
 import { supportsWebGL2 } from './sim/webglSupport'
 import { DrivingCanvasBoundary } from './ui/DrivingCanvasBoundary'
 import { DrivingHelp } from './ui/DrivingHelp'
+import { PedalReadout } from './ui/PedalReadout'
 import { DrivingRendererLifecycle } from './ui/DrivingRendererLifecycle'
 import { TrainingPackReport } from './training/TrainingPackReportPanel'
 import type { TrainingPackStageResult } from './training/trainingPackReport'
@@ -998,7 +999,12 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         </div>
         <b>{Math.abs(display.steeringWheelAngle) < 0.03 ? '方向盘正' : `${display.steeringWheelAngle < 0 ? '左' : '右'} ${(Math.abs(display.steeringWheelAngle) / (Math.PI * 2)).toFixed(2)} 圈`}</b>
       </div>
-      <div className="cluster"><div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>公里/时</span></div><div className="gear">{display.gear === -1 ? '倒挡' : display.gear === 0 ? '空挡' : automatic ? '前进' : `${display.gear} 挡`}</div><div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span>{!automatic && <span className={display.biteLatched ? 'on' : ''}>{display.biteLatched ? '半联动巡航' : '离合结合'}</span>}<span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div></div>
+      <div className="cluster">
+        <div className="speed"><strong>{Math.round(Math.abs(display.speed) * 3.6)}</strong><span>公里/时</span></div>
+        <div className="gear">{display.gear === -1 ? '倒挡' : display.gear === 0 ? '空挡' : automatic ? '前进' : `${display.gear} 挡`}</div>
+        <PedalReadout automatic={automatic} throttle={display.throttle} brake={display.brake} clutch={display.clutch} />
+        <div className="lamps"><span className={display.engineOn ? 'on' : ''}>{display.engineOn ? '发动机运行' : '发动机关闭'}</span><span className={display.handbrake ? 'warn' : ''}>{display.handbrake ? '手刹拉起' : '手刹放下'}</span>{!automatic && <span className={display.biteLatched ? 'on' : ''}>{display.biteLatched ? '半联动保持' : '离合结合'}</span>}<span className={display.leftIndicator || display.hazard ? 'turn' : ''}>◀</span><span className={display.lowBeam ? 'on' : ''}>近</span><span className={display.highBeam ? 'on' : ''}>远</span><span className={display.horn ? 'warn' : ''}>喇叭</span><span className={display.seatbelt ? 'on' : 'warn'}>{display.seatbelt ? '安全带已系' : '安全带未系'}</span><span className={display.rightIndicator || display.hazard ? 'turn' : ''}>▶</span></div>
+      </div>
       {infractions.length > 0 && <div className="penalty-toast">已记录 {infractions.length} 项 · 当前 {score} 分</div>}
     </div>
   </div>

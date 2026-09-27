@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createPedalControlsState, stepPedalControls } from '../src/input/pedalControls'
 import { DRIVING_RULES } from '../src/rules/drivingRules'
 import { assessSessionResult } from '../src/session/sessionResult'
 import { stepVehiclePhysics, type PhysicsVehicle } from '../src/sim/vehiclePhysics'
@@ -103,6 +104,11 @@ function manualGearState(progress: number, elapsed: number) {
       clutch: DRIVING_RULES.manualTransmission.biteClutchPosition,
     }
   }
+  // A brief C press releases the keyboard's half-linkage latch before driving
+  // with the clutch fully engaged; simply releasing Shift keeps it latched.
+  if (elapsed < 4.4) {
+    return { gear: 1, clutch: 1 }
+  }
   if (progress < gearEvent.start) {
     return { gear: 1, clutch: 0 }
   }
@@ -169,6 +175,10 @@ function runPhysicalSubject3Route(automatic: boolean) {
   let maxAbsoluteLateral = 0
   let elapsed = 0
   let stallEvents = 0
+  const pedals = createPedalControlsState()
+  let throttleKey = false
+  let throttlePresses = 0
+  let throttleReleases = 0
 
   const targetPose = poseAtRouteDistance(SUBJECT3_OVERTAKE_TARGET_PROGRESS)
   const overtakeTarget = {
@@ -250,19 +260,39 @@ function runPhysicalSubject3Route(automatic: boolean) {
     const maxSteeringWheelAngle =
       DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
 
+    // This test driver observes speed at 10 Hz and taps/holds the real keyboard
+    // pedal path. A small deadband avoids frame-perfect analog throttle input.
+    // These are driving intentions, not changes to any exam speed threshold.
+    const targetSpeedKmh = 22
+    if (frame % 2 === 0) {
+      const previousThrottleKey = throttleKey
+      if (waitingForStart || stoppingForPullOver || clutch === 1) {
+        throttleKey = false
+      } else if (Math.abs(vehicle.speed) * 3.6 < targetSpeedKmh - 0.4) {
+        throttleKey = true
+      } else if (Math.abs(vehicle.speed) * 3.6 > targetSpeedKmh + 0.4) {
+        throttleKey = false
+      }
+      if (throttleKey && !previousThrottleKey) throttlePresses += 1
+      if (!throttleKey && previousThrottleKey) throttleReleases += 1
+    }
+    const pedalInput = stepPedalControls(pedals, {
+      throttleKey,
+      brakeKey: stoppingForPullOver,
+      clutchFloorKey: !automatic && clutch === 1,
+      clutchBiteKey: !automatic && clutch === DRIVING_RULES.manualTransmission.biteClutchPosition,
+      automatic,
+      speed: vehicle.speed,
+      gear: vehicle.gear,
+      dt,
+    })
+
     const physics = stepVehiclePhysics(
       vehicle,
       {
-        throttle:
-          waitingForStart || stoppingForPullOver
-            ? 0
-            : automatic
-              ? 0.75
-              : elapsed < 4.3
-                ? 0.45
-                : 0.85,
-        brake: stoppingForPullOver ? 1 : 0,
-        clutch,
+        throttle: pedalInput.throttle,
+        brake: pedalInput.brake,
+        clutch: pedalInput.clutch,
         steer: 0,
         steeringWheelTarget:
           (desiredRoadWheelAngle /
@@ -354,6 +384,8 @@ function runPhysicalSubject3Route(automatic: boolean) {
   }
 
   assert.equal(stallEvents, 0)
+  assert.ok(throttlePresses > 10, 'the route must exercise repeated keyboard acceleration')
+  assert.ok(throttleReleases > 10, 'the route must exercise repeated keyboard coasting')
   assert.equal(runtime.completed, true)
   assert.equal(runtime.pullOverSecuredStopSeen, true)
   assert.deepEqual(

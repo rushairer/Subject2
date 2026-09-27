@@ -43,16 +43,83 @@ async function expectHealthyDrivingScene(page: Page) {
   await expect(page.locator('.project-status')).toBeVisible()
 }
 
-test('C2 reverse-parking scene renders, accepts controls, and cycles all four cameras', async ({ page }) => {
-  test.setTimeout(60_000) // Includes two viewport captures with software WebGL.
+async function expectProgressiveKeyboardPedals(page: Page) {
+  const throttle = page.getByRole('meter', { name: '油门开度' })
+  const brake = page.getByRole('meter', { name: '刹车开度' })
+  const throttleOpening = async () => Number(await throttle.getAttribute('value'))
+  const brakeOpening = async () => Number(await brake.getAttribute('value'))
+  await expect(throttle).toHaveAttribute('value', '0')
+  await expect(brake).toHaveAttribute('value', '0')
+
+  // Exercise the real keyboard while parked so waiting for software WebGL
+  // cannot accidentally drive the candidate out of the project boundaries.
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(throttleOpening, { intervals: [20, 50, 100] }).toBeGreaterThan(0)
+    const lightThrottle = await throttleOpening()
+    expect(lightThrottle).toBeLessThan(50)
+    await expect.poll(throttleOpening, { timeout: 12_000 }).toBeGreaterThan(lightThrottle + 20)
+  } finally {
+    await page.keyboard.up('w')
+  }
+  await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(throttleOpening).toBeGreaterThan(0)
+    await page.keyboard.down('s')
+    await expect.poll(brakeOpening).toBeGreaterThan(0)
+    await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+  } finally {
+    await page.keyboard.up('w')
+    await page.keyboard.up('s')
+  }
+  await expect(brake).toHaveAttribute('value', '0', { timeout: 1_000 })
+
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(throttleOpening).toBeGreaterThan(0)
+    // Headless Chromium keeps each tab focused, even after bringToFront().
+    // Send the browser's blur event through the production input listener.
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+    // W is still held: only the focus-loss cleanup can clear this input.
+    await expect(throttle).toHaveAttribute('value', '0', { timeout: 1_000 })
+    await expect(brake).toHaveAttribute('value', '0')
+  } finally {
+    await page.keyboard.up('w')
+  }
+}
+
+async function expectPedalReadoutClearOfHelp(page: Page) {
+  const viewport = page.viewportSize()!
+  const help = (await page.getByRole('region', { name: '键盘操作说明' }).boundingBox())!
+  const cluster = (await page.locator('.cluster').boundingBox())!
+  expect(help.x + help.width).toBeLessThanOrEqual(viewport.width)
+  expect(help.y + help.height).toBeLessThanOrEqual(cluster.y)
+  expect(cluster.x).toBeGreaterThanOrEqual(0)
+  expect(cluster.x + cluster.width).toBeLessThanOrEqual(viewport.width)
+  expect(cluster.y + cluster.height).toBeLessThanOrEqual(viewport.height)
+  for (const meter of await page.getByRole('meter').all()) {
+    const bounds = (await meter.boundingBox())!
+    expect(bounds.x).toBeGreaterThanOrEqual(cluster.x)
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(cluster.x + cluster.width)
+  }
+}
+
+test('C2 reverse-parking scene renders, accepts progressive pedals, and cycles all four cameras', async ({ page }) => {
+  test.setTimeout(90_000) // Includes two viewport captures and pedal checks with software WebGL.
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
   await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
   await expect(page.getByText(/C2 自动挡/)).toBeVisible()
+  await expect(page.getByRole('meter', { name: '油门开度' })).toBeVisible()
+  await expect(page.getByRole('meter', { name: '刹车开度' })).toBeVisible()
+  await expect(page.getByRole('meter', { name: '离合开度' })).toHaveCount(0)
 
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+  await expectProgressiveKeyboardPedals(page)
   const help = page.getByRole('button', { name: /H 展开说明/ })
   await expect(help).toHaveAttribute('aria-expanded', 'false')
   await page.keyboard.down('h')
@@ -60,11 +127,11 @@ test('C2 reverse-parking scene renders, accepts controls, and cycles all four ca
   await page.keyboard.down('h') // OS repeat must not close the panel.
   await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
   await page.keyboard.up('h')
+  await expectPedalReadoutClearOfHelp(page)
   await page.screenshot({ path: '/tmp/subject2-keyboard-help-desktop.png' })
   await page.setViewportSize({ width: 800, height: 700 })
   await expect(page.getByText('行驶与转向', { exact: true })).toBeVisible()
-  const helpBounds = await page.getByRole('region', { name: '键盘操作说明' }).boundingBox()
-  expect(helpBounds!.x + helpBounds!.width).toBeLessThanOrEqual(800)
+  await expectPedalReadoutClearOfHelp(page)
   await page.screenshot({ path: '/tmp/subject2-keyboard-help-small.png' })
   await page.setViewportSize({ width: 1280, height: 720 })
   await page.keyboard.press('h')
@@ -321,7 +388,7 @@ test('replay coaching explains an infraction with before-after operation context
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('C1 sequential keys shift once per press and help preserves held steering', async ({ page }) => {
+test('C1 sequential keys shift once per press, pedals show clutch, and help preserves held steering', async ({ page }) => {
   const errors = captureRuntimeErrors(page)
   await page.goto('./')
   await page.getByLabel('姓名').fill('键盘C1')
@@ -329,8 +396,14 @@ test('C1 sequential keys shift once per press and help preserves held steering',
   await page.getByRole('button', { name: '进入训练中心' }).click()
   await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
   await expectHealthyDrivingScene(page)
+  await expect(page.getByRole('meter', { name: '油门开度' })).toBeVisible()
+  await expect(page.getByRole('meter', { name: '刹车开度' })).toBeVisible()
+  const clutch = page.getByRole('meter', { name: '离合开度' })
+  await expect(clutch).toBeVisible()
+  await expect(clutch).toHaveAttribute('value', '0')
   await page.locator('canvas').click({ position: { x: 80, y: 80 } })
   await page.keyboard.down('c')
+  await expect(clutch).toHaveAttribute('value', '100')
   await page.keyboard.down(']')
   await expect(page.locator('.gear')).toHaveText('1 挡')
   await page.keyboard.down(']')
@@ -341,6 +414,7 @@ test('C1 sequential keys shift once per press and help preserves held steering',
   await page.keyboard.press('[')
   await expect(page.locator('.gear')).toHaveText('1 挡')
   await page.keyboard.up('c')
+  await expect(clutch).toHaveAttribute('value', '0', { timeout: 1_000 })
   await page.keyboard.down('d')
   await page.keyboard.press('h')
   await expect(page.getByText('逐级降 / 升挡', { exact: false })).toBeVisible()

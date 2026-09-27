@@ -3,6 +3,7 @@ import { DRIVING_RULES } from '../rules/drivingRules'
 export interface PedalControlsState {
   elapsedSeconds: number
   throttleHoldTime: number
+  throttle: number
   brakeHoldTime: number
   lastBrakeReleaseTime: number
   isEmergencyBrake: boolean
@@ -30,9 +31,10 @@ export interface PedalControlsOutput {
 
 export const PEDAL_CONFIG = {
   // Throttle progression
-  tapThrottle: 0.28,
-  throttleRampDelay: 0.12, // Duration of the gentle micro-throttle zone
-  throttleRampDuration: 0.32, // Duration to ramp from tapThrottle to 1.0
+  tapThrottle: 0.18,
+  throttleRampDelay: 0.35, // Allow deliberate small corrections before adding power.
+  throttleRampDuration: 1.25,
+  throttleReleasePerSecond: 3.5, // At most 0.29 s from full throttle to released.
 
   // Brake progression
   normalTapBrake: 0.28,
@@ -59,6 +61,7 @@ export function createPedalControlsState(): PedalControlsState {
   return {
     elapsedSeconds: 0,
     throttleHoldTime: 0,
+    throttle: 0,
     brakeHoldTime: 0,
     lastBrakeReleaseTime: -999,
     isEmergencyBrake: false,
@@ -70,6 +73,7 @@ export function createPedalControlsState(): PedalControlsState {
 export function resetPedalControls(state: PedalControlsState) {
   state.elapsedSeconds = 0
   state.throttleHoldTime = 0
+  state.throttle = 0
   state.brakeHoldTime = 0
   state.lastBrakeReleaseTime = -999
   state.isEmergencyBrake = false
@@ -84,7 +88,7 @@ export function resetPedalControls(state: PedalControlsState) {
  * 2. Progressive braking with light deceleration on tap, full brake on hold,
  *    and instant 100% emergency brake on double-tap.
  * 3. Low-speed brake modulation for C2 automatic reverse/parking control.
- * 4. Half-linkage latch (C1 Shift cruise) with micro-adjustments via W/S.
+ * 4. Half-linkage position hold with micro-adjustments via W/S (not cruise control).
  */
 export function stepPedalControls(
   state: PedalControlsState,
@@ -113,21 +117,24 @@ export function stepPedalControls(
   state.elapsedSeconds += dt
 
   // --- 1. Throttle Calculation ---
-  let throttle = 0
+  let throttle = state.throttle
   if (throttleKey && !brakeKey) {
     state.throttleHoldTime += dt
     if (state.throttleHoldTime <= PEDAL_CONFIG.throttleRampDelay) {
-      throttle = PEDAL_CONFIG.tapThrottle
+      throttle = Math.max(state.throttle, PEDAL_CONFIG.tapThrottle)
     } else {
       const progress = Math.min(
         1,
         (state.throttleHoldTime - PEDAL_CONFIG.throttleRampDelay) / PEDAL_CONFIG.throttleRampDuration,
       )
-      throttle = PEDAL_CONFIG.tapThrottle + progress * (1.0 - PEDAL_CONFIG.tapThrottle)
+      const easedProgress = progress * progress * (3 - 2 * progress)
+      throttle = Math.max(state.throttle, PEDAL_CONFIG.tapThrottle + easedProgress * (1.0 - PEDAL_CONFIG.tapThrottle))
     }
   } else {
     state.throttleHoldTime = 0
+    throttle = brakeKey ? 0 : Math.max(0, state.throttle - PEDAL_CONFIG.throttleReleasePerSecond * dt)
   }
+  state.throttle = throttle
 
   // --- 2. Brake Calculation ---
   let brake = 0

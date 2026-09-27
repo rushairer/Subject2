@@ -98,3 +98,37 @@ test('continuous slope placement supplies the world-space uphill heading', () =>
   })
   assert.ok(uphill.speed < 0)
 })
+
+test('engine-off rollback on rotated slopes is consistent across rendering rates', () => {
+  for (const uphillHeading of [0, Math.PI / 2]) {
+    const speeds: number[] = []
+    for (const hz of [20, 30, 60, 120]) {
+      const rolling = vehicle(uphillHeading)
+      for (let frame = 0; frame < hz; frame++) {
+        stepVehiclePhysics(rolling, idleInput, 1 / hz, {
+          automatic: false, grade: 0.1, gradeHeading: uphillHeading,
+        })
+      }
+      assert.ok(rolling.speed < -0.8, `gravity was swallowed at ${hz}Hz: ${rolling.speed}`)
+      speeds.push(rolling.speed)
+    }
+    assert.ok(Math.max(...speeds) - Math.min(...speeds) < 0.01)
+  }
+})
+
+test('light service brake opposes slope gravity continuously; sufficient brake holds', () => {
+  for (const heading of [0, Math.PI]) {
+    const speeds = [0.049, 0.05, 0.051, 0.2].map(brake => {
+      const rolling = vehicle(heading)
+      for (let frame = 0; frame < 60; frame++) {
+        stepVehiclePhysics(rolling, { ...idleInput, brake }, 1 / 60, {
+          automatic: true, grade: 0.1, gradeHeading: 0,
+        })
+      }
+      return rolling.speed
+    })
+    assert.ok(speeds.slice(0, 3).every(speed => Math.abs(speed) > 0.3))
+    assert.ok(Math.abs(speeds[0] - speeds[2]) < 0.03)
+    assert.equal(speeds[3], 0)
+  }
+})

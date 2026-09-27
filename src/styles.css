@@ -10,9 +10,20 @@
 @media(max-width:520px){.webgl-fallback{padding:14px}.webgl-fallback-card{padding:24px 20px}.webgl-fallback-actions{flex-direction:column}.webgl-fallback-actions .ghost-btn,.webgl-fallback-actions .primary{width:100%}}
 
 /* Chinese instrument labels need space beyond the old one-letter lamps. */
+.cluster{width:min(380px,calc(100vw - 20px));min-width:0}
 .cluster .gear{font-size:26px;white-space:nowrap;min-width:64px}
 .cluster .lamps{gap:8px;flex-wrap:wrap;justify-content:center;max-width:430px}
 .cluster .lamps span{font-size:10px;white-space:nowrap}
+.pedal-readout{grid-column:1/3;display:grid;grid-auto-columns:minmax(0,1fr);grid-auto-flow:column;gap:12px;margin-top:10px}
+.pedal-channel{--pedal-color:#79dca7;display:grid;gap:5px;min-width:0}
+.pedal-channel.brake{--pedal-color:#ffab85}
+.pedal-channel.clutch{--pedal-color:#83d5ff}
+.pedal-label{display:flex;justify-content:space-between;gap:4px;color:#a4bbcd;font-size:10px}
+.pedal-label b{color:var(--pedal-color);font-variant-numeric:tabular-nums}
+.pedal-channel meter{display:block;appearance:none;width:100%;height:7px;margin:0;border:0;border-radius:999px;background:#25394b}
+.pedal-channel meter::-webkit-meter-bar{border:0;border-radius:999px;background:#25394b}
+.pedal-channel meter::-webkit-meter-optimum-value{border-radius:999px;background:var(--pedal-color)}
+.pedal-channel meter::-moz-meter-bar{border-radius:999px;background:var(--pedal-color)}
 
 .replay-event-context{display:flex!important;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;color:#8fa9bb!important}
 .replay-event-context i{padding:3px 6px;border:1px solid #26465d;border-radius:999px;background:#0c2030;color:#9fc5dc;font-size:9px;font-style:normal;font-weight:700;white-space:nowrap}
@@ -261,8 +272,8 @@
 .instruction-details p{margin:5px 0}
 .instruction-details small{display:block;color:#9bb0c2;font-size:12px;line-height:1.7}
 .instruction-toggle:focus-visible{outline:2px solid #83d5ff;outline-offset:5px;border-radius:4px}
-@media(max-width:900px){.instruction-card{bottom:148px;left:10px;width:min(310px,calc(100vw - 20px))}.instruction-card.expanded{width:min(560px,calc(100vw - 20px));max-height:calc(100dvh - 280px)}}
-.instruction-card.expanded{bottom:148px;max-height:calc(100dvh - 240px);grid-template-rows:auto minmax(0,1fr)}
+@media(max-width:1100px){.instruction-card{bottom:202px;left:10px;width:min(310px,calc(100vw - 20px))}.instruction-card.expanded{width:min(560px,calc(100vw - 20px));max-height:calc(100dvh - 334px)}}
+.instruction-card.expanded{bottom:202px;max-height:calc(100dvh - 294px);grid-template-rows:auto minmax(0,1fr)}
 .instruction-details{min-height:0}
-@media(max-width:900px){.instruction-card.expanded{max-height:calc(100dvh - 280px)}}
+@media(max-width:1100px){.instruction-card.expanded{max-height:calc(100dvh - 334px)}}
 .driving-loading{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:#07111cf2;color:#bfe7ff;font-size:16px}
