@@ -330,6 +330,8 @@ Rendered driving behavior is release-critical and cannot be proven by Node-only 
 - Preserve Playwright failure artifacts (HTML report, trace, screenshot/video) in CI so WebGL, mirror, camera and interaction regressions are diagnosable.
 - A green TypeScript build is not sufficient evidence for changes to Three.js rendering, RenderTarget mirrors, camera placement, shadows, visible road geometry, dynamic actors or keyboard interaction.
 - Browser tests should interact through user-visible/accessibility semantics where practical. Do not add brittle test-only business branches or bypass the real control path.
+- Progressive pedal ramp timing belongs to deterministic input/physics tests. Software-WebGL browser smoke may verify pedal response, brake priority, focus-loss cleanup and next-frame release, but must not require a particular analogue opening or road speed after a fixed wall-clock delay.
+- C1 browser launch flows must respect the current half-linkage model: Shift latches the bite point; releasing Shift does not cancel that latch. Use C to cancel the latch before expecting fully engaged-clutch road-speed acceleration.
 - Keep the mirror reflection baseline rule above in force: browser smoke supplements, but does not replace, direct comparison with known-good commit `80094e7a` for reflection-layer changes.
 - `src/ui/DrivingRendererLifecycle.tsx` owns synchronous WebGL renderer release when a driving Canvas unmounts. Result → targeted-practice transitions must not briefly retain two heavyweight renderer contexts.
 - Do not remove renderer disposal/context-loss cleanup merely because React Three Fiber also performs delayed root cleanup; the explicit cleanup protects fast remounts and software-WebGL environments.
