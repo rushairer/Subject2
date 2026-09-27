@@ -91,6 +91,18 @@ export const DRIVING_RULES = {
       evidenceWindowSeconds: 3,
       maximumSampleGapSeconds: 0.65,
     },
+    // Simulator coaching heuristics for the scripted crosswalk pedestrian.
+    // Scoring remains owned by the existing crosswalk yield rule.
+    pedestrianResponseCoaching: {
+      minimumPlayerSpeedKmh: 3,
+      maximumRelevantAheadMeters: 50,
+      maximumRelevantBehindMeters: 3,
+      brakeResponseThreshold: 0.15,
+      throttleReleaseDelta: 0.12,
+      reactionWindowSeconds: 2,
+      evidenceWindowSeconds: 4,
+      maximumSampleGapSeconds: 0.65,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
