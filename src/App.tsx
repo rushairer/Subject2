@@ -953,7 +953,16 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     </section>
   </div>
 
-  return <div className="driving-shell" aria-busy={!drivingReady}>
+  return <div
+    className="driving-shell"
+    aria-busy={!drivingReady}
+    onPointerDown={event => {
+      if (event.target instanceof HTMLCanvasElement) {
+        const active = document.activeElement
+        if (active instanceof HTMLElement) active.blur()
+      }
+    }}
+  >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
       <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
