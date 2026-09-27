@@ -21,6 +21,13 @@ import type { Subject2ProjectId } from './courseStartPoses'
 import type { CoursePlacement } from './courseTransform'
 import { COURSE_GATE_GEOMETRY, courseGatePosts } from './courseGateGeometry'
 
+export function subject2ProjectJudgingEnabled(
+  continuousExam: boolean,
+  entryReached: boolean,
+) {
+  return !continuousExam || entryReached
+}
+
 function PlacedCourse({
   placement,
   children,
