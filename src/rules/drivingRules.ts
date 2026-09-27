@@ -59,6 +59,14 @@ export const DRIVING_RULES = {
       minimumSustainedSeconds: 1.5,
       maximumSampleGapSeconds: 0.65,
     },
+    // Road-traffic law context, surfaced as replay coaching rather than a
+    // simulator-side scoring rule because traffic telemetry remains approximate.
+    nightLightingCoaching: {
+      meetingLowBeamDistanceMeters: 150,
+      minimumSpeedKmh: 5,
+      minimumSustainedSeconds: 0.8,
+      maximumSampleGapSeconds: 0.65,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
