@@ -273,6 +273,7 @@ export interface ReverseParkingCourseProps {
   placement?: CoursePlacement
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
+  onConeImpact?: (index: number) => void
 }
 
 export function ReverseParkingCourse({
@@ -280,6 +281,7 @@ export function ReverseParkingCourse({
   placement,
   audioContext,
   audioState,
+  onConeImpact,
 }: ReverseParkingCourseProps = {}): ReactElement {
   const g = REVERSE_PARKING_GEOMETRY
   return <group>
@@ -313,6 +315,7 @@ export function ReverseParkingCourse({
         placement={placement}
         audioContext={audioContext}
         audioState={audioState}
+        onImpact={() => onConeImpact?.(i)}
       />
     ))}
 
