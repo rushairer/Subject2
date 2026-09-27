@@ -109,30 +109,42 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('cross-project training pack advances from reverse parking to side parking', async ({ page }) => {
-  // A pack stage transition mounts a second full software-WebGL scene.
-  test.setTimeout(75_000)
+test('cross-project training pack advances and ends with a total review', async ({ page }) => {
+  // Two pack stages mount two full software-WebGL scenes and then aggregate both results.
+  test.setTimeout(90_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '训练包E2E')
 
-  await page.getByRole('button', { name: /车身边线控制/ }).click()
+  await page.locator('.training-pack-card').filter({ hasText: '观察与信号' }).click()
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 车身边线控制 1/4 · 倒车入库')
-  await expect(page.locator('.project-status')).toContainText(/倒库|控制线|起始端/)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/2 · 直角转弯')
+  await expect(page.locator('.project-status')).toContainText(/直角|转向灯|靠右/)
 
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
   await expect(page.getByText('专项训练阶段结果')).toBeVisible()
-  await expect(page.getByRole('region', { name: '专项训练进度' })).toContainText('车身边线控制')
-  await expect(page.getByRole('region', { name: '专项训练进度' })).toContainText('1 / 4')
-  const nextStage = page.getByRole('button', { name: '继续下一项 · 侧方停车' })
+  const firstProgress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(firstProgress).toContainText('观察与信号')
+  await expect(firstProgress).toContainText('1 / 2')
+  const nextStage = page.getByRole('button', { name: '继续下一项 · 科目三道路驾驶' })
   await expect(nextStage).toBeEnabled()
   await nextStage.click()
 
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 车身边线控制 2/4 · 侧方停车')
-  await expect(page.locator('.project-status')).toContainText(/侧方|库位|右侧边线|准备挂 R 挡/)
-  await expect(page.getByText('专项训练阶段结果')).toHaveCount(0)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/2 · 科目三道路驾驶')
+  await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '训练包总复盘' })).toBeVisible()
+  const report = page.getByRole('region', { name: '训练包总复盘' })
+  await expect(report).toContainText('2/2')
+  await expect(report).toContainText('直角转弯')
+  await expect(report).toContainText('科目三道路驾驶')
+  await expect(report).toContainText('目标习惯错误')
+  await expect(report.getByRole('button', { name: '再练一轮 · 观察与信号' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '训练包完成 · 返回训练中心' })).toBeVisible()
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
