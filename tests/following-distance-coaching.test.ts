@@ -175,3 +175,19 @@ test('live lead-vehicle geometry feeds the coaching report without scoring data'
   assert.equal(report.segments.length, 1)
   assert.equal(report.segments[0].vehicleId, 'flow-b')
 })
+
+
+test('observed duration does not bridge a missing-lead sample', () => {
+  const report = buildFollowingDistanceCoachingReport([
+    sample(0, { leadTimeGapSeconds: 3.4 }),
+    sample(0.3, {
+      leadVehicleId: undefined,
+      leadGapMeters: undefined,
+      leadTimeGapSeconds: undefined,
+    }),
+    sample(0.6, { leadTimeGapSeconds: 3.4 }),
+  ])
+
+  assert.equal(report.observedSampleCount, 2)
+  assert.equal(report.observedSeconds, 0)
+})
