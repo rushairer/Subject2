@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import type { ReplayTrainingProjectId } from '../replay/replayTrainingFocus'
 import {
   buildTrainingPackReport,
   type TrainingPackStageResult,
@@ -7,7 +6,9 @@ import {
 } from './trainingPackReport'
 import {
   trainingPackById,
+  trainingPackStageLabel,
   type TrainingPackId,
+  type TrainingPackSessionState,
 } from './trainingPacks'
 import {
   compareTrainingPackRounds,
@@ -15,15 +16,6 @@ import {
   type TrainingPackLicenseType,
   type TrainingPackMultiRoundTrend,
 } from './trainingPackHistory'
-
-const PROJECT_TITLES: Record<ReplayTrainingProjectId, string> = {
-  'reverse-parking': '倒车入库',
-  'side-parking': '侧方停车',
-  'slope-start': '坡道定点停车和起步',
-  'curve-driving': '曲线行驶',
-  'right-angle': '直角转弯',
-  'subject3': '科目三道路驾驶',
-}
 
 const TREND_COPY: Record<TrainingPackTrend, { label: string; detail: string }> = {
   improving: {
@@ -85,14 +77,14 @@ export function TrainingPackReport({
   candidateName,
   licenseType,
   onRestart,
-  onRetryProject,
+  onRetryStage,
 }: {
   packId: TrainingPackId
   stages: readonly TrainingPackStageResult[]
   candidateName: string
   licenseType: TrainingPackLicenseType
   onRestart: (packId: TrainingPackId) => void
-  onRetryProject: (project: ReplayTrainingProjectId) => void
+  onRetryStage: (state: TrainingPackSessionState) => void
 }) {
   const pack = trainingPackById(packId)
   const report = useMemo(
@@ -135,7 +127,7 @@ export function TrainingPackReport({
       {report.stages.map(stage => <article key={stage.packId + '-' + stage.index}>
         <span className="training-pack-stage-index">{stage.index + 1}</span>
         <div>
-          <strong>{PROJECT_TITLES[stage.project]}</strong>
+          <strong>{trainingPackStageLabel({ id: packId, index: stage.index })}</strong>
           <span>{stageResultLabel(stage)} · {stage.score} 分</span>
         </div>
         <div className="training-pack-stage-evidence">
@@ -149,8 +141,11 @@ export function TrainingPackReport({
     <div className="training-pack-report-guidance">
       <b>如何理解这份报告</b>
       <p>不同项目的规则、机会次数和难度并不相同，因此这里比较的是训练包内“目标习惯相关错误记录”的变化，不新增考试分数，也不把跨项目结果当作同一张正式成绩单。</p>
-      {report.recommendedRetryProject && <p>
-        本轮证据最集中的阶段是 <strong>{PROJECT_TITLES[report.recommendedRetryProject]}</strong>。如果还要继续练，优先回到这个项目，再完整跑一轮训练包确认是否稳定。
+      {report.recommendedRetryStageIndex != null && <p>
+        本轮证据最集中的阶段是 <strong>{trainingPackStageLabel({
+          id: packId,
+          index: report.recommendedRetryStageIndex,
+        })}</strong>。如果还要继续练，优先回到这个阶段，再完整跑一轮训练包确认是否稳定。
       </p>}
     </div>
 
@@ -203,12 +198,18 @@ export function TrainingPackReport({
     </section>
 
     <div className="training-pack-report-actions">
-      {report.recommendedRetryProject && <button
+      {report.recommendedRetryStageIndex != null && <button
         type="button"
         className="ghost-btn"
-        onClick={() => onRetryProject(report.recommendedRetryProject!)}
+        onClick={() => onRetryStage({
+          id: packId,
+          index: report.recommendedRetryStageIndex!,
+        })}
       >
-        重点回练 · {PROJECT_TITLES[report.recommendedRetryProject]}
+        重点回练 · {trainingPackStageLabel({
+          id: packId,
+          index: report.recommendedRetryStageIndex,
+        })}
       </button>}
       <button
         type="button"
