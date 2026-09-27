@@ -190,7 +190,7 @@ export function buildTrainingPlan({
       packId: pack.id,
       title: pack.title,
       summary: pack.summary,
-      totalStages: pack.projects.length,
+      totalStages: pack.stages.length,
       ...classified,
     }
   }).sort((a, b) => {

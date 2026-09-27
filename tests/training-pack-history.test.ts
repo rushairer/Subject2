@@ -4,6 +4,7 @@ import {
   buildTrainingPackHistoryEntry,
   compareTrainingPackRoundEvidence,
   compareTrainingPackRounds,
+  trainingPackHistoryMatchesCurrentDefinition,
   type TrainingPackRoundHistoryEntry,
 } from '../src/training/trainingPackHistory'
 
@@ -12,7 +13,7 @@ function round(
   createdAt: number,
   habitInfractions: number,
   totalFatalInfractions = 0,
-  completedStages = 2,
+  completedStages = 4,
 ): TrainingPackRoundHistoryEntry {
   return {
     id,
@@ -20,8 +21,8 @@ function round(
     candidateName: '训练考生',
     licenseType: 'C2',
     packId: 'observation-signal',
-    recordedStages: 2,
-    totalStages: 2,
+    recordedStages: 4,
+    totalStages: 4,
     completedStages,
     passedStages: completedStages,
     habitInfractions,
@@ -131,4 +132,20 @@ test('only the most recent five rounds participate in the visible comparison', (
   ])
 
   assert.deepEqual(comparison.rounds.map(item => item.id), ['r2', 'r3', 'r4', 'r5', 'r6'])
+})
+
+
+test('obsolete two-stage observation history is excluded from current four-stage comparisons', () => {
+  assert.equal(trainingPackHistoryMatchesCurrentDefinition({
+    packId: 'observation-signal',
+    totalStages: 2,
+  }), false)
+  assert.equal(trainingPackHistoryMatchesCurrentDefinition({
+    packId: 'observation-signal',
+    totalStages: 4,
+  }), true)
+  assert.equal(trainingPackHistoryMatchesCurrentDefinition({
+    packId: 'space-position',
+    totalStages: 4,
+  }), true)
 })

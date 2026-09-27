@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   buildReplayTrainingFocus,
   replayHabitForInfraction,
+  replaySubject3Practice,
   replayTrainingProject,
 } from '../src/replay/replayTrainingFocus'
 
@@ -100,4 +101,47 @@ test('training focus retains the recommended project from representative evidenc
   ])
 
   assert.equal(focus[0].recommendedProject, 'side-parking')
+})
+
+
+test('Subject 3 replay evidence maps only known maneuver families to practice slices', () => {
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-left-turn-2-signal-lead',
+    project: 'subject3',
+  }), 'intersection-turns')
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-right-turn-1-observation',
+    project: 'subject3',
+  }), 'intersection-turns')
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-lane-change-left-observation',
+    project: 'subject3',
+  }), 'lane-change')
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-pull-over-distance-10',
+    project: 'subject3',
+  }), 'pull-over')
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-overtake-left-signal',
+    project: 'subject3',
+  }), null)
+  assert.equal(replaySubject3Practice({
+    id: 'subject3-lane-change-left-observation',
+    project: 'right-angle',
+  }), null)
+})
+
+test('training focus retains exact Subject 3 slice from representative evidence', () => {
+  const focus = buildReplayTrainingFocus([
+    {
+      id: 'subject3-lane-change-left-observation',
+      title: '变更车道前未观察后方交通',
+      points: 10,
+      t: 9,
+      project: 'subject3',
+    },
+  ])
+
+  assert.equal(focus[0].recommendedProject, 'subject3')
+  assert.equal(focus[0].recommendedSubject3Practice, 'lane-change')
 })

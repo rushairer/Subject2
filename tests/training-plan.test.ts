@@ -5,7 +5,7 @@ import {
   type TrainingPlanState,
 } from '../src/training/trainingPlan'
 import type { TrainingPackRoundHistoryEntry } from '../src/training/trainingPackHistory'
-import type { TrainingPackId } from '../src/training/trainingPacks'
+import { trainingPackById, type TrainingPackId } from '../src/training/trainingPacks'
 
 function round({
   id,
@@ -28,7 +28,7 @@ function round({
   candidateName?: string
   licenseType?: 'C1' | 'C2'
 }): TrainingPackRoundHistoryEntry {
-  const resolvedTotal = totalStages ?? (packId === 'space-position' ? 4 : 2)
+  const resolvedTotal = totalStages ?? trainingPackById(packId).stages.length
   const resolvedCompleted = completedStages ?? resolvedTotal
   return {
     id,

@@ -113,6 +113,7 @@ test('training pack report recommends the stage with strongest existing failure 
   ])
 
   assert.equal(report.recommendedRetryProject, 'side-parking')
+  assert.equal(report.recommendedRetryStageIndex, 1)
 })
 
 test('one recorded stage is insufficient for a cross-stage trend', () => {
