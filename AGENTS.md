@@ -193,6 +193,19 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Neutral between sequential positive gears must not erase the previous positive gear used for skip detection.
 - C2 automatic mode is exempt from manual-gear sequence judgments.
 
+## Subject 3 gear-speed coaching
+
+`src/coaching/gearSpeedCoaching.ts` owns non-scoring manual-transmission gear-speed coaching derived from recorded trajectory evidence.
+
+- Gear-speed coaching is a training aid, not a second exam judge. It must never emit `Infraction`, subtract points, change pass/fail status, terminate an exam, or feed the scoring matrix.
+- Do not hard-code a nationwide per-gear km/h table. Public exam guidance requires reasonable gear/speed matching, but small-car per-gear speed bands vary by vehicle and local training practice.
+- Analyze only C1/manual Subject 3 samples with the engine running, a positive forward gear, the clutch substantially engaged, and enough vehicle speed to be outside launch/stop transients.
+- Use the simulated vehicle's RPM evidence and the explicit `DRIVING_RULES.manualTransmission.gearSpeedCoaching` heuristics. User-facing copy must call these simulator training heuristics, not statutory thresholds.
+- Require a sustained mismatch window before surfacing evidence so ordinary shifts, clutch transitions and brief RPM excursions do not become false coaching events.
+- Trajectory samples must retain optional `engineOn`, `engineRpm` and `clutch` fields for this analysis while remaining compatible with older samples that lack them.
+- Replay may show duration, gear, speed and RPM evidence and jump to the representative trajectory time. It must not add the coaching item to the error timeline or training-priority penalty aggregation.
+- Changes to classification, sustained-window logic or filtering require deterministic coverage in `tests/gear-speed-coaching.test.ts`.
+
 ## Subject 3 slow-zone judging
 
 - Straight-through intersections, pedestrian crossings, school zones, and bus-stop events must record both left- and right-side observation during the event.

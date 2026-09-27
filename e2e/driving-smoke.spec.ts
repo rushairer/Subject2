@@ -13,6 +13,18 @@ async function createC2Candidate(page: Page, name = 'E2E考生') {
   await expect(page.getByText('科目三 · 道路驾驶技能')).toBeVisible()
 }
 
+async function createC1Candidate(page: Page, name = 'C1 E2E考生') {
+  await page.goto('./')
+  await expect(page).toHaveTitle(/科目二/)
+
+  await page.getByLabel('姓名').fill(name)
+  await page.getByLabel('准驾车型').selectOption('C1')
+  await page.getByRole('button', { name: '进入训练中心' }).click()
+
+  await expect(page.getByRole('heading', { name: `${name}，选择训练任务` })).toBeVisible()
+  await expect(page.getByText('科目三 · 道路驾驶技能')).toBeVisible()
+}
+
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`))
@@ -136,6 +148,44 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   await page.keyboard.press('q')
   await expect(page.getByText('安全带已系')).toBeVisible()
   await expect(page.getByText('发动机运行')).toBeVisible()
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
+test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live driving', async ({ page }) => {
+  test.setTimeout(75_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC1Candidate(page, '挡速复盘E2E')
+
+  const drill = page.locator('.subject3-practice-card').filter({ hasText: '变更车道' })
+  await drill.click()
+  await expectHealthyDrivingScene(page)
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+
+  await page.keyboard.press('t')
+  await page.keyboard.press('i')
+  await page.keyboard.press('1')
+  await page.keyboard.press('Space')
+
+  const speed = page.locator('.speed strong')
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(
+      async () => Number(await speed.textContent()),
+      { timeout: 15_000 },
+    ).toBeGreaterThan(3)
+    await page.waitForTimeout(2_200)
+  } finally {
+    await page.keyboard.up('w')
+  }
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  const coaching = page.getByRole('region', { name: '挡位—车速训练观察' })
+  await expect(coaching).toBeVisible()
+  await expect(coaching).toContainText('这是训练提示，不是考试扣分项')
+  await expect(coaching).toContainText('未发现持续的明显挡速不匹配')
+  await expect(page.locator('.replay-timeline')).not.toContainText('挡位—车速训练观察')
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
