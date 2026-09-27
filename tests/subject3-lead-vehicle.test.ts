@@ -3,14 +3,16 @@ import test from 'node:test'
 import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
   SUBJECT3_LEAD_OBSERVATION,
+  SUBJECT3_ONCOMING_OBSERVATION,
   observeSubject3LeadVehicle,
+  observeSubject3OncomingVehicle,
 } from '../src/subject3/subject3LeadVehicle'
 import {
   SUBJECT3_TRAFFIC_CAR,
   createSubject3TrafficState,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
-import { actorRoutePose } from '../src/subject3/subject3Route'
+import { SUBJECT3_ROUTE_LENGTH, actorRoutePose } from '../src/subject3/subject3Route'
 
 function playerAt(progress: number, lateral = 0, speed = 10) {
   const pose = actorRoutePose(progress, lateral)
@@ -97,4 +99,56 @@ test('reversing does not produce forward following-gap telemetry', () => {
     observeSubject3LeadVehicle(playerAt(1000, 0, -3), traffic),
     undefined,
   )
+})
+
+
+test('oncoming observation chooses the nearest opposing vehicle ahead', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'same-direction', 1010, 0, 8, false)
+  updateSubject3TrafficVehicle(traffic, 'oncoming-far', 1120, -8.75, 9, true)
+  updateSubject3TrafficVehicle(traffic, 'oncoming-near', 1060, -8.75, 7, true)
+
+  const observation = observeSubject3OncomingVehicle(playerAt(1000, 0, 10), traffic)
+  assert.equal(observation?.vehicleId, 'oncoming-near')
+  assert.ok(Math.abs((observation?.centerDistanceMeters ?? 0) - 60) < 0.01)
+  assert.equal(observation?.closingSpeedMps, 17)
+  assert.ok((observation?.timeToMeetSeconds ?? Infinity) > 0)
+})
+
+test('oncoming observation ignores opposing vehicles already behind the player', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'behind', 980, -8.75, 8, true)
+
+  assert.equal(
+    observeSubject3OncomingVehicle(playerAt(1000, 0, 10), traffic),
+    undefined,
+  )
+})
+
+test('oncoming observation handles the route wrap without treating distant traffic as near', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'wrapped-ahead', 30, -8.75, 8, true)
+  const playerProgress = SUBJECT3_ROUTE_LENGTH - 70
+
+  const observation = observeSubject3OncomingVehicle(
+    playerAt(playerProgress, 0, 10),
+    traffic,
+  )
+  assert.equal(observation?.vehicleId, 'wrapped-ahead')
+  assert.ok((observation?.centerDistanceMeters ?? Infinity) < 120)
+})
+
+test('oncoming observation respects the forward observation horizon and reverse filter', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(
+    traffic,
+    'too-far',
+    1000 + SUBJECT3_ONCOMING_OBSERVATION.maximumLookaheadMeters + 1,
+    -8.75,
+    8,
+    true,
+  )
+
+  assert.equal(observeSubject3OncomingVehicle(playerAt(1000, 0, 10), traffic), undefined)
+  assert.equal(observeSubject3OncomingVehicle(playerAt(1000, 0, -2), traffic), undefined)
 })
