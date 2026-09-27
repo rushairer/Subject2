@@ -53,8 +53,10 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  removeSubject3TrafficHazard,
   removeSubject3TrafficVehicle,
   updateSubject3TrafficAfterImpact,
+  updateSubject3TrafficHazardFromWorld,
   updateSubject3TrafficVehicle,
   type Subject3TrafficState,
 } from './subject3Traffic'
@@ -1484,7 +1486,10 @@ function CrossingPedestrian({
   const walkAngle = useRef(0)
   const body = useSubject3Collision('pedestrian', player, onInfraction, 'subject3-collision-pedestrian', audioContext, audioState)
 
-  useEffect(() => () => { traffic.current.crosswalkPedestrianConflict = false }, [traffic])
+  useEffect(() => () => {
+    traffic.current.crosswalkPedestrianConflict = false
+    removeSubject3TrafficHazard(traffic.current, 'crosswalk-pedestrian')
+  }, [traffic])
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
@@ -1513,6 +1518,15 @@ function CrossingPedestrian({
     traffic.current.crosswalkPedestrianConflict = motion.active
       ? actual.lateral <= RIGHT_EDGE_OFFSET && actual.lateral >= CENTER_LINE_OFFSET
       : crossing.conflict
+    updateSubject3TrafficHazardFromWorld(
+      traffic.current,
+      'crosswalk-pedestrian',
+      'crosswalk-pedestrian',
+      actor,
+      velocity,
+      triggered.current && !isStopped.current && elapsed.current < SUBJECT3_CROSSING_DURATION_SECONDS,
+      traffic.current.crosswalkPedestrianConflict,
+    )
     if (group.current) {
       group.current.position.set(actor.x, 0, actor.z)
       group.current.rotation.y = sceneYawFromHeading(heading)
@@ -1526,11 +1540,13 @@ function CrossingPedestrian({
 
 function CutInScooter({
   player,
+  traffic,
   onInfraction,
   audioContext,
   audioState,
 }: {
   player: MutableRefObject<Subject3Vehicle>
+  traffic: MutableRefObject<Subject3TrafficState>
   onInfraction: (item: Subject3Infraction) => void
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
@@ -1542,6 +1558,8 @@ function CutInScooter({
   const isStopped = useRef(false)
   const wheelAngle = useRef(0)
   const body = useSubject3Collision('scooter', player, onInfraction, 'subject3-collision-scooter', audioContext, audioState)
+
+  useEffect(() => () => removeSubject3TrafficHazard(traffic.current, 'cut-in-scooter'), [traffic])
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05)
@@ -1567,6 +1585,20 @@ function CutInScooter({
         ? { x: forward.x * 3.2 + right.x * lateralSpeed, z: forward.z * 3.2 + right.z * lateralSpeed }
         : { x: 0, z: 0 }
     if (body.circles(actorContactCircles('scooter', actor, tilt), velocity)?.collided) isStopped.current = true
+    const actual = projectToSubject3Route(actor.x, actor.z)
+    const conflict =
+      triggered.current &&
+      actual.lateral <= RIGHT_EDGE_OFFSET &&
+      actual.lateral >= SAME_DIRECTION_DIVIDER
+    updateSubject3TrafficHazardFromWorld(
+      traffic.current,
+      'cut-in-scooter',
+      'cut-in-scooter',
+      actor,
+      velocity,
+      triggered.current && !isStopped.current && elapsed.current < 5,
+      conflict,
+    )
     if (group.current) {
       group.current.position.set(actor.x, 0.18, actor.z)
       group.current.rotation.y = sceneYawFromHeading(actor.heading)
@@ -1598,7 +1630,7 @@ function DynamicTraffic({
     <MovingTrafficCar player={player} traffic={traffic} onInfraction={onInfraction} id="oncoming-b" startProgress={3650} speed={8.6} lateral={-8.75} opposite color="#4f6e51" audioContext={audioContext} audioState={audioState} />
     <SuddenBrakeCar player={player} traffic={traffic} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
     <CrossingPedestrian player={player} traffic={traffic} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
-    <CutInScooter player={player} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
+    <CutInScooter player={player} traffic={traffic} onInfraction={onInfraction} audioContext={audioContext} audioState={audioState} />
   </>
 }
 
