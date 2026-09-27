@@ -79,9 +79,10 @@ export function buildFollowingDistanceCoachingReport(
   const eligible = sorted.filter(eligibleSample)
 
   let observedSeconds = 0
-  for (let index = 1; index < eligible.length; index += 1) {
-    const previous = eligible[index - 1]
-    const current = eligible[index]
+  for (let index = 1; index < sorted.length; index += 1) {
+    const previous = sorted[index - 1]
+    const current = sorted[index]
+    if (!eligibleSample(previous) || !eligibleSample(current)) continue
     const gap = current.t - previous.t
     if (
       current.leadVehicleId === previous.leadVehicleId &&
