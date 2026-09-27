@@ -335,3 +335,28 @@ The “本次优先改进” block must remain readable inside the result-card c
 - User-facing advice must explain the concrete evidence behind the recommendation and state that reduced training priority is not proof of real-road driving competence.
 - Menu recommendations must launch the configured pack through the same `onStartTrainingPack` path as the normal pack card. Do not invent a recommendation-only session type or bypass pack state.
 - The browser smoke must seed evidence, verify the expected training-center recommendation, and enter a real WebGL pack from the recommendation CTA.
+
+
+## Daily balanced training plan
+
+`src/training/dailyTrainingPlan.ts` owns the deterministic “今日训练计划” sequence. `src/training/TodayTrainingPlanPanel.tsx` owns presentation only.
+
+- The daily plan is derived from the current long-term training-plan ordering plus today's persisted training-pack history; do not introduce a second independent priority engine.
+- Limit the default daily workload to at most two distinct training packs. Repeating the same pack multiple times on one local calendar day never substitutes for the other planned pack.
+- A pack counts as completed for today only when a persisted full training-pack round exists for the current candidate + license type + pack ID on the same local calendar day.
+- History from another candidate, another license type, or a previous local calendar day may influence long-term priority but must never mark today's task complete.
+- If the highest-priority pack is already complete today, advance to the next distinct pending pack instead of recommending another repetition.
+- When one pack has already been repeated multiple times today while another planned pack is still pending, surface an explicit anti-bias notice rather than silently rewarding repetition.
+- “Today complete” means the configured daily sequence has been covered once; it is not a statement that driving skill is mastered.
+- The browser smoke must seed prior evidence, enter the first daily recommendation, finish that real WebGL training pack, return to the training center, and verify the second distinct pack becomes the next task.
+
+
+## Portable production asset base
+
+`vite.config.ts` must keep the production `base` relative (`'./'`) so one build works both under the GitHub Pages repository subpath and at a custom-domain root such as `https://kemu2.aben.io/`.
+
+- Do not hard-code `/Subject2/`, `/`, or another absolute asset base into the production Vite config.
+- Built CSS/JS/font/image references emitted by Vite must remain relative to the deployed `index.html`.
+- Playwright production preview must exercise the build from the server root; it must not depend on the historical `/Subject2/` preview path.
+- Keep `tests/vite-base.test.ts` as the regression lock for this portability requirement.
+- If client-side routes are introduced later, re-evaluate deep-link handling separately; do not solve routing by reverting static asset URLs to a repository-specific absolute prefix.

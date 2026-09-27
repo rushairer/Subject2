@@ -207,3 +207,45 @@
   .training-plan-feature{grid-template-columns:1fr}
   .training-plan-feature>.primary{width:100%;min-width:0;white-space:normal}
 }
+
+
+.today-plan-section{margin:30px 0 22px;padding:18px;border:1px solid #315a75;border-radius:22px;background:linear-gradient(145deg,#102638,#081823)}
+.today-plan-heading{margin:0 0 14px}
+.today-plan-heading p{max-width:560px}
+.today-plan-progress{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px;border:1px solid #2d5068;border-radius:16px;background:#0a1c29}
+.today-plan-progress>span{display:grid;gap:2px;min-width:72px}
+.today-plan-progress>span b{font-size:24px;line-height:1;color:#e8f8ff;font-variant-numeric:tabular-nums}
+.today-plan-progress>span small{font-size:8px;color:#7691a3}
+.today-plan-progress>div{display:grid;gap:3px;min-width:0}
+.today-plan-progress>div strong{font-size:13px;color:#e8f7ff}
+.today-plan-progress>div small{font-size:9px;line-height:1.5;color:#88a0b1}
+.today-plan-progress>.primary{min-width:190px;white-space:nowrap}
+.today-plan-balance-note{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;margin-top:9px;padding:9px 10px;border:1px solid #6b5938;border-radius:11px;background:#211b10}
+.today-plan-balance-note b{font-size:8px;color:#f0cf89;white-space:nowrap}
+.today-plan-balance-note span{font-size:8px;color:#a89570;line-height:1.5}
+.today-plan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.today-plan-task{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:9px;align-items:center;min-width:0;padding:12px;border:1px solid #27475d;border-radius:13px;background:#091925}
+.today-plan-task.completed{border-color:#315f4d;background:#0d241c}
+.today-plan-index{width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:#15364c;color:#82dcff;font-size:9px;font-weight:900}
+.today-plan-task.completed .today-plan-index{background:#1b513d;color:#b8efd0}
+.today-plan-task>div{display:grid;gap:4px;min-width:0}
+.today-plan-task>div>strong{font-size:11px;color:#e6f5fc}
+.today-plan-task>div>small{font-size:8px;color:#7f98a9;line-height:1.4}
+.today-plan-tags{display:flex;gap:4px;flex-wrap:wrap}
+.today-plan-tags i{padding:2px 5px;border-radius:999px;background:#102b3d;color:#8fadc0;font-size:7px;font-style:normal;font-weight:800}
+.today-plan-task.completed .today-plan-tags i:first-child{background:#184633;color:#a9e8c6}
+.today-plan-task>button{min-width:58px;min-height:30px;padding:6px 8px;border:1px solid #4f91b6;border-radius:8px;background:#0d2a3e;color:#c5efff;font-size:8px;font-weight:900;cursor:pointer}
+.today-plan-task>button:hover,.today-plan-task>button:focus-visible{border-color:#79d8ff;color:#fff;outline:none}
+.today-plan-done{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;background:#1d543e;color:#baf0d1;font-size:13px;font-weight:900}
+.today-plan-note{margin:9px 2px 0;color:#708999;font-size:8px;line-height:1.55}
+@media(max-width:760px){
+  .today-plan-section{padding:14px}
+  .today-plan-progress{grid-template-columns:auto minmax(0,1fr)}
+  .today-plan-progress>.primary{grid-column:1/-1;width:100%;min-width:0;white-space:normal}
+  .today-plan-grid{grid-template-columns:1fr}
+}
+@media(max-width:460px){
+  .today-plan-progress{grid-template-columns:1fr}
+  .today-plan-task{grid-template-columns:28px minmax(0,1fr)}
+  .today-plan-task>button,.today-plan-done{grid-column:2;justify-self:start}
+}

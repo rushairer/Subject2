@@ -139,7 +139,12 @@ test('personalized plan prioritizes evidence and training pack persists the next
   await expect(plan).toContainText('观察与信号')
   await expect(plan).toContainText('优先巩固')
   await expect(plan).toContainText('不合格 1')
-  await plan.getByRole('button', { name: '按建议开始 · 观察与信号' }).click()
+
+  const today = page.getByRole('region', { name: '今日训练计划' })
+  await expect(today).toContainText('0/2')
+  await expect(today).toContainText('下一项 · 观察与信号')
+  await expect(today.getByRole('article', { name: '今日训练第 1 项：观察与信号' })).toContainText('待完成')
+  await today.getByRole('button', { name: '开始今日下一项 · 观察与信号' }).click()
 
   await expectHealthyDrivingScene(page)
   await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/2 · 直角转弯')
@@ -189,7 +194,15 @@ test('personalized plan prioritizes evidence and training pack persists the next
     totalStages: 2,
   })
 
-  await expect(page.getByRole('button', { name: '训练包完成 · 返回训练中心' })).toBeVisible()
+  const returnToCenter = page.getByRole('button', { name: '训练包完成 · 返回训练中心' })
+  await expect(returnToCenter).toBeVisible()
+  await returnToCenter.click()
+
+  const refreshedToday = page.getByRole('region', { name: '今日训练计划' })
+  await expect(refreshedToday).toContainText('1/2')
+  await expect(refreshedToday).toContainText('下一项 · 车身边线控制')
+  await expect(refreshedToday.getByRole('article', { name: '今日训练第 1 项：观察与信号' })).toContainText('今日已完成')
+  await expect(refreshedToday.getByRole('button', { name: '开始今日下一项 · 车身边线控制' })).toBeEnabled()
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })

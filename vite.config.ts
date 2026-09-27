@@ -3,5 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/Subject2/',
+  // Keep emitted asset URLs relative so both GitHub Pages subpaths and custom-domain roots work.
+  base: './',
 })

@@ -42,6 +42,8 @@ import {
 } from './training/trainingPackHistory'
 import { buildTrainingPlan } from './training/trainingPlan'
 import { TrainingPlanPanel } from './training/TrainingPlanPanel'
+import { buildDailyTrainingPlan } from './training/dailyTrainingPlan'
+import { TodayTrainingPlanPanel } from './training/TodayTrainingPlanPanel'
 import {
   TRAINING_PACKS,
   nextTrainingPackState,
@@ -228,16 +230,30 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
     () => loadExamHistory().filter(item => item.candidateName === candidate.name).slice(0, 4),
     [candidate.name],
   )
+  const trainingPackHistory = useMemo(
+    () => loadTrainingPackHistory({
+      candidateName: candidate.name,
+      licenseType: candidate.licenseType,
+    }),
+    [candidate.name, candidate.licenseType],
+  )
   const trainingPlan = useMemo(
     () => buildTrainingPlan({
       candidateName: candidate.name,
       licenseType: candidate.licenseType,
-      history: loadTrainingPackHistory({
-        candidateName: candidate.name,
-        licenseType: candidate.licenseType,
-      }),
+      history: trainingPackHistory,
     }),
-    [candidate.name, candidate.licenseType],
+    [candidate.name, candidate.licenseType, trainingPackHistory],
+  )
+  const dailyTrainingPlan = useMemo(
+    () => buildDailyTrainingPlan({
+      candidateName: candidate.name,
+      licenseType: candidate.licenseType,
+      history: trainingPackHistory,
+      trainingPlan,
+      now: Date.now(),
+    }),
+    [candidate.name, candidate.licenseType, trainingPackHistory, trainingPlan],
   )
   return <main className="shell menu-shell">
     <header className="topbar"><div><div className="eyebrow">驾驶训练中心</div><h1>{candidate.name}，选择训练任务</h1></div><div className="candidate-actions"><div className="candidate-pill">{candidate.licenseType} · {candidate.gender} · {candidate.age} 岁</div><button className="ghost-btn" onClick={onSwitchCandidate}>切换考生</button></div></header>
@@ -246,6 +262,10 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
     </section>
     <RacingWheelSetup />
+    <TodayTrainingPlanPanel
+      plan={dailyTrainingPlan}
+      onStartPack={packId => onStartTrainingPack(packId, time)}
+    />
     <TrainingPlanPanel
       plan={trainingPlan}
       onStartPack={packId => onStartTrainingPack(packId, time)}
