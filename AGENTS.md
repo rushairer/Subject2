@@ -366,6 +366,8 @@ For any subsystem the user reports as "previously correct":
 ## Shared world collisions and effective-area containment
 
 - Subject 2 and Subject 3 must use `src/sim/collisionResponse.ts` and `useCollisionBody.ts` for physical response, material animation and sound. Course adapters may attach scoring callbacks but must not implement independent speed resets or impulses.
+- Collision response must preserve relative-speed scaling. Do not reintroduce low fixed travel/speed caps that make a 40–50 km/h impact look like a parking-speed bump. Light actors may receive several metres of bounded displacement at severe speeds; scoring remains independent of that presentation.
+- Pedestrian/scooter severe-impact visuals may use bounded ballistic lift, loss of balance and glancing yaw, but must stay non-graphic. Their compound proxies must follow the same visible local XYZ rotation so collision geometry does not lag behind the rendered actor.
 - Collision shapes, actor velocity and motion offsets use world coordinates; placed-course props convert to local coordinates only for rendering. Cars retain oriented body polygons; compact people, scooters and cones may use shared compound circle proxies that follow visible tilt.
 - Course-gate posts use `courseGateGeometry.ts`; the open center and elevated crossbar must not become invisible walls.
 - Integrate vehicle physics at frame priority -2, resolve contacts at -1, then update camera/judges/replay. These negative priorities must not take over rendering.

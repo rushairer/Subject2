@@ -141,6 +141,45 @@ test('impact severity follows relative normal approach, not player absolute spee
   close(lateralImpact.impactSpeed, 4)
 })
 
+test('high-speed impacts keep light-actor momentum instead of flattening to one response', () => {
+  for (const kind of ['pedestrian', 'scooter', 'cone'] as const) {
+    const low = resolveCircleImpact(player(4), frontCircle(), kind)
+    const high = resolveCircleImpact(player(14), frontCircle(), kind)
+    const lowSpeed = Math.hypot(low.actorVelocity.x, low.actorVelocity.z)
+    const highSpeed = Math.hypot(high.actorVelocity.x, high.actorVelocity.z)
+    assert.ok(highSpeed > lowSpeed * 2.5, `${kind} high-speed transfer should remain visibly stronger`)
+    assert.ok(high.strength > low.strength)
+    assert.ok(high.strength < 1)
+
+    const lowMotion = createCollisionMotion()
+    const highMotion = createCollisionMotion()
+    applyCollisionMotion(lowMotion, low)
+    applyCollisionMotion(highMotion, high)
+    stepCollisionMotion(lowMotion, kind, 0.2)
+    stepCollisionMotion(highMotion, kind, 0.2)
+    assert.ok(
+      Math.hypot(highMotion.offsetX, highMotion.offsetZ) > Math.hypot(lowMotion.offsetX, lowMotion.offsetZ) * 2.5,
+      `${kind} displacement should scale with transferred momentum`,
+    )
+    assert.ok(collisionMotionPose(highMotion, kind, 0).lift > 0, `${kind} severe impact should have a brief ballistic phase`)
+  }
+})
+
+test('glancing severe impacts add deterministic yaw while head-on impacts do not invent spin', () => {
+  const corner = { x: halfWidth + 0.15, z: -(halfLength + 0.15), radius: 0.25 }
+  const glancingImpact = resolveCircleImpact(player(14), corner, 'scooter')
+  const glancingMotion = createCollisionMotion()
+  applyCollisionMotion(glancingMotion, glancingImpact)
+  stepCollisionMotion(glancingMotion, 'scooter', 0.3)
+  assert.ok(Math.abs(collisionMotionPose(glancingMotion, 'scooter', 0).yaw) > 0.05)
+
+  const headOnImpact = resolveCircleImpact(player(14), frontCircle(), 'scooter')
+  const headOnMotion = createCollisionMotion()
+  applyCollisionMotion(headOnMotion, headOnImpact)
+  stepCollisionMotion(headOnMotion, 'scooter', 0.3)
+  close(collisionMotionPose(headOnMotion, 'scooter', 0).yaw, 0)
+})
+
 test('stationary player can receive moving traffic contact without fabricated reverse speed', () => {
   const car = player(0)
   const actor = { x: 0, z: -(halfLength + trafficCar.lengthMeters / 2 - 0.05), heading: Math.PI }
@@ -220,7 +259,7 @@ test('zero and very slow overlaps separate but cannot activate a dramatic animat
       applyCollisionMotion(motion, impact)
       stepCollisionMotion(motion, kind, 1)
       assert.equal(motion.active, false)
-      assert.deepEqual(collisionMotionPose(motion, kind, 0), { tiltX: 0, tiltZ: 0, lift: 0 })
+      assert.deepEqual(collisionMotionPose(motion, kind, 0), { tiltX: 0, tiltZ: 0, yaw: 0, lift: 0 })
       close(motion.offsetX, 0)
       close(motion.offsetZ, 0)
       assert.equal(checkVehicleCircleCollision(car, obstacle).colliding, false)
@@ -245,6 +284,8 @@ test('actor motion uses bounded exact exponential damping independent of frame r
     const finePose = collisionMotionPose(fine, kind, 0)
     close(coarsePose.tiltX, finePose.tiltX)
     close(coarsePose.tiltZ, finePose.tiltZ)
+    close(coarsePose.yaw, finePose.yaw)
+    close(coarsePose.lift, finePose.lift)
     stepCollisionMotion(coarse, kind, 100)
     assert.ok(Math.hypot(coarse.offsetX, coarse.offsetZ) <= COLLISION_PROFILES[kind].maxDisplacement)
     assert.equal(coarse.active, true)
@@ -286,12 +327,12 @@ test('pedestrian stumble, scooter and cone falls, and vehicle suspension have di
     stepCollisionMotion(motion, kind, 10)
     settled.set(kind, collisionMotionPose(motion, kind, 0))
   }
-  assert.ok(Math.abs(settled.get('pedestrian')!.tiltX) > 0.3)
-  assert.ok(Math.abs(settled.get('pedestrian')!.tiltX) <= 0.4)
-  assert.ok(Math.abs(settled.get('scooter')!.tiltZ) > 1)
-  assert.ok(Math.abs(settled.get('scooter')!.tiltZ) <= 1.1)
-  assert.ok(Math.abs(settled.get('cone')!.tiltX) > 1.4)
-  assert.ok(Math.abs(settled.get('cone')!.tiltX) <= 1.45)
+  assert.ok(Math.abs(settled.get('pedestrian')!.tiltX) > 0.45)
+  assert.ok(Math.abs(settled.get('pedestrian')!.tiltX) <= 1.48)
+  assert.ok(Math.abs(settled.get('scooter')!.tiltX) > 1)
+  assert.ok(Math.abs(settled.get('scooter')!.tiltX) <= 1.5)
+  assert.ok(Math.abs(settled.get('cone')!.tiltX) > 1.45)
+  assert.ok(Math.abs(settled.get('cone')!.tiltX) <= 1.52)
   close(settled.get('vehicle')!.tiltX, 0)
   close(settled.get('vehicle')!.tiltZ, 0)
   close(settled.get('vehicle')!.lift, 0)

@@ -29,24 +29,24 @@ export interface CollisionProfile {
 /** Conservative, non-graphic game responses. None of these values are exam thresholds. */
 export const COLLISION_PROFILES: Readonly<Record<CollisionKind, CollisionProfile>> = {
   cone: {
-    label: '锥桶', movable: true, relativeMass: 0.006, restitution: 0.08,
-    motionDamping: 3.2, maxActorSpeed: 2.8, maxDisplacement: 0.9,
-    maxTilt: 1.45, angularFrequency: 0, angularDamping: 9,
+    label: '锥桶', movable: true, relativeMass: 0.006, restitution: 0.16,
+    motionDamping: 2.3, maxActorSpeed: 18, maxDisplacement: 7.8,
+    maxTilt: 1.52, angularFrequency: 0, angularDamping: 7,
   },
   pedestrian: {
-    label: '行人', movable: true, relativeMass: 0.06, restitution: 0,
-    motionDamping: 5, maxActorSpeed: 1.6, maxDisplacement: 0.45,
-    maxTilt: 0.4, angularFrequency: 0, angularDamping: 8,
+    label: '行人', movable: true, relativeMass: 0.06, restitution: 0.01,
+    motionDamping: 2.2, maxActorSpeed: 16, maxDisplacement: 7.2,
+    maxTilt: 1.48, angularFrequency: 0, angularDamping: 5,
   },
   vehicle: {
     label: '车辆', movable: true, relativeMass: 1.1, restitution: 0.05,
-    motionDamping: 2.8, maxActorSpeed: 2.8, maxDisplacement: 1.1,
+    motionDamping: 2.8, maxActorSpeed: 5, maxDisplacement: 1.8,
     maxTilt: 0.075, angularFrequency: 10, angularDamping: 3.6,
   },
   scooter: {
-    label: '电动车', movable: true, relativeMass: 0.14, restitution: 0.02,
-    motionDamping: 3.8, maxActorSpeed: 2, maxDisplacement: 0.65,
-    maxTilt: 1.1, angularFrequency: 0, angularDamping: 6,
+    label: '电动车', movable: true, relativeMass: 0.14, restitution: 0.03,
+    motionDamping: 2, maxActorSpeed: 14, maxDisplacement: 7,
+    maxTilt: 1.5, angularFrequency: 0, angularDamping: 4.8,
   },
   pole: {
     label: '立杆', movable: false, relativeMass: Infinity, restitution: 0,
@@ -79,8 +79,43 @@ export interface CollisionImpact {
 
 const SEPARATION_CLEARANCE_METERS = 1e-4
 const MIN_ANIMATED_IMPACT_SPEED = 0.12
-const FULL_IMPACT_SPEED = 4
 const ANIMATION_RESTART_SECONDS = 0.65
+const GRAVITY_METERS_PER_SECOND_SQUARED = 9.81
+
+/** Speed at which the visual response reaches roughly half strength. */
+const IMPACT_RESPONSE_SPEED: Readonly<Record<CollisionKind, number>> = {
+  cone: 2.2,
+  pedestrian: 4.5,
+  vehicle: 6.5,
+  scooter: 5.2,
+  pole: 5,
+  tree: 6,
+  building: 7,
+}
+
+const LAUNCH_RESPONSE: Readonly<Record<CollisionKind, {
+  threshold: number
+  scale: number
+  maximum: number
+}>> = {
+  cone: { threshold: 2.5, scale: 0.38, maximum: 3.2 },
+  pedestrian: { threshold: 5, scale: 0.32, maximum: 3.4 },
+  scooter: { threshold: 6, scale: 0.22, maximum: 2.2 },
+  vehicle: { threshold: Infinity, scale: 0, maximum: 0 },
+  pole: { threshold: Infinity, scale: 0, maximum: 0 },
+  tree: { threshold: Infinity, scale: 0, maximum: 0 },
+  building: { threshold: Infinity, scale: 0, maximum: 0 },
+}
+
+const MAX_YAW_RESPONSE: Readonly<Record<CollisionKind, number>> = {
+  pedestrian: 0.55,
+  scooter: 1.1,
+  cone: 0,
+  vehicle: 0,
+  pole: 0,
+  tree: 0,
+  building: 0,
+}
 
 function keepsSettledPose(kind: CollisionKind) {
   return kind === 'pedestrian' || kind === 'scooter' || kind === 'cone'
@@ -98,6 +133,58 @@ function limitVelocity(velocity: XZVector, maxSpeed: number): XZVector {
   if (speed <= maxSpeed) return velocity
   const scale = maxSpeed / speed
   return { x: velocity.x * scale, z: velocity.z * scale }
+}
+
+function smoothStep(edge0: number, edge1: number, value: number) {
+  if (value <= edge0) return 0
+  if (value >= edge1) return 1
+  const t = (value - edge0) / (edge1 - edge0)
+  return t * t * (3 - 2 * t)
+}
+
+function impactResponseStrength(kind: CollisionKind, impactSpeed: number) {
+  const speed = Math.max(0, impactSpeed - MIN_ANIMATED_IMPACT_SPEED)
+  if (speed <= 0) return 0
+  const reference = IMPACT_RESPONSE_SPEED[kind]
+  const speedSquared = speed * speed
+  return speedSquared / (speedSquared + reference * reference)
+}
+
+function ballisticLift(state: CollisionMotion, kind: CollisionKind) {
+  const response = LAUNCH_RESPONSE[kind]
+  const launchVelocity = Math.min(
+    response.maximum,
+    Math.max(0, state.impactSpeed - response.threshold) * response.scale,
+  )
+  if (launchVelocity <= 0) return 0
+  return Math.max(
+    0,
+    launchVelocity * state.elapsed
+      - 0.5 * GRAVITY_METERS_PER_SECOND_SQUARED * state.elapsed * state.elapsed,
+  )
+}
+
+function settledTiltAmplitude(state: CollisionMotion, kind: CollisionKind) {
+  const profile = COLLISION_PROFILES[kind]
+  if (kind === 'pedestrian') {
+    const stumble = 0.52 * smoothStep(0, 0.3, state.strength)
+    return stumble + (profile.maxTilt - stumble) * smoothStep(0.38, 0.78, state.strength)
+  }
+  if (kind === 'scooter') {
+    const initialLean = 0.68 * smoothStep(0, 0.2, state.strength)
+    return initialLean + (profile.maxTilt - initialLean) * smoothStep(0.16, 0.52, state.strength)
+  }
+  if (kind === 'cone') return profile.maxTilt * smoothStep(0.03, 0.3, state.strength)
+  return profile.maxTilt * state.strength
+}
+
+function settledYaw(state: CollisionMotion, kind: CollisionKind, normalRight: number) {
+  const maximum = MAX_YAW_RESPONSE[kind]
+  const glancing = Math.min(1, Math.abs(normalRight))
+  if (maximum <= 0 || glancing < 0.05) return 0
+  const response = smoothStep(0.25, 0.9, state.strength)
+  const settled = -Math.expm1(-3.5 * state.elapsed)
+  return -Math.sign(normalRight) * maximum * glancing * response * settled
 }
 
 function separateContact(player: InteractiveVehicle, normal: XZVector, penetration: number) {
@@ -146,9 +233,7 @@ function resolveContact(
   return {
     kind, collided: true, impactSpeed, normal,
     actorVelocity: displacedActorVelocity,
-    strength: Math.min(1, Math.max(0,
-      (impactSpeed - MIN_ANIMATED_IMPACT_SPEED) / (FULL_IMPACT_SPEED - MIN_ANIMATED_IMPACT_SPEED),
-    )),
+    strength: impactResponseStrength(kind, impactSpeed),
   }
 }
 
@@ -318,29 +403,53 @@ export function stepCollisionMotion(state: CollisionMotion, kind: CollisionKind,
 
 /** Model-local visual response; keep a fixed trunk/pole collider at its base. */
 export function collisionMotionPose(state: CollisionMotion, kind: CollisionKind, heading: number) {
-  if (!state.active) return { tiltX: 0, tiltZ: 0, lift: 0 }
+  if (!state.active) return { tiltX: 0, tiltZ: 0, yaw: 0, lift: 0 }
   const profile = COLLISION_PROFILES[kind]
   const forward = forwardFromHeading(heading)
   const right = rightFromHeading(heading)
   const normalForward = state.normalX * forward.x + state.normalZ * forward.z
   const normalRight = state.normalX * right.x + state.normalZ * right.z
-  const amplitude = profile.maxTilt * state.strength
+
   if (keepsSettledPose(kind)) {
     const settled = -Math.expm1(-profile.angularDamping * state.elapsed)
-    const lean = amplitude * settled
+    const lean = settledTiltAmplitude(state, kind) * settled
+    const yaw = settledYaw(state, kind, normalRight)
+    const lift = ballisticLift(state, kind)
+
     if (kind === 'scooter') {
-      const side = Math.abs(normalRight) > 0.05 ? Math.sign(normalRight) : 1
-      return { tiltX: -normalForward * lean * 0.12, tiltZ: -side * lean, lift: 0 }
+      // Broadside hits topple the scooter sideways. Near head-on/rear impacts
+      // pitch the bike in the travel plane instead of always choosing one side.
+      if (Math.abs(normalRight) > 0.15) {
+        return {
+          tiltX: -normalForward * lean * 0.16,
+          tiltZ: -Math.sign(normalRight) * lean,
+          yaw,
+          lift,
+        }
+      }
+      return {
+        tiltX: -normalForward * lean * 0.9,
+        tiltZ: -normalRight * lean,
+        yaw,
+        lift,
+      }
     }
-    // A restrained held loss of balance keeps the upright radial proxy useful;
-    // the renderer must conservatively cover any horizontal model overhang.
-    return { tiltX: -normalForward * lean, tiltZ: -normalRight * lean, lift: 0 }
+
+    return {
+      tiltX: -normalForward * lean,
+      tiltZ: -normalRight * lean,
+      yaw,
+      lift,
+    }
   }
+
+  const amplitude = profile.maxTilt * state.strength
   const oscillation = Math.sin(state.elapsed * profile.angularFrequency)
     * Math.exp(-state.elapsed * profile.angularDamping)
   return {
     tiltX: -normalForward * amplitude * oscillation,
     tiltZ: -normalRight * amplitude * oscillation,
+    yaw: 0,
     lift: kind === 'vehicle' ? Math.abs(oscillation) * state.strength * 0.025 : 0,
   }
 }

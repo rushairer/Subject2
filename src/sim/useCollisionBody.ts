@@ -78,6 +78,7 @@ export function useCollisionBody({
       const pose = collisionMotionPose(motion.current, kind, heading)
       if (visual.current) {
         visual.current.rotation.x = pose.tiltX
+        visual.current.rotation.y = pose.yaw
         visual.current.rotation.z = pose.tiltZ
         visual.current.position.y = pose.lift
       }

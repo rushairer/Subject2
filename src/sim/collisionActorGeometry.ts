@@ -82,18 +82,24 @@ const SCOOTER_CONTACT_SPHERES: readonly LocalContactSphere[] = [
 export function actorContactCircles(
   kind: CompactCollisionActorKind,
   pose: VehiclePose,
-  tilt: { tiltX: number; tiltZ: number },
+  tilt: { tiltX: number; tiltZ: number; yaw?: number },
 ): CircleObstacle[] {
   const spheres = kind === 'pedestrian' ? PEDESTRIAN_CONTACT_SPHERES : SCOOTER_CONTACT_SPHERES
   const sinX = Math.sin(tilt.tiltX)
   const cosX = Math.cos(tilt.tiltX)
+  const sinY = Math.sin(tilt.yaw ?? 0)
+  const cosY = Math.cos(tilt.yaw ?? 0)
   const sinZ = Math.sin(tilt.tiltZ)
   const cosZ = Math.cos(tilt.tiltZ)
   return spheres.map(sphere => {
-    const localX = sphere.x * cosZ - sphere.y * sinZ
+    // Three.js Euler XYZ applies the local Z, then Y, then X rotations to a point.
+    // Match that order so collision proxies follow the spun/leaned rendered actor.
+    const rotatedX = sphere.x * cosZ - sphere.y * sinZ
     const rotatedY = sphere.x * sinZ + sphere.y * cosZ
-    const localZ = rotatedY * sinX + sphere.z * cosX
-    const point = worldPointFromVehicle(pose.x, pose.z, pose.heading, -localZ, localX)
+    const yawX = rotatedX * cosY + sphere.z * sinY
+    const yawZ = -rotatedX * sinY + sphere.z * cosY
+    const localZ = rotatedY * sinX + yawZ * cosX
+    const point = worldPointFromVehicle(pose.x, pose.z, pose.heading, -localZ, yawX)
     return { x: point.x, z: point.z, radius: sphere.radius }
   })
 }

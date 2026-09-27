@@ -17,10 +17,10 @@ const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - 
 function renderedPoint(
   local: Vector3,
   pose: VehiclePose,
-  tilt: { tiltX: number; tiltZ: number },
+  tilt: { tiltX: number; tiltZ: number; yaw?: number },
 ) {
   return local.clone()
-    .applyEuler(new Euler(tilt.tiltX, 0, tilt.tiltZ, 'XYZ'))
+    .applyEuler(new Euler(tilt.tiltX, tilt.yaw ?? 0, tilt.tiltZ, 'XYZ'))
     .applyEuler(new Euler(0, sceneYawFromHeading(pose.heading), 0, 'XYZ'))
     .add(new Vector3(pose.x, 0, pose.z))
 }
@@ -117,6 +117,22 @@ test('fallen scooter proxies cover visible bike corners, handlebars and rider ov
     const circles = actorContactCircles('scooter', pose, tilt)
     for (const point of points) covered(circles, renderedPoint(point, pose, tilt), `scooter ${point.toArray()} / ${JSON.stringify(tilt)}`)
   }
+})
+
+test('collision yaw keeps compact proxies aligned with the rendered actor', () => {
+  const pose = { x: 5.2, z: -9.4, heading: 0.73 }
+  const tilt = { tiltX: -0.24, tiltZ: 1.18, yaw: 0.82 }
+  const pedestrianCircles = actorContactCircles('pedestrian', pose, tilt)
+  const scooterCircles = actorContactCircles('scooter', pose, tilt)
+  const pedestrianHead = renderedPoint(new Vector3(0, 1.5, 0), pose, tilt)
+  const scooterHead = renderedPoint(new Vector3(0, 1.3, 0), pose, tilt)
+  const frontWheel = renderedPoint(new Vector3(0, 0.18, -0.48), pose, tilt)
+  close(pedestrianCircles[5].x, pedestrianHead.x)
+  close(pedestrianCircles[5].z, pedestrianHead.z)
+  close(scooterCircles[12].x, scooterHead.x)
+  close(scooterCircles[12].z, scooterHead.z)
+  close(scooterCircles[0].x, frontWheel.x)
+  close(scooterCircles[0].z, frontWheel.z)
 })
 
 test('vehicle contact occurs at the exact outer proxy boundary with a real gap remaining safe', () => {
