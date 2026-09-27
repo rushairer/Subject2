@@ -20,6 +20,7 @@ import {
 import type { Subject2ProjectId } from './courseStartPoses'
 import type { CoursePlacement } from './courseTransform'
 import { COURSE_GATE_GEOMETRY, courseGatePosts } from './courseGateGeometry'
+import { subject2CourseGateIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 
 function PlacedCourse({
   placement,
@@ -50,7 +51,7 @@ function CourseGate({
   vehicle?: MutableRefObject<Vehicle>
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
-  onIncident?: (incident: { id: string; title: string }) => void
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }) {
   const pose = subject2ExamWorldStartPose(project)
   const posts = courseGatePosts(pose)
@@ -60,7 +61,7 @@ function CourseGate({
     audioContext,
     audioState,
     onImpact: onIncident
-      ? () => onIncident({ id: `course-gate-${project}-left`, title: '连续考试连接道路撞到入口立杆' })
+      ? () => onIncident(subject2CourseGateIncident({ id: `course-gate-${project}-left`, course: project }))
       : undefined,
   })
   const rightBody = useCollisionBody({
@@ -69,7 +70,7 @@ function CourseGate({
     audioContext,
     audioState,
     onImpact: onIncident
-      ? () => onIncident({ id: `course-gate-${project}-right`, title: '连续考试连接道路撞到入口立杆' })
+      ? () => onIncident(subject2CourseGateIncident({ id: `course-gate-${project}-right`, course: project }))
       : undefined,
   })
   const bodies = [leftBody, rightBody]
@@ -152,7 +153,7 @@ export function Subject2ExamCourse({
   vehicle?: MutableRefObject<Vehicle>
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
-  onIncident?: (incident: { id: string; title: string }) => void
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }): ReactElement {
   const transitions = subject2ExamTransitions(automatic)
   const sequence = subject2ExamSequence(automatic)
@@ -177,10 +178,7 @@ export function Subject2ExamCourse({
         placement={SUBJECT2_EXAM_PLACEMENTS['reverse-parking']}
         audioContext={audioContext}
         audioState={audioState}
-        onConeImpact={index => onIncident?.({
-          id: `reverse-parking-cone-${index}`,
-          title: '倒车入库时撞到锥桶',
-        })}
+        onIncident={onIncident}
       />
     </PlacedCourse>
     {!automatic && <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['slope-start']}>
@@ -189,6 +187,7 @@ export function Subject2ExamCourse({
         placement={SUBJECT2_EXAM_PLACEMENTS['slope-start']}
         audioContext={audioContext}
         audioState={audioState}
+        onIncident={onIncident}
       />
     </PlacedCourse>}
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['side-parking']}>
@@ -197,10 +196,7 @@ export function Subject2ExamCourse({
         placement={SUBJECT2_EXAM_PLACEMENTS['side-parking']}
         audioContext={audioContext}
         audioState={audioState}
-        onConeImpact={index => onIncident?.({
-          id: `side-parking-cone-${index}`,
-          title: '侧方停车时撞到锥桶',
-        })}
+        onIncident={onIncident}
       />
     </PlacedCourse>
     <PlacedCourse placement={SUBJECT2_EXAM_PLACEMENTS['curve-driving']}>
@@ -212,10 +208,7 @@ export function Subject2ExamCourse({
         placement={SUBJECT2_EXAM_PLACEMENTS['right-angle']}
         audioContext={audioContext}
         audioState={audioState}
-        onConeImpact={index => onIncident?.({
-          id: `right-angle-cone-${index}`,
-          title: '直角转弯时撞到锥桶',
-        })}
+        onIncident={onIncident}
       />
     </PlacedCourse>
   </group>
