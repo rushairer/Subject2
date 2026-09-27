@@ -341,6 +341,7 @@ For any subsystem the user reports as "previously correct":
 - Course-gate posts use `courseGateGeometry.ts`; the open center and elevated crossbar must not become invisible walls.
 - Integrate vehicle physics at frame priority -2, resolve contacts at -1, then update camera/judges/replay. These negative priorities must not take over rendering.
 - Native project boundary checks must not wait for a reverse/start/entry maneuver before detecting a departure. Continuous navigation still disables the next project's judge.
+- `subject2ProjectJudgingEnabled(...)` in `subject2ExamLayout.ts` is the pure source of truth for that continuous-navigation gate. State-machine tests must not bypass this gate and then expect transition-road silence from native boundary guards.
 - `subject2EffectiveArea.ts` supplies the separate full-session outer-area guard using actual ground surfaces and connecting roads. Preserve rotated placements, open internal seams and legal canonical starts; do not reintroduce a global world-X cutoff.
 - `courseGroundGeometry.ts` is shared by ground rendering and outer-area judging. The outer-area failure severity belongs in `subject2Rules.ts`, while Subject 3 road containment remains in its state machine and scoring matrix.
 
