@@ -238,6 +238,20 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay evidence jumps must reuse the existing project/time focus path and expose the recorded cut-in distance state in the project readout.
 - Hazard publication changes require deterministic coverage in `tests/subject3-traffic-state.test.ts`; observer changes require `tests/subject3-hazard-observation.test.ts`; response timing changes require `tests/cut-in-response-coaching.test.ts`.
 
+## Subject 3 pedestrian response coaching
+
+`src/coaching/pedestrianResponseCoaching.ts` explains the candidate's response after the scripted crosswalk pedestrian enters the same-direction carriageway.
+
+- Existing `Subject3Runtime.crosswalkConflictSeen/crosswalkYieldStopSeen` and the centralized crosswalk yield rule remain the only scoring authority. The replay module must never add a duplicate penalty, change pass/fail, terminate an exam, or feed penalty-priority aggregation.
+- Pedestrian telemetry comes from `Subject3TrafficState.hazards` and must follow the rendered/collision-resolved world actor through route projection. Replay code must never inspect Three.js meshes.
+- Keep pedestrian hazard observation available while the candidate stops. Do not apply a minimum player-speed filter in the observer, because that would erase the exact stopped-state evidence the coaching module needs.
+- Trigger coaching only on a continuous false→true pedestrian-conflict transition with a relevant route-relative distance. Large trajectory gaps must not fabricate a response event.
+- `DRIVING_RULES.subject3.pedestrianResponseCoaching` values gate replay evidence only. They are not statutory reaction-time or distance thresholds.
+- Report observed throttle release, brake response, stopped-state timing, minimum speed and separation. The existing scoring rule may still judge whether a required stop occurred; the coaching layer only explains how the response unfolded.
+- Keep all pedestrian trajectory fields optional so older replay/history records remain readable.
+- Replay evidence jumps must reuse the existing project/time focus path and show pedestrian conflict/distance context in the project readout.
+- Observer changes require `tests/subject3-hazard-observation.test.ts`; response timing changes require `tests/pedestrian-response-coaching.test.ts`.
+
 ## Subject 3 sudden-brake response coaching
 
 `src/coaching/suddenBrakeCoaching.ts` owns advisory replay analysis for the scripted same-lane sudden-brake vehicle.
