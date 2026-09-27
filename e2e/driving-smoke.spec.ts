@@ -109,6 +109,27 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
+test('standalone Subject 3 lane-change drill starts at the targeted slice', async ({ page }) => {
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '科三专项E2E')
+
+  const drill = page.locator('.subject3-practice-card').filter({ hasText: '变更车道' })
+  await expect(drill).toBeVisible()
+  await drill.click()
+
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('科目三专项 · 变更车道')
+  await expect(page.locator('.status-chip')).toContainText('白天')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 变更车道|下一项目：变更车道/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+  await expect(page.locator('.result-meta')).toContainText('科目三专项 · 变更车道')
+  await expect(page.getByText('未完成', { exact: true })).toBeVisible()
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
 test('personalized plan routes through four targeted observation-signal stages', async ({ page }) => {
   // The pack now mounts four real driving scenes, including three targeted
   // Subject 3 slices. State-machine tests cover automatic event completion;
