@@ -952,6 +952,9 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         rightIndicator: v.rightIndicator || v.hazard,
         handbrake: v.handbrake,
         automatic,
+        engineOn: v.engineOn,
+        engineRpm: v.engineRpm,
+        clutch: v.clutch,
       })
     }
   }
