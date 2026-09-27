@@ -141,6 +141,15 @@ test('replay coaching explains an infraction with before-after operation context
 
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
+  await expect(page.getByRole('heading', { name: '本次优先改进' })).toBeVisible()
+  const focus = page.getByRole('button', { name: /优先改进 1：安全检查与起停流程/ })
+  await expect(focus).toBeVisible()
+  await expect(focus).toBeEnabled()
+  await expect(focus).toContainText('1 条相关记录')
+  await expect(focus).toContainText('含 1 条不合格')
+  await expect(focus).toContainText('训练重点')
+  await focus.click()
+
   const event = page.getByRole('button', { name: /起步或行驶时未按规定使用安全带/ })
   await expect(event).toBeVisible()
   await expect(event).toContainText('原因')
