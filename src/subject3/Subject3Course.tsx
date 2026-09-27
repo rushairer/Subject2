@@ -1450,7 +1450,7 @@ function SuddenBrakeCar({
     if (motion.active) {
       updateSubject3TrafficAfterImpact(traffic.current, 'sudden-brake', world.pose, motion, false)
     } else {
-      updateSubject3TrafficVehicle(traffic.current, 'sudden-brake', progress.current, 0, moving ? speed.current : 0, false)
+      updateSubject3TrafficVehicle(traffic.current, 'sudden-brake', progress.current, 0, moving ? speed.current : 0, false, 'sudden-brake')
     }
     if (group.current) {
       group.current.position.set(actor.x, 0.04, actor.z)
