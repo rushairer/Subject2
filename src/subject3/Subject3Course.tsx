@@ -67,6 +67,12 @@ import {
   makeSpeedLimitTexture,
   makeUTurnSignTexture,
 } from './subject3Signs'
+import {
+  isSubject3PracticeSliceComplete,
+  subject3PracticeCompletionStatus,
+  subject3PracticeSliceById,
+  type Subject3PracticeSliceId,
+} from './subject3Practice'
 
 export { SUBJECT3_START } from './subject3Route'
 
@@ -181,9 +187,12 @@ function resetEventStats(runtime: Subject3Runtime) {
   runtime.crosswalkYieldStopSeen = false
 }
 
-export function createSubject3Runtime(): Subject3Runtime {
+export function createSubject3Runtime(seed?: {
+  eventIndex?: number
+  progress?: number
+}): Subject3Runtime {
   return {
-    eventIndex: 0,
+    eventIndex: seed?.eventIndex ?? 0,
     started: false,
     eventActive: false,
     eventMaxSpeed: 0,
@@ -224,7 +233,7 @@ export function createSubject3Runtime(): Subject3Runtime {
     parkingBrakeRecorded: false,
     seatbeltRecorded: false,
     completed: false,
-    progress: 0,
+    progress: seed?.progress ?? 0,
   }
 }
 
@@ -485,10 +494,21 @@ function evaluateEvent(event: Subject3RouteEvent, runtime: Subject3Runtime, auto
   return infractions
 }
 
-function instructionFor(runtime: Subject3Runtime) {
-  if (runtime.completed) return `科目三道路驾驶路线完成 · 实际路线长度 ${(SUBJECT3_ROUTE_LENGTH / 1000).toFixed(2)} km`
+function instructionFor(
+  runtime: Subject3Runtime,
+  practiceSlice?: Subject3PracticeSliceId,
+) {
+  if (runtime.completed) {
+    return practiceSlice
+      ? subject3PracticeCompletionStatus(practiceSlice)
+      : `科目三道路驾驶路线完成 · 实际路线长度 ${(SUBJECT3_ROUTE_LENGTH / 1000).toFixed(2)} km`
+  }
   const event = SUBJECT3_EVENTS[runtime.eventIndex]
-  if (!event) return '继续沿考试路线安全行驶，准备完成靠边停车。'
+  if (!event) {
+    return practiceSlice
+      ? `科目三专项 · ${subject3PracticeSliceById(practiceSlice).title} · 准备结束本次训练`
+      : '继续沿考试路线安全行驶，准备完成靠边停车。'
+  }
   if (runtime.progress < event.start) return `下一项目：${event.title} · ${event.instruction}`
   return `${event.title} · ${event.instruction}`
 }
@@ -501,10 +521,11 @@ export function updateSubject3(
   dt: number,
   traffic: Readonly<Subject3TrafficState> = createSubject3TrafficState(),
   examMode = true,
+  practiceSlice?: Subject3PracticeSliceId,
 ): { runtime: Subject3Runtime; infractions: Subject3Infraction[]; status: string } {
   const runtime = { ...previous }
   const infractions: Subject3Infraction[] = []
-  if (runtime.completed) return { runtime, infractions, status: instructionFor(runtime) }
+  if (runtime.completed) return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
 
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
   runtime.progress = Math.max(runtime.progress, projection.progress)
@@ -703,17 +724,24 @@ export function updateSubject3(
       runtime.pullOverSecuredStopSeen = true
       infractions.push(...evaluateEvent(event, runtime, automatic, night))
       runtime.completed = true
-      return { runtime, infractions, status: instructionFor(runtime) }
+      return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
     }
 
     if (runtime.progress > event.end) {
       infractions.push(...evaluateEvent(event, runtime, automatic, night))
+      const practiceCompleted = practiceSlice
+        ? isSubject3PracticeSliceComplete(practiceSlice, event.id)
+        : false
       runtime.eventIndex += 1
       resetEventStats(runtime)
+      if (practiceCompleted) {
+        runtime.completed = true
+        return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
+      }
     }
   }
 
-  return { runtime, infractions, status: instructionFor(runtime) }
+  return { runtime, infractions, status: instructionFor(runtime, practiceSlice) }
 }
 
 function RouteSign({

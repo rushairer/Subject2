@@ -5,6 +5,10 @@ import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
 import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
+import {
+  subject3PracticeSliceTitle,
+  type Subject3PracticeSliceId,
+} from '../subject3/subject3Practice'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
 import { nearestReplaySample } from './replayContext'
 import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
@@ -314,12 +318,14 @@ function TrainingFocusSummary({
   onSelect,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
 }: {
   items: ReplayTrainingFocus[]
   projects: Set<string>
   onSelect: (item: ReplayTrainingFocus) => void
   onStartTraining?: (project: ReplayTrainingProjectId) => void
   onStartTrainingPack?: (packId: TrainingPackId) => void
+  onStartSubject3Practice?: (slice: Subject3PracticeSliceId) => void
 }) {
   if (items.length === 0) return null
 
@@ -339,7 +345,15 @@ function TrainingFocusSummary({
           representative.t != null &&
           representative.project != null &&
           projects.has(representative.project)
-        const canTrain = item.recommendedProject != null && onStartTraining != null
+        const sliceTitle = subject3PracticeSliceTitle(item.recommendedSubject3Practice ?? undefined)
+        const canTrainSlice =
+          item.recommendedSubject3Practice != null &&
+          sliceTitle != null &&
+          onStartSubject3Practice != null
+        const canTrain =
+          !canTrainSlice &&
+          item.recommendedProject != null &&
+          onStartTraining != null
         const pack = trainingPackForHabit(item.id)
         const canStartPack = pack != null && onStartTrainingPack != null
 
@@ -379,6 +393,13 @@ function TrainingFocusSummary({
                 onClick={() => onStartTrainingPack(pack!.id)}
               >
                 训练包 · {pack!.title}
+              </button>}
+              {canTrainSlice && <button
+                type="button"
+                className="replay-focus-training-btn"
+                onClick={() => onStartSubject3Practice(item.recommendedSubject3Practice!)}
+              >
+                {canStartPack ? '回练' : '专项训练'} · {sliceTitle}
               </button>}
               {canTrain && <button
                 type="button"
@@ -482,11 +503,13 @@ export function ExamReplay({
   infractions,
   onStartTraining,
   onStartTrainingPack,
+  onStartSubject3Practice,
 }: {
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   onStartTraining?: (project: ReplayTrainingProjectId) => void
   onStartTrainingPack?: (packId: TrainingPackId) => void
+  onStartSubject3Practice?: (slice: Subject3PracticeSliceId) => void
 }): ReactElement | null {
   const [focusRequest, setFocusRequest] = useState<{
     project: string
@@ -529,6 +552,7 @@ export function ExamReplay({
       }}
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
+      onStartSubject3Practice={onStartSubject3Practice}
     />
 
     <div className="replay-projects">
