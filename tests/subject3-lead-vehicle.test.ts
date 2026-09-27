@@ -87,3 +87,14 @@ test('actors beyond the observation horizon are ignored', () => {
 
   assert.equal(observeSubject3LeadVehicle(playerAt(1000), traffic), undefined)
 })
+
+
+test('reversing does not produce forward following-gap telemetry', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'lead', 1015, 0, 0, false)
+
+  assert.equal(
+    observeSubject3LeadVehicle(playerAt(1000, 0, -3), traffic),
+    undefined,
+  )
+})
