@@ -55,7 +55,6 @@ import {
   TRAINING_PACKS,
   nextTrainingPackState,
   trainingPackById,
-  trainingPackProject,
   trainingPackStage,
   trainingPackStageLabel,
   type TrainingPackId,
@@ -986,7 +985,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
         <div className="status-chip">{candidate.name} · {combinedExam
           ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}`
           : trainingPack && session.trainingPack
-            ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.projects.length} · ${examTitle(activeExamId)}`
+            ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
             : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
           <button className="view-btn" onClick={cycleCameraMode}>
@@ -1071,15 +1070,15 @@ function Result({
     {trainingPack && session.trainingPack && <section className="training-pack-progress" aria-label="专项训练进度">
       <div className="training-pack-progress-head">
         <div><span>专项训练包</span><strong>{trainingPack.title}</strong></div>
-        <b>{session.trainingPack.index + 1} / {trainingPack.projects.length}</b>
+        <b>{session.trainingPack.index + 1} / {trainingPack.stages.length}</b>
       </div>
       <p>{trainingPack.summary}</p>
       <div className="training-pack-steps">
-        {trainingPack.projects.map((project, index) => <span
-          key={project}
+        {trainingPack.stages.map((stage, index) => <span
+          key={stage.label + '-' + index}
           className={index < session.trainingPack!.index ? 'done' : index === session.trainingPack!.index ? 'active' : ''}
         >
-          <i>{index + 1}</i>{examTitle(project as ExamId)}
+          <i>{index + 1}</i>{stage.label}
         </span>)}
       </div>
     </section>}
