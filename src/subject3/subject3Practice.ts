@@ -59,6 +59,15 @@ const DEFINITION_BY_ID = new Map(
   SUBJECT3_PRACTICE_SLICES.map(slice => [slice.id, slice] as const),
 )
 
+export function isSubject3PracticeSliceId(value: string): value is Subject3PracticeSliceId {
+  return DEFINITION_BY_ID.has(value as Subject3PracticeSliceId)
+}
+
+export function subject3PracticeSliceTitle(value: string | undefined) {
+  if (!value || !isSubject3PracticeSliceId(value)) return null
+  return DEFINITION_BY_ID.get(value)?.title ?? null
+}
+
 function eventIndexById(id: string) {
   return SUBJECT3_EVENTS.findIndex(event => event.id === id)
 }
