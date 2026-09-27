@@ -285,3 +285,24 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 - A completed Subject 2 pack stage may auto-open its stage result only after the underlying project reports real completion. Manual “结束并查看结果” remains allowed and may continue the pack from an incomplete stage result.
 - Subject 3 remains a normal full-road training stage until event-level sub-route training is implemented; do not fake partial Subject 3 completion just to shorten a pack.
 - Browser coverage must verify at least one real pack transition across two WebGL scenes, including stage progress, result UI, next-stage routing and clean renderer lifecycle.
+
+
+## Training-pack aggregate review
+
+`src/training/trainingPackReport.ts` owns deterministic aggregation across stages of one active training-pack run; `src/training/TrainingPackReport.tsx` owns its final presentation.
+
+- Never create a synthetic cross-project exam score. Pack review may show the existing per-stage scores, completion state and emitted infractions only.
+- Cross-stage trend compares target-habit infraction evidence conservatively. Because projects have different rule opportunities and difficulty, user-facing copy must state that this is an in-pack coaching trend, not a formal exam-performance equivalence.
+- Stage aggregation must retain the real pack/project/index identity. Re-running the same stage replaces that stage's in-memory result rather than duplicating it.
+- Starting a fresh training pack resets prior pack-stage aggregation. Starting a normal single project, returning to the training center, or switching candidate must not leak a previous pack's aggregate state into the next session.
+- Retry recommendations rank existing evidence lexicographically (fatal evidence, target-habit event count, total emitted events, then existing stage score); do not invent a hidden coaching score.
+- Final-pack browser coverage must traverse at least two real WebGL stages and verify the aggregate report renders from the recorded stage results.
+
+## Replay-priority responsive layout
+
+The “本次优先改进” block must remain readable inside the result-card content width, not merely at full viewport width.
+
+- Do not force three fixed columns when priority cards contain long Chinese evidence/action text. Use intrinsic/auto-fit card sizing so the grid drops to fewer columns based on available container width.
+- Header description belongs in normal document flow under the title; it must never overlap the first row of cards.
+- Priority-card action buttons must allow wrapping and stay within the card's inline bounds. Prefer concise project action labels such as “科目三 / 倒库 / 侧方” over repeating long course titles inside narrow buttons.
+- When a cross-project training-pack action exists, keep it visually distinct from evidence navigation and single-project retry.
