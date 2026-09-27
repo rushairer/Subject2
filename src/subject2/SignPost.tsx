@@ -2,6 +2,7 @@ import type { MutableRefObject, ReactElement } from 'react'
 import { useFrame } from '@react-three/fiber'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
+import type { DrivingIncidentDraft } from '../session/drivingIncident'
 import { useCollisionBody } from '../sim/useCollisionBody'
 import {
   localPoseToWorld,
@@ -16,6 +17,8 @@ export interface SignPostProps {
   audioContext?: AudioContext | null
   audioState?: VehicleAudioState
   signText?: string
+  incident?: DrivingIncidentDraft
+  onIncident?: (incident: DrivingIncidentDraft) => void
 }
 
 const SIGN_POST_GEOMETRY = {
@@ -32,8 +35,16 @@ export function SignPost({
   placement,
   audioContext,
   audioState,
+  incident,
+  onIncident,
 }: SignPostProps): ReactElement {
-  const body = useCollisionBody({ kind: 'pole', player: vehicle, audioContext, audioState })
+  const body = useCollisionBody({
+    kind: 'pole',
+    player: vehicle,
+    audioContext,
+    audioState,
+    onImpact: incident && onIncident ? () => onIncident(incident) : undefined,
+  })
   const localPole = { x: x + SIGN_POST_GEOMETRY.poleOffsetX, z, heading: 0 }
   const worldPole = placement ? localPoseToWorld(localPole, placement) : localPole
   useFrame((_, dt) => {
