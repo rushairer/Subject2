@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   buildReplayTrainingFocus,
   replayHabitForInfraction,
+  replayTrainingProject,
 } from '../src/replay/replayTrainingFocus'
 
 test('replayHabitForInfraction maps rule families to one primary habit', () => {
@@ -74,4 +75,29 @@ test('training focus returns empty output for clean sessions or disabled limit',
     buildReplayTrainingFocus([{ id: 'speed-control', title: '速度控制', points: 10 }], 0),
     [],
   )
+})
+
+
+test('targeted training uses the evidence project and resolves continuous-exam transitions forward', () => {
+  assert.equal(replayTrainingProject('side-parking'), 'side-parking')
+  assert.equal(
+    replayTrainingProject('transition:reverse-parking:side-parking'),
+    'side-parking',
+  )
+  assert.equal(replayTrainingProject('subject2-exam'), null)
+  assert.equal(replayTrainingProject(undefined), null)
+})
+
+test('training focus retains the recommended project from representative evidence', () => {
+  const focus = buildReplayTrainingFocus([
+    {
+      id: 'side-parking-line-contact-1',
+      title: '侧方停车行驶中车轮或车身触碰边线',
+      points: 10,
+      t: 9,
+      project: 'side-parking',
+    },
+  ])
+
+  assert.equal(focus[0].recommendedProject, 'side-parking')
 })
