@@ -112,3 +112,42 @@ test('ending a training session reaches the incomplete result and replay surface
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
+
+
+test('replay coaching explains an infraction with before-after operation context', async ({ page }) => {
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '诊断E2E')
+
+  await page.getByRole('button', { name: /倒车入库/ }).click()
+  await expectHealthyDrivingScene(page)
+  await page.locator('canvas').click({ position: { x: 80, y: 80 } })
+
+  await page.keyboard.press('i')
+  await page.keyboard.press('g')
+  await page.keyboard.press('Space')
+
+  const speed = page.locator('.speed strong')
+  await page.keyboard.down('w')
+  try {
+    await expect.poll(
+      async () => Number(await speed.textContent()),
+      { timeout: 12_000 },
+    ).toBeGreaterThan(0)
+    await expect(page.getByText(/已记录 .* 项/)).toBeVisible()
+    await page.waitForTimeout(350)
+  } finally {
+    await page.keyboard.up('w')
+  }
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  const event = page.getByRole('button', { name: /起步或行驶时未按规定使用安全带/ })
+  await expect(event).toBeVisible()
+  await expect(event).toContainText('原因')
+  await expect(event).toContainText('建议')
+  await expect(event).toContainText('扣分时')
+  await expect(event).toContainText(/km\/h/)
+  await expect(event.locator('.replay-operation-point.event')).toBeVisible()
+
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
