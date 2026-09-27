@@ -6,6 +6,7 @@ import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
 import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
 import { toReplayHeading, toReplayLocal, type ReplayPoint } from './replayGeometry'
+import { nearestReplaySample } from './replayContext'
 
 export interface TrajectorySample {
   t: number
@@ -421,6 +422,7 @@ export function ExamReplay({
                 item.t != null &&
                 item.project != null &&
                 projects.includes(item.project)
+              const context = nearestReplaySample(samples, item.project, item.t)
               return <button
                 type="button"
                 className={`replay-event${canFocus ? ' interactive' : ''}`}
@@ -439,6 +441,13 @@ export function ExamReplay({
                 <span className="replay-event-copy">
                   <strong>{item.title}</strong>
                   <span>{item.project ? projectLabel(item.project) : '驾驶过程'}</span>
+                  {context && <span className="replay-event-context" aria-label="扣分时操作状态">
+                    <i>{(Math.abs(context.speed) * 3.6).toFixed(1)} km/h</i>
+                    <i>{gearLabel(context)} 挡</i>
+                    <i>方向盘 {steeringLabel(context.steeringWheelAngle)}</i>
+                    <i>{indicatorLabel(context)}</i>
+                    <i>手刹{context.handbrake ? '拉起' : '释放'}</i>
+                  </span>}
                 </span>
                 <b>{item.fatal ? '不合格' : `-${item.points}`}</b>
               </button>
