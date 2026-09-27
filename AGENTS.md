@@ -247,6 +247,9 @@ Rendered driving behavior is release-critical and cannot be proven by Node-only 
 - A green TypeScript build is not sufficient evidence for changes to Three.js rendering, RenderTarget mirrors, camera placement, shadows, visible road geometry, dynamic actors or keyboard interaction.
 - Browser tests should interact through user-visible/accessibility semantics where practical. Do not add brittle test-only business branches or bypass the real control path.
 - Keep the mirror reflection baseline rule above in force: browser smoke supplements, but does not replace, direct comparison with known-good commit `80094e7a` for reflection-layer changes.
+- `src/ui/DrivingRendererLifecycle.tsx` owns synchronous WebGL renderer release when a driving Canvas unmounts. Result → targeted-practice transitions must not briefly retain two heavyweight renderer contexts.
+- Do not remove renderer disposal/context-loss cleanup merely because React Three Fiber also performs delayed root cleanup; the explicit cleanup protects fast remounts and software-WebGL environments.
+- Browser tests should end any still-active driving session after each case so the next case begins without a stale WebGL surface.
 
 
 ## Replay diagnosis and coaching
