@@ -23,27 +23,9 @@ function playerAt(progress: number, lateral = 0, speed = 10) {
 
 test('lead observation ignores opposing and adjacent-lane traffic', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'opposing-close',
-    progress: 1008,
-    lateral: 0,
-    speedMps: 8,
-    opposite: true,
-  })
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'adjacent-close',
-    progress: 1010,
-    lateral: -3.5,
-    speedMps: 8,
-    opposite: false,
-  })
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'same-lane',
-    progress: 1025,
-    lateral: 0,
-    speedMps: 8,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'opposing-close', 1008, 0, 8, true)
+  updateSubject3TrafficVehicle(traffic, 'adjacent-close', 1010, -3.5, 8, false)
+  updateSubject3TrafficVehicle(traffic, 'same-lane', 1025, 0, 8, false)
 
   const observation = observeSubject3LeadVehicle(playerAt(1000), traffic)
   assert.equal(observation?.vehicleId, 'same-lane')
@@ -51,27 +33,9 @@ test('lead observation ignores opposing and adjacent-lane traffic', () => {
 
 test('lead observation chooses the nearest same-lane vehicle ahead', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'far',
-    progress: 1060,
-    lateral: 0,
-    speedMps: 7,
-    opposite: false,
-  })
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'near',
-    progress: 1030,
-    lateral: 0.2,
-    speedMps: 8,
-    opposite: false,
-  })
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'behind',
-    progress: 990,
-    lateral: 0,
-    speedMps: 9,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'far', 1060, 0, 7, false)
+  updateSubject3TrafficVehicle(traffic, 'near', 1030, 0.2, 8, false)
+  updateSubject3TrafficVehicle(traffic, 'behind', 990, 0, 9, false)
 
   const observation = observeSubject3LeadVehicle(playerAt(1000), traffic)
   assert.equal(observation?.vehicleId, 'near')
@@ -80,13 +44,7 @@ test('lead observation chooses the nearest same-lane vehicle ahead', () => {
 
 test('bumper gap subtracts both vehicle half-lengths from route-center distance', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'lead',
-    progress: 1020,
-    lateral: 0,
-    speedMps: 8,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'lead', 1020, 0, 8, false)
 
   const observation = observeSubject3LeadVehicle(playerAt(1000, 0, 10), traffic)
   assert.ok(observation)
@@ -99,13 +57,7 @@ test('bumper gap subtracts both vehicle half-lengths from route-center distance'
 
 test('closing speed produces time-to-collision only while the player is gaining', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'lead',
-    progress: 1040,
-    lateral: 0,
-    speedMps: 6,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'lead', 1040, 0, 6, false)
 
   const gaining = observeSubject3LeadVehicle(playerAt(1000, 0, 10), traffic)
   assert.ok(gaining)
@@ -120,13 +72,7 @@ test('closing speed produces time-to-collision only while the player is gaining'
 
 test('very slow player speed does not produce unstable time-gap telemetry', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'lead',
-    progress: 1015,
-    lateral: 0,
-    speedMps: 0,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'lead', 1015, 0, 0, false)
 
   const observation = observeSubject3LeadVehicle(
     playerAt(1000, 0, SUBJECT3_LEAD_OBSERVATION.minimumPlayerSpeedMps - 0.01),
@@ -137,13 +83,7 @@ test('very slow player speed does not produce unstable time-gap telemetry', () =
 
 test('actors beyond the observation horizon are ignored', () => {
   const traffic = createSubject3TrafficState()
-  updateSubject3TrafficVehicle(traffic, {
-    id: 'too-far',
-    progress: 1000 + SUBJECT3_LEAD_OBSERVATION.maximumLookaheadMeters + 1,
-    lateral: 0,
-    speedMps: 8,
-    opposite: false,
-  })
+  updateSubject3TrafficVehicle(traffic, 'too-far', 1000 + SUBJECT3_LEAD_OBSERVATION.maximumLookaheadMeters + 1, 0, 8, false)
 
   assert.equal(observeSubject3LeadVehicle(playerAt(1000), traffic), undefined)
 })
