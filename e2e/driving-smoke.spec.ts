@@ -216,7 +216,7 @@ test('replay coaching explains an infraction with before-after operation context
   await expect(event).toContainText(/km\/h/)
   await expect(event.locator('.replay-operation-point.event')).toBeVisible()
 
-  const targetedTraining = focus.getByRole('button', { name: '专项训练 · 倒车入库' })
+  const targetedTraining = focus.getByRole('button', { name: '专项训练 · 倒库' })
   await expect(targetedTraining).toBeEnabled()
   await targetedTraining.click()
 
