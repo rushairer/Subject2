@@ -82,7 +82,14 @@ export function FollowingDistanceCoachingPanel({
                 <span>
                   最小 {segment.minimumTimeGapSeconds.toFixed(1)} 秒 ·
                   净距 {segment.minimumGapMeters.toFixed(1)} m ·
+                  车速 {segment.representativeSpeedKmh.toFixed(1)} km/h ·
                   持续 {durationLabel(segment.durationSeconds)}
+                  {segment.representativeClosingSpeedMps > 0.2
+                    ? ` · 追近 ${segment.representativeClosingSpeedMps.toFixed(1)} m/s`
+                    : ''}
+                  {segment.representativeTimeToCollisionSeconds != null
+                    ? ` · TTC ${segment.representativeTimeToCollisionSeconds.toFixed(1)} 秒`
+                    : ''}
                 </span>
                 <span className="replay-focus-practice">
                   <b>训练建议</b>
