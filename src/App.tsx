@@ -7,7 +7,7 @@ import { SideParkingCourse, createSideParkingRuntime, updateSideParking } from '
 import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './subject2/RightAngleCourse'
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
-import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
+import { Subject2ExamCourse, subject2ProjectJudgingEnabled } from './subject2/Subject2ExamCourse'
 import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
@@ -1083,7 +1083,7 @@ function Driving({ session, candidate, onDone, onExit }: { session: Session, can
     }}
   >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={!navigatingToProject} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
