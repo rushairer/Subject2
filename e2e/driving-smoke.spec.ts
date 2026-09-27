@@ -128,6 +128,9 @@ test('ending a training session reaches the incomplete result and replay surface
 
 
 test('replay coaching explains an infraction with before-after operation context', async ({ page }) => {
+  // This path intentionally mounts two full software-WebGL driving scenes:
+  // initial evidence generation, then result -> targeted practice.
+  test.setTimeout(75_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '诊断E2E')
 
