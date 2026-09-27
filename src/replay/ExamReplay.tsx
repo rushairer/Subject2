@@ -323,6 +323,12 @@ function indicatorLabel(sample: TrajectorySample) {
   return '关闭'
 }
 
+function headlampLabel(sample: TrajectorySample) {
+  if (sample.highBeam) return '远光'
+  if (sample.lowBeam) return '近光'
+  return '关闭'
+}
+
 function operationOffsetLabel(offsetSeconds: number) {
   if (offsetSeconds === 0) return '扣分时'
   return offsetSeconds < 0
@@ -511,6 +517,7 @@ function ProjectReplay({
         <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
+        <span><b>{headlampLabel(current)}</b><small>前照灯</small></span>
         {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
           <span>
             <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
