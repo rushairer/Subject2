@@ -249,3 +249,12 @@
   .today-plan-task{grid-template-columns:28px minmax(0,1fr)}
   .today-plan-task>button,.today-plan-done{grid-column:2;justify-self:start}
 }
+
+
+.subject3-practice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.subject3-practice-card{display:grid;gap:7px;min-width:0;padding:15px 16px;border:1px solid #2b4c64;border-radius:15px;background:linear-gradient(145deg,#0d2232,#091824);text-align:left;cursor:pointer;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.subject3-practice-card:hover,.subject3-practice-card:focus-visible{transform:translateY(-2px);border-color:#58a8d2;box-shadow:0 14px 32px #0004;outline:none}
+.subject3-practice-card strong{font-size:14px;color:#e8f7ff}
+.subject3-practice-card p{margin:0;color:#879eae;font-size:9px;line-height:1.55}
+.subject3-practice-card .enter{margin-top:3px;font-size:9px}
+@media(max-width:820px){.subject3-practice-grid{grid-template-columns:1fr}}
