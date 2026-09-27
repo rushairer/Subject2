@@ -291,7 +291,10 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Speed uses absolute vehicle speed for display while the original signed sample remains available to replay logic.
 - Timeline selection must route through the existing project/time focus mechanism rather than creating an independent replay cursor source of truth.
 - Changes to sorting, max-speed calculation, gear-transition detection or downsampling require deterministic coverage in `tests/driving-dynamics-timeline.test.ts`.
-- Browser coverage must prove the dynamics timeline can drive the existing project replay focus instead of only verifying that the chart renders.
+- Defensive-driving event markers must be derived from the existing sudden-brake, cut-in and pedestrian coaching reports; do not duplicate those trigger heuristics in the timeline UI.
+- Marker time must use each coaching event's existing `representativeTime`, and clicking a marker/chip must update the timeline cursor and route through the existing project/time focus callback.
+- Marker generation belongs in `src/replay/drivingDynamicsEvents.ts`; deterministic marker kind/order/evidence-time coverage stays in `tests/driving-dynamics-timeline.test.ts`.
+- Browser coverage must prove the dynamics timeline can drive the existing project replay focus instead of only verifying that the chart renders, and must verify the unified hazard-aware chart surface is present.
 
 ## Subject 3 slow-zone judging
 
