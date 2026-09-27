@@ -111,7 +111,7 @@ export function buildTrainingPackReport(
 
   return {
     packId,
-    totalStages: pack.projects.length,
+    totalStages: pack.stages.length,
     recordedStages: stages.length,
     completedStages: stages.filter(stage => stage.completed).length,
     passedStages: stages.filter(stage => stage.passed).length,
