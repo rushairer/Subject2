@@ -206,6 +206,21 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Replay may show duration, gear, speed and RPM evidence and jump to the representative trajectory time. It must not add the coaching item to the error timeline or training-priority penalty aggregation.
 - Changes to classification, sustained-window logic or filtering require deterministic coverage in `tests/gear-speed-coaching.test.ts`.
 
+## Subject 3 traffic telemetry and following-distance coaching
+
+`src/subject3/subject3Traffic.ts` owns the shared deterministic registry for rendered Subject 3 vehicles, and `src/subject3/subject3LeadVehicle.ts` owns nearest same-lane lead-vehicle observation.
+
+- Traffic that can influence coaching must publish route progress, lateral position, speed and travel direction into the shared traffic state. Never inspect Three.js mesh transforms from replay/scoring code.
+- Lead-vehicle selection must use route progress plus lateral lane geometry, not raw Euclidean center distance. Ignore opposing traffic, adjacent-lane traffic, vehicles behind the candidate and actors outside the observation horizon.
+- Following distance is bumper-to-bumper clearance: subtract both vehicle half-lengths from center-to-center route distance before calculating the time gap.
+- Keep actor publication allocation-light in the frame loop and remove registry entries when an actor unmounts.
+- `src/coaching/followingDistanceCoaching.ts` is a training aid, not a second exam judge. It must never emit `Infraction`, subtract points, terminate an exam, change completion/pass-fail, or feed the error timeline/training-priority penalty aggregation.
+- The configured 3-second reference is a coaching baseline from public traffic-safety guidance, not a nationwide Subject 3 scoring threshold. User-facing copy must preserve that distinction.
+- Low-speed queueing and brief cut-in/lane-change transients must not become coaching problems. Apply the configured minimum speed and sustained-duration window before surfacing a short-gap segment.
+- Trajectory samples keep lead-vehicle telemetry optional so old replay/history data remains compatible.
+- Replay may show net distance, time gap, closing speed/TTC context and jump to the representative trajectory moment, but the evidence remains advisory.
+- Changes to traffic publication/selection require deterministic coverage in `tests/subject3-traffic-state.test.ts` and `tests/subject3-lead-vehicle.test.ts`; changes to coaching segmentation require `tests/following-distance-coaching.test.ts`.
+
 ## Subject 3 slow-zone judging
 
 - Straight-through intersections, pedestrian crossings, school zones, and bus-stop events must record both left- and right-side observation during the event.

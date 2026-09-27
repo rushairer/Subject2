@@ -15,6 +15,7 @@ import { replayDiagnosis, replayOperationSlice } from './replayDiagnosis'
 import { buildReplayTrainingFocus, type ReplayTrainingFocus, type ReplayTrainingProjectId } from './replayTrainingFocus'
 import { trainingPackForHabit, type TrainingPackId } from '../training/trainingPacks'
 import { GearSpeedCoachingPanel } from './GearSpeedCoachingPanel'
+import { FollowingDistanceCoachingPanel } from './FollowingDistanceCoachingPanel'
 
 export interface TrajectorySample {
   t: number
@@ -32,6 +33,11 @@ export interface TrajectorySample {
   engineOn?: boolean
   engineRpm?: number
   clutch?: number
+  leadVehicleId?: string
+  leadGapMeters?: number
+  leadTimeGapSeconds?: number
+  leadClosingSpeedMps?: number
+  leadTimeToCollisionSeconds?: number
 }
 
 export interface ReplayInfraction {
@@ -497,6 +503,11 @@ function ProjectReplay({
         <span><b>{steeringLabel(current.steeringWheelAngle)}</b><small>方向盘</small></span>
         <span><b>{indicatorLabel(current)}</b><small>转向灯</small></span>
         <span><b>{current.handbrake ? '拉起' : '释放'}</b><small>手刹</small></span>
+        {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
+          <span>
+            <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>
+            <small>前车时距 · {current.leadGapMeters.toFixed(1)} m</small>
+          </span>}
       </div>
     </div>
   </article>
@@ -563,6 +574,15 @@ export function ExamReplay({
       samples={samples}
       onSelect={(project, t) => setFocusRequest(previous => ({
         project,
+        t,
+        token: (previous?.token ?? 0) + 1,
+      }))}
+    />
+
+    <FollowingDistanceCoachingPanel
+      samples={samples}
+      onSelect={t => setFocusRequest(previous => ({
+        project: 'subject3',
         t,
         token: (previous?.token ?? 0) + 1,
       }))}

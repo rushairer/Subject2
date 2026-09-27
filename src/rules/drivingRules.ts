@@ -51,6 +51,14 @@ export const DRIVING_RULES = {
     overtake: {
       passClearanceMeters: TRAINING_CAR.lengthMeters,
     },
+    // Coaching reference only. The 3-second gap comes from public traffic
+    // safety guidance and is not a nationwide Subject 3 scoring threshold.
+    followingCoaching: {
+      referenceTimeGapSeconds: 3,
+      minimumSpeedKmh: 8,
+      minimumSustainedSeconds: 1.5,
+      maximumSampleGapSeconds: 0.65,
+    },
     gear: {
       minimumRequiredGear: TRAINING_MANUAL_HIGHEST_FORWARD_GEAR - 1,
       minimumHighGearSeconds: 5,
