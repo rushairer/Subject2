@@ -1452,6 +1452,7 @@ function SuddenBrakeCar({
       0,
       isStopped.current ? 0 : speed.current,
       false,
+      'sudden-brake',
     )
     if (group.current) {
       group.current.position.set(world.x, 0.04, world.z)
