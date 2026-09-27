@@ -109,10 +109,11 @@ test('Subject 3 night scene opens directly into the live road without renderer f
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
 
-test('personalized plan prioritizes evidence and training pack persists the next round', async ({ page }) => {
-  // Two pack stages mount two full software-WebGL scenes, persist the round,
-  // then compare it with one prior round for the same candidate/license/pack.
-  test.setTimeout(90_000)
+test('personalized plan routes through four targeted observation-signal stages', async ({ page }) => {
+  // The pack now mounts four real driving scenes, including three targeted
+  // Subject 3 slices. State-machine tests cover automatic event completion;
+  // this browser path verifies routing, labels, persistence and renderer cleanup.
+  test.setTimeout(180_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await page.addInitScript(() => {
     window.localStorage.setItem('subject2.trainingPackHistory.v1', JSON.stringify([{
@@ -121,8 +122,8 @@ test('personalized plan prioritizes evidence and training pack persists the next
       candidateName: '训练包E2E',
       licenseType: 'C2',
       packId: 'observation-signal',
-      recordedStages: 2,
-      totalStages: 2,
+      recordedStages: 4,
+      totalStages: 4,
       completedStages: 0,
       passedStages: 0,
       habitInfractions: 4,
@@ -132,9 +133,6 @@ test('personalized plan prioritizes evidence and training pack persists the next
     }]))
   })
   await createC2Candidate(page, '训练包E2E')
-  // Keep this persistence/daily-plan scenario independent from the timed
-  // simulated light-test preflight used by daytime Subject 3.
-  await page.getByRole('button', { name: '夜间', exact: true }).click()
 
   const plan = page.getByRole('region', { name: '个性化训练建议' })
   await expect(plan).toContainText('长期训练建议')
@@ -149,32 +147,57 @@ test('personalized plan prioritizes evidence and training pack persists the next
   await expect(today.getByRole('article', { name: '今日训练第 1 项：观察与信号' })).toContainText('待完成')
   await today.getByRole('button', { name: '开始今日下一项 · 观察与信号' }).click()
 
+  // Stage 1: Subject 2 right-angle turn.
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/2 · 直角转弯')
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 1/4 · 直角转弯')
   await expect(page.locator('.project-status')).toContainText(/直角|转向灯|靠右/)
-
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
-  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
-  const firstProgress = page.getByRole('region', { name: '专项训练进度' })
-  await expect(firstProgress).toContainText('观察与信号')
-  await expect(firstProgress).toContainText('1 / 2')
-  const nextStage = page.getByRole('button', { name: '继续下一项 · 科目三道路驾驶' })
-  await expect(nextStage).toBeEnabled()
+  let progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('1 / 4')
+  await expect(progress).toContainText('路口左右转弯')
+  let nextStage = page.getByRole('button', { name: '继续下一项 · 路口左右转弯' })
   await nextStage.click()
 
+  // Stage 2: Subject 3 intersection-turn slice. Daytime slices intentionally
+  // skip the unrelated simulated-light-test preflight.
   await expectHealthyDrivingScene(page)
-  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/2 · 科目三道路驾驶')
-  await expect(page.locator('.project-status')).toContainText(/上车准备|起步/)
-
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 2/4 · 路口左右转弯')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 路口左右转弯|下一项目：路口左转弯/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
   await page.getByRole('button', { name: '结束并查看结果' }).click()
 
-  await expect(page.getByText('专项训练阶段结果')).toBeVisible()
+  progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('2 / 4')
+  nextStage = page.getByRole('button', { name: '继续下一项 · 变更车道' })
+  await nextStage.click()
+
+  // Stage 3: lane-change slice.
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 3/4 · 变更车道')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 变更车道|下一项目：变更车道/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  progress = page.getByRole('region', { name: '专项训练进度' })
+  await expect(progress).toContainText('3 / 4')
+  nextStage = page.getByRole('button', { name: '继续下一项 · 靠边停车' })
+  await nextStage.click()
+
+  // Stage 4: pull-over slice.
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('专项训练 · 观察与信号 4/4 · 靠边停车')
+  await expect(page.locator('.project-status')).toContainText(/科目三专项 · 靠边停车|下一项目：靠边停车/)
+  await expect(page.locator('.light-test')).toHaveCount(0)
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
   await expect(page.getByRole('heading', { name: '训练包总复盘' })).toBeVisible()
   const report = page.getByRole('region', { name: '训练包总复盘' })
-  await expect(report).toContainText('2/2')
+  await expect(report).toContainText('4/4')
   await expect(report).toContainText('直角转弯')
-  await expect(report).toContainText('科目三道路驾驶')
+  await expect(report).toContainText('路口左右转弯')
+  await expect(report).toContainText('变更车道')
+  await expect(report).toContainText('靠边停车')
   await expect(report).toContainText('目标习惯错误')
   await expect(report.getByRole('button', { name: '再练一轮 · 观察与信号' })).toBeEnabled()
 
@@ -193,12 +216,11 @@ test('personalized plan prioritizes evidence and training pack persists the next
     candidateName: '训练包E2E',
     licenseType: 'C2',
     packId: 'observation-signal',
-    recordedStages: 2,
-    totalStages: 2,
+    recordedStages: 4,
+    totalStages: 4,
   })
 
   const returnToCenter = page.getByRole('button', { name: '训练包完成 · 返回训练中心' })
-  await expect(returnToCenter).toBeVisible()
   await returnToCenter.click()
 
   const refreshedToday = page.getByRole('region', { name: '今日训练计划' })
