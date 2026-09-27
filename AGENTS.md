@@ -114,6 +114,24 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Per-event reset must clear maneuver-local state without clearing session-wide facts such as seatbelt/parking-brake/route-speed records.
 - If the final pull-over window is passed without a secured stop, keep the route incomplete; a fatal failure may end an exam, but it does not fabricate successful project completion.
 
+
+
+## Subject 3 event-level practice slices
+
+`src/subject3/subject3Practice.ts` is the single source of truth for targeted Subject 3 route slices.
+
+- A practice slice reuses the existing Subject 3 route, renderer, dynamic traffic, `updateSubject3` state machine and scoring matrix. Never fork or copy a separate “practice judge”.
+- Every slice starts before its first target event with a real approach distance (currently at least 60 m) so observation, signal lead time, deceleration and lane preparation can occur naturally.
+- Initialize slice runtime with the configured event index and route progress. Earlier Subject 3 events must not be replayed, auto-evaluated or synthesized as completed.
+- Slice completion means “this practice attempt reached the configured terminal event boundary”. It may complete with emitted infractions. It is not equivalent to passing a full Subject 3 exam.
+- Full-road Subject 3 completion semantics remain unchanged: without a practice slice, only the secured final pull-over may set full-route completion.
+- Passing an intermediate event end must never complete a normal full-road Subject 3 session.
+- Daytime event-level slices skip the separate simulated night-light-test preflight because it is unrelated to the targeted maneuver. Full daytime Subject 3 keeps the light-test requirement.
+- Starting a slice must place the vehicle on the canonical route using `poseAtRouteDistance`; do not hand-copy X/Z/heading coordinates into React.
+- The current slice catalog is: intersection turns, lane change and pull-over. Add new slices only through `SUBJECT3_PRACTICE_SLICES` with deterministic route/start/completion tests.
+- Replay coaching may map only known Subject 3 infraction families to exact slices. Unknown maneuvers must fall back to full Subject 3 rather than guessing a loosely related drill.
+- Persist optional slice identity with generic exam history so recent records remain distinguishable. Old records without this field remain valid.
+
 ## Subject 3 road and maneuver completion
 
 - Subject 3 road-boundary judging must use the full training-car body footprint, not the vehicle center alone.
@@ -277,14 +295,14 @@ Replay coaching must remain deterministic and evidence-linked until an explicit 
 
 - Training packs are coaching playlists, not a new scoring system. Every stage must use the existing project's real state machine, scoring matrix, geometry, completion event and replay evidence.
 - A pack always runs in `practice` mode. Starting or continuing a pack must never rewrite the source result, convert a prior exam into practice, or fabricate a synthetic pass/fail score across stages.
-- `space-position` currently sequences reverse parking → side parking → curve driving → right-angle turn. `observation-signal` currently sequences right-angle turn → Subject 3. Change these only in `trainingPacks.ts`.
+- `space-position` currently sequences reverse parking → side parking → curve driving → right-angle turn. `observation-signal` currently sequences right-angle turn → Subject 3 intersection-turn slice → lane-change slice → pull-over slice. Change these only in `trainingPacks.ts`.
 - Only habits explicitly mapped in `trainingPacks.ts` may show a cross-project pack action. Unmapped habits must retain the evidence-project targeted-practice fallback instead of inventing a sequence.
 - When both actions exist, keep them distinct: the pack action trains the broader habit across projects; the project action returns to the representative evidence project.
-- Pack stage advancement must use `TrainingPackSessionState` and `trainingPackProject(...)`; never infer the next course from UI text or array indexes duplicated in React components.
+- Pack stage advancement must use `TrainingPackSessionState`, `trainingPackStage(...)` and `trainingPackStageLabel(...)`; never infer the next course/slice from UI text or duplicate stage arrays inside React components.
 - Preserve the selected day/night environment and candidate license type when moving between pack stages.
 - A completed Subject 2 pack stage may auto-open its stage result only after the underlying project reports real completion. Manual “结束并查看结果” remains allowed and may continue the pack from an incomplete stage result.
-- Subject 3 remains a normal full-road training stage until event-level sub-route training is implemented; do not fake partial Subject 3 completion just to shorten a pack.
-- Browser coverage must verify at least one real pack transition across two WebGL scenes, including stage progress, result UI, next-stage routing and clean renderer lifecycle.
+- Subject 3 pack stages may use an explicit `subject3Practice` slice from `src/subject3/subject3Practice.ts`. Never replace that metadata with a generic full-road `subject3` stage when an exact slice exists.
+- Browser coverage must verify the real observation/signal pack across its four WebGL stages, including exact slice labels, no unrelated light-test preflight, stage progress, final persistence and clean renderer lifecycle.
 
 
 ## Training-pack aggregate review
@@ -314,6 +332,7 @@ The “本次优先改进” block must remain readable inside the result-card c
 
 - Persist one round only after the candidate reaches the pack's final configured stage and every pack stage has a recorded result. Leaving a pack early must not create a fake complete round.
 - History identity is scoped by candidate name + license type + training-pack ID. Never compare C1 and C2 evidence, different candidates, or different packs as one trend.
+- Ignore persisted rounds whose `totalStages` no longer matches the current pack definition. A pack-layout migration (for example observation/signal changing from two stages to four) must not contaminate new cross-round trends.
 - Keep history local-only unless an explicit sync/account feature is added. Storage failure must never block the active result screen.
 - Cross-round comparison must remain evidence-based and lexicographic; do not synthesize a hidden aggregate score. Current priority is fatal evidence, then incomplete-stage count, then target-habit infraction count.
 - At least two rounds are required for a directional comparison. “Continuous/stable improvement” requires at least three rounds, no adjacent regression in the comparison evidence, and at least one actual improvement.
