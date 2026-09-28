@@ -22,6 +22,11 @@ import {
   createSideParkingRuntime,
   updateSideParking,
 } from '../src/subject2/SideParkingCourse'
+import {
+  createSlopeRuntime,
+  getSlopePose,
+  updateSlopeStart,
+} from '../src/subject2/SlopeStartCourse'
 import { subject2StartPose } from '../src/subject2/courseStartPoses'
 import { stepVehiclePhysics } from '../src/sim/vehiclePhysics'
 import { wheelContactFootprints } from '../src/sim/wheelContact'
@@ -409,6 +414,111 @@ test('coach side-parking plan parks and exits through real physics without penal
   )
   assert.equal(phases.has('parked'), true)
   assert.equal(phases.has('exit'), true)
+  assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
+})
+
+
+
+test('coach slope plan performs an accurate handbrake stop and zero-rollback start', () => {
+  const plan = subject2CoachPlan('slope-start')
+  assert.ok(plan)
+
+  const start = subject2StartPose('slope-start')
+  assert.ok(start)
+  const vehicle = {
+    x: start.x,
+    z: start.z,
+    heading: start.heading,
+    speed: 0,
+    steering: 0,
+    steeringWheelAngle: 0,
+    throttle: 0,
+    brake: 0,
+    clutch: 0,
+    gear: 1,
+    engineOn: true,
+    engineRpm: 820,
+    stallTimer: 0,
+    handbrake: false,
+  }
+
+  let coach = createCoachRuntime()
+  let course = createSlopeRuntime()
+  const phases = new Set<string>()
+  const infractions: string[] = []
+  let handbrakeObserved = false
+  let firstInfraction: {
+    frame: number
+    x: number
+    z: number
+    speed: number
+    handbrake: boolean
+    waypoint: number
+    phase: string
+    ids: string[]
+  } | null = null
+  const dt = 0.02
+
+  for (let frame = 0; frame < 12000 && !course.completed; frame++) {
+    const next = stepCoachController(plan, vehicle, coach, dt, true)
+    coach = next.runtime
+    vehicle.gear = next.command.gear
+    vehicle.engineOn = next.command.engineOn
+    vehicle.handbrake = next.command.handbrake
+    handbrakeObserved ||= vehicle.handbrake
+
+    const slope = getSlopePose(vehicle.z)
+    stepVehiclePhysics(vehicle, {
+      throttle: next.command.throttle,
+      brake: next.command.brake,
+      clutch: next.command.clutch,
+      steer: 0,
+      steeringWheelTarget: next.command.steeringWheelTarget,
+    }, dt, {
+      automatic: true,
+      grade: slope.grade,
+      gradeHeading: 0,
+    })
+
+    const judged = updateSlopeStart(vehicle, course, dt)
+    course = judged.runtime
+    phases.add(course.phase)
+    if (!firstInfraction && judged.infractions.length > 0) {
+      firstInfraction = {
+        frame,
+        x: vehicle.x,
+        z: vehicle.z,
+        speed: vehicle.speed,
+        handbrake: vehicle.handbrake,
+        waypoint: coach.waypointIndex,
+        phase: course.phase,
+        ids: judged.infractions.map(item => item.id),
+      }
+    }
+    infractions.push(...judged.infractions.map(item => item.id))
+  }
+
+  assert.equal(
+    course.completed,
+    true,
+    JSON.stringify({
+      vehicle: {
+        x: vehicle.x,
+        z: vehicle.z,
+        speed: vehicle.speed,
+        handbrake: vehicle.handbrake,
+      },
+      coach,
+      currentTarget: plan.waypoints[coach.waypointIndex],
+      course,
+      phases: [...phases],
+      firstInfraction,
+      infractions: [...new Set(infractions)],
+    }),
+  )
+  assert.equal(handbrakeObserved, true)
+  assert.equal(phases.has('stopped'), true)
+  assert.equal(phases.has('starting'), true)
   assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
 })
 
