@@ -94,7 +94,7 @@ export function NightLightTest({
 
     if (coachActive) {
       onCoachStatusRef.current?.(`灯光预检 · ${prompt.text} · 听完整口令`)
-      for (const action of subject3LightCoachSequence(prompt.answer)) {
+      for (const action of subject3LightCoachSequence(prompt.answer, vehicle.current)) {
         coachTimers.push(window.setTimeout(() => {
           if (resolved) return
           applySubject3LightCoachAction(
