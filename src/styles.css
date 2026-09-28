@@ -48,6 +48,8 @@
 .gear-speed-coaching>.replay-focus-meta,.following-distance-coaching>.replay-focus-meta{margin-bottom:12px}
 .replay-focus-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:12px;align-items:stretch}
 .replay-focus-card{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;min-width:0;overflow:hidden;padding:13px;border:1px solid #25465c;border-radius:14px;background:#0b2030;color:inherit;text-align:left;transition:border-color .16s ease,background .16s ease}
+.replay-focus-card.selected-evidence{border-color:#76ccea;box-shadow:0 0 0 2px #65c9ee2e,0 12px 30px #0004;background:linear-gradient(145deg,#0d2638,#0a1d2a)}
+.replay-focus-current{justify-self:start;padding:3px 6px;border-radius:999px;background:#16415a;color:#aee8ff;font-size:7px;font-weight:900;letter-spacing:.06em}
 .replay-focus-card:hover{border-color:#3e6f8e;background:#0c2334}
 .replay-focus-rank{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#14344a;color:#79d6ff;font-weight:900;font-size:13px}
 .replay-focus-copy{display:grid;gap:6px;min-width:0}
@@ -312,6 +314,7 @@
 .replay-dynamics-event.sudden-brake circle{fill:#ffb56b;stroke:#ffe0bb}
 .replay-dynamics-event.cut-in circle{fill:#77d9ff;stroke:#d7f5ff}
 .replay-dynamics-event.pedestrian circle{fill:#8fe0ad;stroke:#dcf9e7}
+.replay-dynamics-event.selected circle{r:14;stroke-width:4;filter:drop-shadow(0 0 7px #cceeff88)}
 .replay-dynamics-events{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0 2px}
 .replay-dynamics-event-chip{display:grid;grid-template-columns:auto auto;gap:3px 8px;align-items:center;padding:7px 9px;border:1px solid #31526a;border-radius:10px;background:#0c2231;color:#dff4ff;text-align:left;cursor:pointer;transition:border-color .16s ease,transform .16s ease,background .16s ease}
 .replay-dynamics-event-chip:hover,.replay-dynamics-event-chip:focus-visible{transform:translateY(-1px);border-color:#72bfe6;outline:none}
@@ -320,6 +323,10 @@
 .replay-dynamics-event-chip.sudden-brake{border-color:#805f39;background:#241b11}
 .replay-dynamics-event-chip.cut-in{border-color:#2f6680;background:#0b2230}
 .replay-dynamics-event-chip.pedestrian{border-color:#35674a;background:#0c251a}
+.replay-dynamics-event-chip.selected{border-color:#d8f3ff;box-shadow:0 0 0 2px #77cdf044,0 8px 20px #0004}
+.replay-dynamics-current-event{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;border:1px solid #47728d;border-radius:10px;background:#10283a;color:#cfeeff}
+.replay-dynamics-current-event b{font-size:9px}
+.replay-dynamics-current-event span{font-size:8px;color:#8eabbc}
 .replay-dynamics-label{fill:#8da9bc;font-size:18px;font-weight:800}
 .replay-dynamics-scale{fill:#69879c;font-size:16px;font-weight:700}
 .replay-dynamics-scrubber{width:100%;margin:10px 0 8px;accent-color:#65d9ff;cursor:pointer}
