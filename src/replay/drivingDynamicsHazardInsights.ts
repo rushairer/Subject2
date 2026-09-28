@@ -150,6 +150,16 @@ function coverageInsight(
   }
 }
 
+function metricPresenceChanged(
+  previous: DrivingDynamicsHazardComparisonItem,
+  current: DrivingDynamicsHazardComparisonItem,
+  metric: MetricDefinition,
+) {
+  const previousValue = metricValue(previous, metric)
+  const currentValue = metricValue(current, metric)
+  return (previousValue == null) !== (currentValue == null)
+}
+
 function adjacentMetricInsight(
   previous: DrivingDynamicsHazardComparisonItem,
   current: DrivingDynamicsHazardComparisonItem,
@@ -215,19 +225,30 @@ function buildGroupInsights(
     const previous = group.items[index - 1]
     const current = group.items[index]
 
-    const reaction = reactionMetrics
-      .map(metric =>
-        adjacentMetricInsight(
+    const reactionPresenceMetric = reactionMetrics.find(metric =>
+      metricPresenceChanged(previous, current, metric),
+    )
+    const reaction = reactionPresenceMetric
+      ? adjacentMetricInsight(
           previous,
           current,
           index,
           index + 1,
-          metric,
-        ),
-      )
-      .find((insight): insight is DrivingDynamicsHazardInsight =>
-        insight != null,
-      )
+          reactionPresenceMetric,
+        )
+      : reactionMetrics
+          .map(metric =>
+            adjacentMetricInsight(
+              previous,
+              current,
+              index,
+              index + 1,
+              metric,
+            ),
+          )
+          .find((insight): insight is DrivingDynamicsHazardInsight =>
+            insight != null,
+          ) ?? null
 
     if (reaction) insights.push(reaction)
 
