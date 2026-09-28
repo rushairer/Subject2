@@ -18,7 +18,7 @@ function curveWaypoints(): CoachWaypoint[] {
 function rightAngleWaypoints(): CoachWaypoint[] {
   const g = RIGHT_ANGLE_GEOMETRY
   const approachX = 0.62
-  const turnStartZ = -1.18
+  const turnStartZ = -0.98
   const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
   const rearTurnRadius =
     DRIVING_RULES.steering.wheelbaseMeters /
