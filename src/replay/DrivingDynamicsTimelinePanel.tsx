@@ -763,7 +763,11 @@ export function DrivingDynamicsTimeline({
               focusEvent(event)
             }}
           >
-            <title>{event.label} · 点击查看轨迹证据</title>
+            <title>
+              {included
+                ? `${event.label} · 点击查看轨迹证据`
+                : `${event.label} · 不在当前筛选结果中`}
+            </title>
             <line x1="0" x2="0" y1="0" y2={(curveY - markerY).toFixed(2)} />
             <circle r="11" />
             <text x="0" y="4" textAnchor="middle">{event.glyph}</text>
