@@ -2,6 +2,7 @@ import { DRIVING_RULES } from '../rules/drivingRules'
 import { CURVE_CENTERLINE } from '../subject2/CurveDrivingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
+import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import type { Subject2ProjectId } from '../subject2/courseStartPoses'
 import type { CoachPlan, CoachWaypoint } from './coachController'
 
@@ -477,6 +478,149 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   return points
 }
 
+
+function sideParkingWaypoints(): CoachWaypoint[] {
+  const g = SIDE_PARKING_GEOMETRY
+  const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
+  const wheelbase = DRIVING_RULES.steering.wheelbaseMeters
+  const staging = { x: 0.6, z: -5.4, heading: 0 }
+  const points: CoachWaypoint[] = []
+
+  const push = (waypoint: CoachWaypoint) => points.push(waypoint)
+
+  const appendKinematicPath = (
+    start: { x: number; z: number; heading: number },
+    gear: -1 | 1,
+    segments: readonly { steering: number; distance: number }[],
+    label: string,
+    leftIndicator: boolean,
+  ) => {
+    let pose = { ...start }
+    const stepMeters = 0.22
+
+    for (const segment of segments) {
+      const steps = Math.max(1, Math.ceil(segment.distance / stepMeters))
+      const distancePerStep = segment.distance / steps
+      for (let index = 0; index < steps; index++) {
+        const signedDistance = distancePerStep * gear
+        const forwardX = Math.sin(pose.heading)
+        const forwardZ = -Math.cos(pose.heading)
+        let rearAxleX = pose.x - forwardX * rearAxle
+        let rearAxleZ = pose.z - forwardZ * rearAxle
+        const headingDelta =
+          signedDistance / wheelbase * Math.tan(segment.steering)
+        const headingMid = pose.heading + headingDelta * 0.5
+        rearAxleX += Math.sin(headingMid) * signedDistance
+        rearAxleZ -= Math.cos(headingMid) * signedDistance
+        const heading = pose.heading + headingDelta
+        pose = {
+          x: rearAxleX + Math.sin(heading) * rearAxle,
+          z: rearAxleZ - Math.cos(heading) * rearAxle,
+          heading,
+        }
+        push({
+          x: pose.x,
+          z: pose.z,
+          targetSpeedMps: 0.42,
+          gear,
+          arrivalRadiusMeters: 0.11,
+          pathCurvaturePerMeter:
+            gear * Math.tan(segment.steering) / wheelbase,
+          leftIndicator,
+          label,
+        })
+      }
+    }
+    return pose
+  }
+
+  ;[
+    [0, 7.5],
+    [0.08, 6.0],
+    [0.22, 4.0],
+    [0.4, 2.0],
+    [0.54, 0],
+    [staging.x, -2.0],
+    [staging.x, -3.4],
+    [staging.x, -4.4],
+  ].forEach(([x, z], index, approach) => push({
+    x,
+    z,
+    targetSpeedMps: index < approach.length - 3 ? 0.72 : 0.52,
+    gear: 1,
+    arrivalRadiusMeters: 0.42,
+    ...(index >= approach.length - 3
+      ? { pathCurvaturePerMeter: 0, headingHoldRadians: 0 }
+      : {}),
+    label: index < approach.length - 3
+      ? '侧方停车示范 · 驶过库位并靠右调整'
+      : '侧方停车示范 · 保持车身平行，准备停车挂倒挡',
+  }))
+  push({
+    x: staging.x,
+    z: staging.z,
+    targetSpeedMps: 0,
+    gear: 1,
+    stop: true,
+    holdSeconds: 0.35,
+    arrivalRadiusMeters: 0.16,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    label: '侧方停车示范 · 停稳，准备挂倒挡',
+  })
+
+  const parkedPose = appendKinematicPath(
+    staging,
+    -1,
+    [
+      { steering: 0.58, distance: 3.25 },
+      { steering: -0.58, distance: 3.25 },
+    ],
+    '侧方停车示范 · 倒车右打后左打回正入库',
+    false,
+  )
+
+  push({
+    x: parkedPose.x,
+    z: parkedPose.z,
+    targetSpeedMps: 0,
+    gear: -1,
+    stop: true,
+    holdSeconds: 0.72,
+    // The bay has ample longitudinal clearance; capture the stop early enough
+    // to brake before automatic creep can step past a tiny point target.
+    arrivalRadiusMeters: 0.5,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    label: '侧方停车示范 · 车身完全入库并停稳',
+  })
+
+  appendKinematicPath(
+    parkedPose,
+    1,
+    [
+      { steering: -0.58, distance: 3.25 },
+      { steering: 0.58, distance: 3.25 },
+    ],
+    '侧方停车示范 · 左灯开启，前进驶出库位',
+    true,
+  )
+
+  push({
+    x: staging.x,
+    z: Math.min(staging.z, g.exitCompleteZ - 0.25),
+    targetSpeedMps: 0.62,
+    gear: 1,
+    arrivalRadiusMeters: 0.2,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    leftIndicator: false,
+    label: '侧方停车示范 · 驶出完成',
+  })
+
+  return points
+}
+
 const CURVE_DRIVING_COACH_PLAN: CoachPlan = {
   id: 'curve-driving',
   title: '曲线行驶教练示范',
@@ -503,10 +647,20 @@ const REVERSE_PARKING_COACH_PLAN: CoachPlan = {
   curvatureFeedforwardBlend: 1,
 }
 
+const SIDE_PARKING_COACH_PLAN: CoachPlan = {
+  id: 'side-parking',
+  title: '侧方停车教练示范',
+  waypoints: sideParkingWaypoints(),
+  lookAheadWaypoints: 2,
+  steeringGain: 0.5,
+  curvatureFeedforwardBlend: 1,
+}
+
 export function subject2CoachPlan(project: Subject2ProjectId): CoachPlan | null {
   if (project === 'curve-driving') return CURVE_DRIVING_COACH_PLAN
   if (project === 'right-angle') return RIGHT_ANGLE_COACH_PLAN
   if (project === 'reverse-parking') return REVERSE_PARKING_COACH_PLAN
+  if (project === 'side-parking') return SIDE_PARKING_COACH_PLAN
   return null
 }
 
