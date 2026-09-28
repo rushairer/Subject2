@@ -18,6 +18,10 @@ import {
   createReverseParkingRuntime,
   updateReverseParking,
 } from '../src/subject2/ReverseParkingCourse'
+import {
+  createSideParkingRuntime,
+  updateSideParking,
+} from '../src/subject2/SideParkingCourse'
 import { subject2StartPose } from '../src/subject2/courseStartPoses'
 import { stepVehiclePhysics } from '../src/sim/vehiclePhysics'
 import { wheelContactFootprints } from '../src/sim/wheelContact'
@@ -298,6 +302,113 @@ test('coach reverse-parking plan completes both parking passes through real phys
       infractions: [...new Set(infractions)],
     }),
   )
+  assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
+})
+
+
+
+test('coach side-parking plan parks and exits through real physics without penalties', () => {
+  const plan = subject2CoachPlan('side-parking')
+  assert.ok(plan)
+
+  const start = subject2StartPose('side-parking')
+  assert.ok(start)
+  const vehicle = {
+    x: start.x,
+    z: start.z,
+    heading: start.heading,
+    speed: 0,
+    steering: 0,
+    steeringWheelAngle: 0,
+    throttle: 0,
+    brake: 0,
+    clutch: 0,
+    gear: 1,
+    engineOn: true,
+    engineRpm: 820,
+    stallTimer: 0,
+    handbrake: false,
+    leftIndicator: false,
+    rightIndicator: false,
+  }
+
+  let coach = createCoachRuntime()
+  let course = createSideParkingRuntime()
+  const phases = new Set<string>()
+  const infractions: string[] = []
+  let firstInfraction: {
+    frame: number
+    x: number
+    z: number
+    heading: number
+    steering: number
+    gear: number
+    waypoint: number
+    phase: string
+    ids: string[]
+  } | null = null
+  const dt = 0.02
+
+  for (let frame = 0; frame < 12000 && !course.completed; frame++) {
+    const next = stepCoachController(plan, vehicle, coach, dt, true)
+    coach = next.runtime
+    vehicle.gear = next.command.gear
+    vehicle.engineOn = next.command.engineOn
+    vehicle.handbrake = next.command.handbrake
+    vehicle.leftIndicator = next.command.leftIndicator
+    vehicle.rightIndicator = next.command.rightIndicator
+
+    stepVehiclePhysics(vehicle, {
+      throttle: next.command.throttle,
+      brake: next.command.brake,
+      clutch: next.command.clutch,
+      steer: 0,
+      steeringWheelTarget: next.command.steeringWheelTarget,
+    }, dt, {
+      automatic: true,
+      grade: 0,
+    })
+
+    const judged = updateSideParking(vehicle, course, dt)
+    course = judged.runtime
+    phases.add(course.phase)
+    if (!firstInfraction && judged.infractions.length > 0) {
+      firstInfraction = {
+        frame,
+        x: vehicle.x,
+        z: vehicle.z,
+        heading: vehicle.heading,
+        steering: vehicle.steering,
+        gear: vehicle.gear,
+        waypoint: coach.waypointIndex,
+        phase: course.phase,
+        ids: judged.infractions.map(item => item.id),
+      }
+    }
+    infractions.push(...judged.infractions.map(item => item.id))
+  }
+
+  assert.equal(
+    course.completed,
+    true,
+    JSON.stringify({
+      vehicle: {
+        x: vehicle.x,
+        z: vehicle.z,
+        heading: vehicle.heading,
+        speed: vehicle.speed,
+        gear: vehicle.gear,
+      },
+      coach,
+      currentTarget: plan.waypoints[coach.waypointIndex],
+      course,
+      phases: [...phases],
+      firstInfraction,
+      infractions: [...new Set(infractions)],
+    }),
+  )
+  assert.equal(phases.has('parked'), true)
+  assert.equal(phases.has('exit'), true)
   assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
 })
 
