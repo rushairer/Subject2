@@ -133,6 +133,23 @@ test('slope line contact begins at the inner edge of the painted boundary line',
   assert.equal(touching.infractions.some(item => item.id === 'slope-wheel-line'), true)
 })
 
+test('right-angle inner boundary stops at the corner instead of crossing the entry lane', () => {
+  const result = updateRightAngle({
+    x: 0,
+    z: -0.3,
+    heading: 0,
+    steering: 0,
+    speed: 0.5,
+    engineOn: true,
+    leftIndicator: true,
+  }, {
+    ...createRightAngleRuntime(),
+    entered: true,
+  }, 0.1)
+
+  assert.equal(result.infractions.some(item => item.id === 'right-angle-wheel-out'), false)
+})
+
 test('right-angle line judge triggers at the painted line before the road boundary', () => {
   const halfRoad = 1.8
   const vehicleX =

@@ -18,6 +18,8 @@ export interface CoachWaypoint {
   arrivalRadiusMeters?: number
   stop?: boolean
   holdSeconds?: number
+  leftIndicator?: boolean
+  rightIndicator?: boolean
   label?: string
 }
 
@@ -43,6 +45,8 @@ export interface CoachCommand {
   engineOn: true
   handbrake: boolean
   seatbelt: true
+  leftIndicator: boolean
+  rightIndicator: boolean
   waypointIndex: number
   completed: boolean
   status: string
@@ -104,6 +108,8 @@ export function stepCoachController(
         engineOn: true,
         handbrake: true,
         seatbelt: true,
+        leftIndicator: false,
+        rightIndicator: false,
         waypointIndex: runtime.waypointIndex,
         completed: true,
         status: '教练示范完成',
@@ -200,6 +206,8 @@ export function stepCoachController(
       engineOn: true,
       handbrake: runtime.completed,
       seatbelt: true,
+      leftIndicator: target.leftIndicator ?? false,
+      rightIndicator: target.rightIndicator ?? false,
       waypointIndex: runtime.waypointIndex,
       completed: runtime.completed,
       status: target.label ?? `教练驾驶 · 路径点 ${runtime.waypointIndex + 1}/${plan.waypoints.length}`,
