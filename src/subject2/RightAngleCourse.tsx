@@ -105,6 +105,7 @@ function boundaryLineRects(): readonly AxisAlignedRect[] {
   const entryCenterZ = (g.entryMaxZ + g.cornerCenterZ - g.half) / 2
   const exitLength = g.half - g.horizontalMinX
   const exitCenterX = (g.horizontalMinX + g.half) / 2
+  const innerTopLength = -g.half - g.horizontalMinX
   return [
     subject2LineRect(g.half, entryCenterZ, line, entryLength),
     subject2LineRect(
@@ -116,7 +117,7 @@ function boundaryLineRects(): readonly AxisAlignedRect[] {
     subject2LineRect(
       (g.horizontalMinX - g.half) / 2,
       g.cornerCenterZ + g.half,
-      g.half - g.horizontalMinX,
+      innerTopLength,
       line,
     ),
     subject2LineRect(
@@ -253,6 +254,7 @@ export function RightAngleCourse({
   const entryCenterZ = (g.entryMaxZ + g.cornerCenterZ - g.half) / 2
   const exitLength = g.half - g.horizontalMinX
   const exitCenterX = (g.horizontalMinX + g.half) / 2
+  const innerTopLength = -g.half - g.horizontalMinX
 
   return <group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.025, entryCenterZ]} receiveShadow>
@@ -266,7 +268,7 @@ export function RightAngleCourse({
 
     <Line x={g.half} z={entryCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={entryLength} />
     <Line x={-g.half} z={(g.entryMaxZ + g.cornerCenterZ + g.half) / 2} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={g.entryMaxZ - (g.cornerCenterZ + g.half)} />
-    <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={g.half - g.horizontalMinX} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
+    <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={innerTopLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={exitCenterX} z={g.cornerCenterZ - g.half} width={exitLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={g.horizontalMinX} z={g.cornerCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={RIGHT_ANGLE.roadWidth} />
 
