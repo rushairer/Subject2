@@ -121,7 +121,8 @@ test('comparison uses trigger-near speed and post-trigger three-second minimum f
   assert.equal(group.items[0].stopReactionSeconds, undefined)
   assert.equal(group.items[0].steeringChangeTurns, 0.12)
 
-  close(group.items[1].triggerSpeedKmh, 23)
+  // Equidistant trigger-near samples intentionally keep the earlier recorded sample.
+  close(group.items[1].triggerSpeedKmh, 24)
   close(group.items[1].minimumPostTriggerSpeedKmh, 19)
 })
 
