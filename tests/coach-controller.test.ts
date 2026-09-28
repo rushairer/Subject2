@@ -229,8 +229,10 @@ test('coach reverse-parking plan completes both parking passes through real phys
     coach = next.runtime
     if (
       coach.waypointIndex !== lastWaypoint &&
-      coach.waypointIndex >= 7 &&
-      coach.waypointIndex <= 16
+      (
+        (coach.waypointIndex >= 7 && coach.waypointIndex <= 16) ||
+        (coach.waypointIndex >= 110 && coach.waypointIndex <= 124)
+      )
     ) {
       checkpoints.push({
         waypoint: coach.waypointIndex,
