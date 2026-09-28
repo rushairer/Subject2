@@ -383,3 +383,34 @@ test('coach critical waypoint cannot be skipped by projection', () => {
 
   assert.equal(result.runtime.waypointIndex, 1)
 })
+
+
+test('coach curved waypoint advances only after passing inside its tight corridor', () => {
+  const plan = {
+    id: 'curved-corridor',
+    title: 'curved corridor',
+    waypoints: [
+      { x: 0, z: 0, targetSpeedMps: 0.4, gear: -1 as const, pathCurvaturePerMeter: 0.2 },
+      { x: 0.25, z: 0, targetSpeedMps: 0.4, gear: -1 as const, pathCurvaturePerMeter: 0.2, arrivalRadiusMeters: 0.1 },
+      { x: 0.5, z: 0, targetSpeedMps: 0.4, gear: -1 as const, pathCurvaturePerMeter: 0.2, arrivalRadiusMeters: 0.1 },
+    ],
+  }
+
+  const nearPassed = stepCoachController(plan, {
+    x: 0.3,
+    z: 0.18,
+    heading: Math.PI,
+    speed: -0.3,
+    gear: -1,
+  }, { waypointIndex: 1, holdSeconds: 0, completed: false }, 0.02, true)
+  assert.equal(nearPassed.runtime.waypointIndex, 2)
+
+  const farPassed = stepCoachController(plan, {
+    x: 0.3,
+    z: 0.7,
+    heading: Math.PI,
+    speed: -0.3,
+    gear: -1,
+  }, { waypointIndex: 1, holdSeconds: 0, completed: false }, 0.02, true)
+  assert.equal(farPassed.runtime.waypointIndex, 1)
+})
