@@ -288,6 +288,18 @@ export function stepCoachController(
     // we reuse the normal cruising dead-band. Keep a light brake bias while
     // converging on a stop point, then clamp firmly inside its capture radius.
     brake = clamp(0.1 + (alongSpeed - requestedSpeed) * 1.1, 0.1, 0.68)
+  } else if (
+    target.stop &&
+    requestedSpeed > 0 &&
+    alongSpeed < requestedSpeed - 0.04
+  ) {
+    // A precision stop may sit on an uphill grade. Do not let gravity create
+    // an unintended early stop before the target capture zone.
+    throttle = clamp(
+      0.14 + (requestedSpeed - Math.max(0, alongSpeed)) * 0.25,
+      0.14,
+      0.3,
+    )
   } else if (!target.stop && alongSpeed > requestedSpeed + 0.12) {
     brake = clamp((alongSpeed - requestedSpeed) * 0.75, 0.12, 0.7)
   } else if (!target.stop && requestedSpeed > 0 && alongSpeed < requestedSpeed - 0.05) {
