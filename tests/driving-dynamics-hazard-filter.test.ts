@@ -5,10 +5,11 @@ import {
   drivingDynamicsHazardFilterActive,
   filterDrivingDynamicsHazardEvents,
 } from '../src/replay/drivingDynamicsHazardFilter'
-import type {
-  DrivingDynamicsEventKind,
-  DrivingDynamicsEventMarker,
-  DrivingDynamicsEventSample,
+import {
+  drivingDynamicsEventSelection,
+  type DrivingDynamicsEventKind,
+  type DrivingDynamicsEventMarker,
+  type DrivingDynamicsEventSample,
 } from '../src/replay/drivingDynamicsEvents'
 
 function event(
@@ -176,4 +177,24 @@ test('hazard filter active state changes only when a real filter is selected', (
     drivingDynamicsHazardFilterActive({ kind: 'all', evidence: 'brake' }),
     true,
   )
+})
+
+
+test('previous and next navigation is derived from the filtered event list only', () => {
+  const result = filterDrivingDynamicsHazardEvents(
+    samples,
+    events,
+    { kind: 'pedestrian', evidence: 'all' },
+  )
+
+  const first = drivingDynamicsEventSelection(result.events, 'stop')
+  assert.equal(first.total, 2)
+  assert.equal(first.index, 0)
+  assert.equal(first.previous, null)
+  assert.equal(first.next?.id, 'plain')
+
+  const second = drivingDynamicsEventSelection(result.events, 'plain')
+  assert.equal(second.total, 2)
+  assert.equal(second.previous?.id, 'stop')
+  assert.equal(second.next, null)
 })
