@@ -44,6 +44,14 @@ const EVENT_META: Record<
   pedestrian: { label: '行人横穿', glyph: '人' },
 }
 
+export function drivingDynamicsEventId(
+  kind: DrivingDynamicsEventKind,
+  actorId: string,
+  triggerTime: number,
+) {
+  return `${kind}:${actorId}:${triggerTime.toFixed(3)}`
+}
+
 function nearestSampleIndex(
   samples: readonly DrivingDynamicsEventSample[],
   targetTime: number,
@@ -78,7 +86,7 @@ function marker(
   const meta = EVENT_META[kind]
 
   return {
-    id: `${kind}:${id}:${triggerTime.toFixed(3)}`,
+    id: drivingDynamicsEventId(kind, id, triggerTime),
     kind,
     label: meta.label,
     glyph: meta.glyph,
