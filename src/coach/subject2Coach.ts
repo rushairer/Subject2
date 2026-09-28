@@ -185,12 +185,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     { steering: 0, distance: 2.9 },
   ] as const
   const secondReverseParkingSegments = reverseParkingSegments.map(
-    (segment, index) => ({
+    segment => ({
       steering: -segment.steering,
-      distance:
-        index === reverseParkingSegments.length - 1
-          ? segment.distance + 0.25
-          : segment.distance,
+      distance: segment.distance,
     }),
   )
 
