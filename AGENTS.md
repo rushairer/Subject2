@@ -519,3 +519,16 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Playwright production preview must exercise the build from the server root; it must not depend on the historical `/Subject2/` preview path.
 - Keep `tests/vite-base.test.ts` as the regression lock for this portability requirement.
 - If client-side routes are introduced later, re-evaluate deep-link handling separately; do not solve routing by reverting static asset URLs to a repository-specific absolute prefix.
+
+
+## Coach mode / Golden Driver
+
+`src/coach/coachController.ts` owns the deterministic low-level coach control loop. Coach driving is a control source, not a second physics engine or a privileged scoring mode.
+
+- Coach mode must drive through `stepVehiclePhysics`, the normal collision pipeline and the existing Subject 2/3 judges. Never teleport the car, bypass collision response, suppress infractions or synthesize completion.
+- Coach mode may set ordinary driver controls and safety state (steering, pedals, gear, parking brake, indicators, belt, lights) exactly as a human could. Course state machines remain authoritative for success/failure.
+- A user takeover must stop coach commands immediately and restore the normal keyboard/wheel input path without remounting the driving world or resetting the vehicle pose.
+- `src/coach/subject2Coach.ts` owns Subject 2 demonstration plans. Plans should reuse canonical course geometry rather than hand-copying unrelated coordinates.
+- New supported projects require deterministic physics-integrated regression coverage that runs the real coach controller, real vehicle physics and real project judge and proves completion without infractions.
+- Keep coach/golden-driver behavior deterministic so it can later serve as CI regression coverage for physics, geometry and judging changes.
+- Continuous Subject 2 coach routing must use `subject2ExamLayout.ts` transforms when added; do not reuse standalone-local waypoints directly in world space.
