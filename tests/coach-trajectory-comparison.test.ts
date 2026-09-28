@@ -10,6 +10,7 @@ import { subject2StartPose } from '../src/subject2/courseStartPoses'
 import { subject2ExamTransitions } from '../src/subject2/subject2ExamLayout'
 import { SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS } from '../src/coach/subject3Coach'
 import { projectToSubject3Route } from '../src/subject3/subject3Route'
+import { subject3PracticeSliceById } from '../src/subject3/subject3Practice'
 
 test('standalone Subject 2 replay uses the local golden-driver path', () => {
   const project = 'right-angle'
@@ -113,8 +114,65 @@ test('Subject 3 replay uses the production Golden Driver road geometry', () => {
   assert.ok(Math.abs(stop.lateral - 0.6) < 0.05)
 })
 
+test('Subject 3 practice replay crops the coach reference to the targeted route window', () => {
+  const slice = subject3PracticeSliceById('lane-change')
+  const c1 = coachReferencePathForReplay(
+    'subject3',
+    false,
+    'lane-change',
+  )
+  const c2 = coachReferencePathForReplay(
+    'subject3',
+    true,
+    'lane-change',
+  )
+
+  assert.deepEqual(c1, c2)
+  assert.ok(c1.length > 20)
+  assert.ok(c1.length < 100)
+
+  const start = projectToSubject3Route(c1[0]!.x, c1[0]!.z)
+  const end = projectToSubject3Route(
+    c1[c1.length - 1]!.x,
+    c1[c1.length - 1]!.z,
+  )
+  assert.ok(Math.abs(start.progress - slice.startDistance) < 0.3)
+  assert.ok(Math.abs(end.progress - slice.endDistance) < 0.3)
+
+  const sampleProgress = 1950
+  const sampleIndex = Math.round(
+    (sampleProgress - slice.startDistance) / 5,
+  )
+  const laneChange = projectToSubject3Route(
+    c1[sampleIndex]!.x,
+    c1[sampleIndex]!.z,
+  )
+  assert.ok(Math.abs(laneChange.progress - sampleProgress) < 0.3)
+  assert.ok(Math.abs(laneChange.lateral + 2.2) < 0.05)
+})
+
+test('pull-over practice coach reference stops at the production secured-stop point', () => {
+  const path = coachReferencePathForReplay(
+    'subject3',
+    true,
+    'pull-over',
+  )
+  const stop = projectToSubject3Route(
+    path[path.length - 1]!.x,
+    path[path.length - 1]!.z,
+  )
+  assert.ok(
+    Math.abs(stop.progress - SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS) < 0.3,
+  )
+  assert.ok(Math.abs(stop.lateral - 0.6) < 0.05)
+})
+
 const replaySource = readFileSync(
   new URL('../src/replay/ExamReplay.tsx', import.meta.url),
+  'utf8',
+)
+const appSource = readFileSync(
+  new URL('../src/App.tsx', import.meta.url),
   'utf8',
 )
 
@@ -125,4 +183,11 @@ test('replay UI renders coach reference and deviation evidence without changing 
   assert.match(replaySource, /距教练标准轨迹/)
   assert.doesNotMatch(replaySource, /coachDeviation.*points/)
   assert.doesNotMatch(replaySource, /coachDeviation.*fatal/)
+})
+
+test('Subject 3 practice scope reaches both replay reference layers', () => {
+  assert.match(replaySource, /referenceLinesForProject\([\s\S]*subject3Practice/)
+  assert.match(replaySource, /coachReferencePathForReplay\([\s\S]*subject3Practice/)
+  assert.match(replaySource, /科目三专项/)
+  assert.match(appSource, /subject3Practice=\{session\.subject3Practice\}/)
 })
