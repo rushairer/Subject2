@@ -3,7 +3,8 @@ import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
-import { TrafficCone } from './TrafficCone'\nimport { SignPost } from './SignPost'
+import { TrafficCone } from './TrafficCone'
+import { SignPost } from './SignPost'
 import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
@@ -207,7 +208,14 @@ export function updateRightAngle(
     }
   }
 
-  if (runtime.phase === 'exit' && vehicle.x < -7.2) {
+  const exitCompletionX =
+    RIGHT_ANGLE_GEOMETRY.horizontalMinX +
+    TRAINING_CAR.frontAxleFromCenterMeters +
+    TRAINING_CAR.tireContactPatchLengthMeters / 2 +
+    TRAINING_CAR.tireWidthMeters / 2 +
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2 +
+    0.05
+  if (runtime.phase === 'exit' && vehicle.x < exitCompletionX) {
     runtime.phase = 'complete'
     runtime.completed = true
   }
