@@ -35,6 +35,10 @@ import {
   buildDrivingDynamicsHazardComparisons,
   type DrivingDynamicsHazardComparisonGroup,
 } from './drivingDynamicsHazardComparison'
+import {
+  buildDrivingDynamicsHazardInsights,
+  type DrivingDynamicsHazardInsightGroup,
+} from './drivingDynamicsHazardInsights'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -244,11 +248,13 @@ function comparisonSteering(value: number | undefined) {
 
 function HazardPeerComparison({
   groups,
+  insightGroups,
   sessionStartTime,
   selectedEventId,
   onSelect,
 }: {
   groups: readonly DrivingDynamicsHazardComparisonGroup[]
+  insightGroups: readonly DrivingDynamicsHazardInsightGroup[]
   sessionStartTime: number
   selectedEventId?: string | null
   onSelect: (eventId: string) => void
@@ -276,6 +282,29 @@ function HazardPeerComparison({
           <small>{group.items.length} 次同类事件 · 按真实触发时间排序</small>
         </span>
       </div>
+
+      {(() => {
+        const insightGroup = insightGroups.find(item => item.kind === group.kind)
+        const insights = insightGroup?.insights ?? []
+        return <div className="replay-hazard-insights" aria-label={`${group.label}事实洞察`}>
+          <div className="replay-hazard-insights-head">
+            <b>事实洞察</b>
+            <small>只描述可复核差异，不评价处理优劣。</small>
+          </div>
+          {insights.length > 0
+            ? <ul>
+                {insights.map(insight => <li
+                  key={insight.id}
+                  className={insight.kind}
+                >
+                  {insight.text}
+                </li>)}
+              </ul>
+            : <p>
+                当前可比较指标没有形成超过摘要显示阈值的差异；完整数值仍保留在下表。
+              </p>}
+        </div>
+      })()}
 
       <div className="replay-hazard-comparison-table-wrap">
         <table className="replay-hazard-comparison-table">
@@ -755,6 +784,10 @@ export function DrivingDynamicsTimeline({
     ),
     [filteredEvents, model.samples],
   )
+  const hazardInsights = useMemo(
+    () => buildDrivingDynamicsHazardInsights(hazardComparisons),
+    [hazardComparisons],
+  )
   const [cursorIndex, setCursorIndex] = useState(0)
   const selection = drivingDynamicsEventSelection(filteredEvents, selectedEventId)
   const selectedEvent = selectedEventId
@@ -942,6 +975,7 @@ export function DrivingDynamicsTimeline({
 
       <HazardPeerComparison
         groups={hazardComparisons}
+        insightGroups={hazardInsights}
         sessionStartTime={model.startTime}
         selectedEventId={selectedEventId}
         onSelect={eventId => {
