@@ -11,6 +11,7 @@ import {
   type DrivingDynamicsEventSample,
 } from '../src/replay/drivingDynamicsEvents'
 import { drivingDynamicsEventId } from '../src/replay/drivingDynamicsEventIdentity'
+import { buildDrivingDynamicsEventContext } from '../src/replay/drivingDynamicsEventContext'
 
 function sample(
   t: number,
@@ -312,4 +313,97 @@ test('dynamics event markers stay empty when coaching reports have no analyzable
   ])
 
   assert.deepEqual(markers, [])
+})
+
+
+test('hazard context window keeps only same-project samples within three seconds of trigger', () => {
+  const event = {
+    id: drivingDynamicsEventId('cut-in', 'cut-context', 10),
+    kind: 'cut-in' as const,
+    label: '电动车加塞',
+    glyph: '切',
+    summary: '测试事件',
+    t: 10.4,
+    triggerTime: 10,
+    project: 'subject3',
+    sampleIndex: 4,
+    speedKmh: 28.8,
+  }
+
+  const context = buildDrivingDynamicsEventContext([
+    eventSample(6.9, { throttle: 0.1 }),
+    eventSample(7, { speed: 6, throttle: 0.6, brake: 0, steeringWheelAngle: -Math.PI }),
+    eventSample(8.5, { speed: 7, throttle: 0.4, brake: 0.1, steeringWheelAngle: -Math.PI / 2 }),
+    eventSample(9.9, { speed: 8, throttle: 0.2, brake: 0.3, steeringWheelAngle: 0 }),
+    eventSample(10.1, { speed: 7, throttle: 0, brake: 0.7, steeringWheelAngle: Math.PI / 2 }),
+    eventSample(12.5, { speed: 4, throttle: 0, brake: 1, steeringWheelAngle: Math.PI }),
+    eventSample(13, { speed: 3, throttle: 0, brake: 0.6, steeringWheelAngle: Math.PI / 4 }),
+    eventSample(13.1, { throttle: 0 }),
+    eventSample(10.2, { project: 'side-parking', throttle: 1, brake: 1 }),
+  ], event)
+
+  assert.deepEqual(
+    context.samples.map(sample => Number(sample.relativeTime.toFixed(1))),
+    [-3, -1.5, -0.1, 0.1, 2.5, 3],
+  )
+  assert.equal(context.beforeCoverageSeconds, 3)
+  assert.equal(context.afterCoverageSeconds, 3)
+  assert.equal(context.speedScaleMaxKmh, 30)
+  assert.equal(context.steeringScaleTurns, 0.5)
+  assert.equal(context.triggerSample?.relativeTime, -0.09999999999999964)
+  assert.equal(context.triggerSample?.throttlePercent, 20)
+  assert.equal(context.triggerSample?.brakePercent, 30)
+})
+
+test('hazard context window reports truncated recording coverage without inventing samples', () => {
+  const event = {
+    id: drivingDynamicsEventId('pedestrian', 'ped-edge', 2),
+    kind: 'pedestrian' as const,
+    label: '行人横穿',
+    glyph: '人',
+    summary: '测试事件',
+    t: 2.2,
+    triggerTime: 2,
+    project: 'subject3',
+    sampleIndex: 1,
+    speedKmh: 18,
+  }
+
+  const context = buildDrivingDynamicsEventContext([
+    eventSample(1.2, { throttle: 1.2, brake: -0.4 }),
+    eventSample(2, { throttle: 0.5, brake: 0.2 }),
+    eventSample(3.4, { throttle: 0, brake: 0.8 }),
+  ], event)
+
+  assert.equal(context.samples.length, 3)
+  assert.equal(context.beforeCoverageSeconds, 0.8)
+  assert.equal(context.afterCoverageSeconds, 1.4)
+  assert.equal(context.samples[0].throttlePercent, 100)
+  assert.equal(context.samples[0].brakePercent, 0)
+  assert.equal(context.samples.at(-1)?.relativeTime, 1.4)
+  assert.equal(context.triggerSample?.relativeTime, 0)
+})
+
+test('hazard context window stays empty when no sample belongs to the event project', () => {
+  const event = {
+    id: drivingDynamicsEventId('sudden-brake', 'lead-empty', 4),
+    kind: 'sudden-brake' as const,
+    label: '前车急刹',
+    glyph: '急',
+    summary: '测试事件',
+    t: 4,
+    triggerTime: 4,
+    project: 'subject3',
+    sampleIndex: 0,
+    speedKmh: 0,
+  }
+
+  const context = buildDrivingDynamicsEventContext([
+    eventSample(4, { project: 'curve-driving' }),
+  ], event)
+
+  assert.deepEqual(context.samples, [])
+  assert.equal(context.beforeCoverageSeconds, 0)
+  assert.equal(context.afterCoverageSeconds, 0)
+  assert.equal(context.triggerSample, null)
 })
