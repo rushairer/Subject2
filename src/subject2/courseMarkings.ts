@@ -1,6 +1,7 @@
 import type { AxisAlignedRect } from '../sim/wheelContact'
 
-// GA 1029-2022 6.2.7.1: ordinary Subject 2 project figure lines are 150 mm ± 5 mm.\nexport const SUBJECT2_BOUNDARY_LINE_WIDTH_METERS = 0.15
+// GA 1029-2022 6.2.7.1: ordinary Subject 2 project figure lines are 150 mm ± 5 mm.
+export const SUBJECT2_BOUNDARY_LINE_WIDTH_METERS = 0.15
 
 export function subject2LineRect(
   x: number,
