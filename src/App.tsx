@@ -622,6 +622,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       v.handbrake = coachStep.command.handbrake
       v.seatbelt = coachStep.command.seatbelt
       v.gear = coachStep.command.gear
+      v.leftIndicator = coachStep.command.leftIndicator
+      v.rightIndicator = coachStep.command.rightIndicator
       if (coachStep.command.status !== lastCoachStatus.current) {
         lastCoachStatus.current = coachStep.command.status
         onCoachStatus(coachStep.command.status)
