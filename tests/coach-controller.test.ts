@@ -16,6 +16,7 @@ import {
 } from '../src/subject2/RightAngleCourse'
 import { subject2StartPose } from '../src/subject2/courseStartPoses'
 import { stepVehiclePhysics } from '../src/sim/vehiclePhysics'
+import { wheelContactFootprints } from '../src/sim/wheelContact'
 
 function curveHeading(index: number) {
   const current = CURVE_CENTERLINE[index]
@@ -107,7 +108,16 @@ test('coach right-angle plan drives the real physics through the real judge with
   let coach = createCoachRuntime()
   let course = createRightAngleRuntime()
   const infractions: string[] = []
-  let firstInfraction: { frame: number; x: number; z: number; heading: number; phase: string; ids: string[] } | null = null
+  let firstInfraction: {
+    frame: number
+    x: number
+    z: number
+    heading: number
+    steering: number
+    phase: string
+    ids: string[]
+    wheels: ReturnType<typeof wheelContactFootprints>
+  } | null = null
   const dt = 0.02
 
   for (let frame = 0; frame < 5000 && !course.completed; frame++) {
@@ -138,8 +148,10 @@ test('coach right-angle plan drives the real physics through the real judge with
         x: vehicle.x,
         z: vehicle.z,
         heading: vehicle.heading,
+        steering: vehicle.steering,
         phase: course.phase,
         ids: judged.infractions.map(item => item.id),
+        wheels: wheelContactFootprints(vehicle),
       }
     }
     infractions.push(...judged.infractions.map(item => item.id))
