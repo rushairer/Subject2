@@ -317,6 +317,12 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Evidence-presence changes take precedence over pure numeric deltas for the same adjacent pair. When evidence is complete, show at most one reaction-timing difference and one vehicle-state difference per adjacent pair so prose stays concise; the table remains the source for all raw values.
 - Narrative display-noise thresholds are 0.1 s for reaction timing, 1 km/h for speed and 0.05 steering-wheel turns. These thresholds suppress trivial prose only; they must never become analyzer, scoring or pass/fail thresholds.
 - Missing insight bullets mean no comparison difference crossed the prose-display threshold, not that the events were identical. User-facing copy must direct readers back to the full comparison table for exact values.
+- The single-event four-part summary is a presentation layer over the selected hazard event and its existing context. It must separate hazard facts, recorded driver response, observed vehicle result and evidence gaps instead of blending them into one evaluative paragraph.
+- “What happened” may include only hazard geometry/distance/time-gap facts already emitted by the event analyzer. Do not repeat driver-response phrases there just because the legacy one-line summary contains them.
+- “What you did” must use structured throttle/brake/steering evidence already attached to the event. “Vehicle result” may use real same-project trigger/post-trigger speed samples and analyzer stop timing; do not infer a stop or control action from visual trends alone.
+- Evidence-gap rules are hazard-kind-aware: pedestrian events may expect stop timing, cut-in events may expect structured steering change, while unrelated metrics must not be reported as missing. Missing evidence must always be described as missing observation, never as proof that the action did not occur.
+- A stop or other analyzer response may be summarized even when it lies outside the visible +3 s context, but the card must explicitly disclose that it is outside the current visible curve. Truncated pre/post recording coverage and missing raw control channels must be surfaced rather than interpolated.
+- The single-event summary must remain factual, non-scoring and synchronized to the same selected event as the browser, reaction chain, coaching evidence and trajectory cursor.
 
 ## Replay driving dynamics timeline
 
