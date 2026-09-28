@@ -22,6 +22,8 @@ export interface CoachWaypoint {
   rightIndicator?: boolean
   /** Signed curvature of the desired travel path, positive turns right. */
   pathCurvaturePerMeter?: number
+  /** Critical geometry points must be physically captured, never skipped by projection. */
+  requireCapture?: boolean
   label?: string
 }
 
@@ -153,9 +155,10 @@ export function stepCoachController(
   while (!target.stop && index < lastIndex) {
     const previousTarget = index > 0 ? plan.waypoints[index - 1] : null
     const curvedTarget = Math.abs(target.pathCurvaturePerMeter ?? 0) > 1e-5
+    const captureOnly = curvedTarget || target.requireCapture === true
     const reached =
       distance <= arrivalRadius ||
-      (!curvedTarget &&
+      (!captureOnly &&
         previousTarget != null &&
         hasPassedWaypoint(vehicle, previousTarget, target))
     if (!reached) break
