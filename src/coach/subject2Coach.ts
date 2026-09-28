@@ -158,7 +158,10 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
           z: pose.z,
           targetSpeedMps: Math.abs(segment.steering) > 0.3 ? 0.42 : 0.36,
           gear,
-          arrivalRadiusMeters: 0.34,
+          // Waypoints are generated about 0.25 m apart. Keep the capture
+          // radius below that spacing so one physics step cannot consume
+          // multiple arc points and switch curvature before the car arrives.
+          arrivalRadiusMeters: 0.12,
           pathCurvaturePerMeter:
             gear * Math.tan(segment.steering) /
             DRIVING_RULES.steering.wheelbaseMeters,
