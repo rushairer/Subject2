@@ -48,7 +48,6 @@ test('coach curve plan drives the real physics through the real judge without pe
   let coach = createCoachRuntime()
   let course = createCurveRuntime()
   const infractions: string[] = []
-  let firstInfraction: { frame: number; x: number; z: number; heading: number; phase: string; ids: string[] } | null = null
   const dt = 0.02
 
   for (let frame = 0; frame < 5000 && !course.completed; frame++) {
@@ -108,6 +107,7 @@ test('coach right-angle plan drives the real physics through the real judge with
   let coach = createCoachRuntime()
   let course = createRightAngleRuntime()
   const infractions: string[] = []
+  let firstInfraction: { frame: number; x: number; z: number; heading: number; phase: string; ids: string[] } | null = null
   const dt = 0.02
 
   for (let frame = 0; frame < 5000 && !course.completed; frame++) {
