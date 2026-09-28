@@ -375,6 +375,17 @@
 .replay-hazard-comparison-group-head>span:last-child{display:grid;gap:2px}
 .replay-hazard-comparison-group-head b{color:#e9f7ff;font-size:10px}
 .replay-hazard-comparison-group-head small{color:#708d9e;font-size:8px}
+.replay-hazard-insights{display:grid;gap:6px;padding:9px;border:1px solid #2d4d61;border-radius:9px;background:#0a1a25}
+.replay-hazard-insights-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.replay-hazard-insights-head b{color:#dceff8;font-size:9px}
+.replay-hazard-insights-head small{color:#6e8797;font-size:7px}
+.replay-hazard-insights ul{display:grid;gap:5px;margin:0;padding:0;list-style:none}
+.replay-hazard-insights li{position:relative;padding-left:12px;color:#9eb7c6;font-size:8px;line-height:1.5}
+.replay-hazard-insights li::before{content:"";position:absolute;left:1px;top:.55em;width:5px;height:5px;border-radius:50%;background:#5d8ca5}
+.replay-hazard-insights li.coverage::before{background:#b8975f}
+.replay-hazard-insights li.reaction::before{background:#d98279}
+.replay-hazard-insights li.vehicle-state::before{background:#6faed0}
+.replay-hazard-insights>p{margin:0;color:#698292;font-size:8px;line-height:1.5}
 .replay-hazard-comparison-table-wrap{overflow-x:auto;border:1px solid #213e51;border-radius:9px;background:#06131c}
 .replay-hazard-comparison-table{width:100%;min-width:620px;border-collapse:collapse;table-layout:fixed}
 .replay-hazard-comparison-table th,.replay-hazard-comparison-table td{padding:8px 9px;border-right:1px solid #ffffff0d;border-bottom:1px solid #ffffff0d;color:#b8ceda;font-size:8px;text-align:center;vertical-align:middle}
@@ -492,6 +503,7 @@
   .replay-hazard-overview-lane-label{text-align:left}
   .replay-hazard-comparison-head{align-items:stretch;flex-direction:column}
   .replay-hazard-comparison-head>em{text-align:left}
+  .replay-hazard-insights-head{align-items:flex-start;flex-direction:column;gap:2px}
   .replay-hazard-comparison-table thead th:first-child,.replay-hazard-comparison-table tbody th{width:130px}
   .replay-hazard-browser-head{align-items:stretch;flex-direction:column}
   .replay-hazard-browser-nav{display:grid;grid-template-columns:1fr 1fr}
