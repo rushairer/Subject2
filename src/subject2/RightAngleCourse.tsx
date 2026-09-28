@@ -208,7 +208,14 @@ export function updateRightAngle(
     }
   }
 
-  if (runtime.phase === 'exit' && vehicle.x < -7.2) {
+  const exitCompletionX =
+    RIGHT_ANGLE_GEOMETRY.horizontalMinX +
+    TRAINING_CAR.frontAxleFromCenterMeters +
+    TRAINING_CAR.tireContactPatchLengthMeters / 2 +
+    TRAINING_CAR.tireWidthMeters / 2 +
+    SUBJECT2_BOUNDARY_LINE_WIDTH_METERS / 2 +
+    0.05
+  if (runtime.phase === 'exit' && vehicle.x < exitCompletionX) {
     runtime.phase = 'complete'
     runtime.completed = true
   }
