@@ -8,6 +8,10 @@ import {
 } from '../coach/subject3Coach'
 import { poseAtRouteDistance } from '../subject3/subject3Route'
 import {
+  subject3PracticeSliceById,
+  type Subject3PracticeSliceId,
+} from '../subject3/subject3Practice'
+import {
   subject2ExamTransitions,
 } from '../subject2/subject2ExamLayout'
 import {
@@ -36,11 +40,23 @@ function subject2Project(project: string): Subject2ProjectId | null {
 
 const SUBJECT3_COACH_REFERENCE_STEP_METERS = 5
 
-function subject3CoachReferencePath(): CoachReferencePoint[] {
+function subject3CoachReferencePath(
+  practiceSlice?: Subject3PracticeSliceId,
+): CoachReferencePoint[] {
+  const slice = practiceSlice
+    ? subject3PracticeSliceById(practiceSlice)
+    : null
+  const startProgress = slice?.startDistance ?? 0
+  const endProgress = Math.min(
+    slice?.endDistance ?? SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
+    SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
+  )
+  if (endProgress < startProgress) return []
+
   const points: CoachReferencePoint[] = []
   for (
-    let progress = 0;
-    progress < SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS;
+    let progress = startProgress;
+    progress < endProgress;
     progress += SUBJECT3_COACH_REFERENCE_STEP_METERS
   ) {
     const pose = poseAtRouteDistance(progress)
@@ -51,15 +67,11 @@ function subject3CoachReferencePath(): CoachReferencePoint[] {
     })
   }
 
-  const stopPose = poseAtRouteDistance(
-    SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
-  )
-  const stopLateral = subject3CoachDesiredLateral(
-    SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
-  )
+  const endPose = poseAtRouteDistance(endProgress)
+  const endLateral = subject3CoachDesiredLateral(endProgress)
   points.push({
-    x: stopPose.x + stopPose.rightX * stopLateral,
-    z: stopPose.z + stopPose.rightZ * stopLateral,
+    x: endPose.x + endPose.rightX * endLateral,
+    z: endPose.z + endPose.rightZ * endLateral,
   })
   return points
 }
@@ -67,9 +79,10 @@ function subject3CoachReferencePath(): CoachReferencePoint[] {
 export function coachReferencePathForReplay(
   project: string,
   automatic: boolean,
+  subject3Practice?: Subject3PracticeSliceId,
 ): CoachReferencePoint[] {
   if (project === 'subject3') {
-    return subject3CoachReferencePath()
+    return subject3CoachReferencePath(subject3Practice)
   }
 
   if (project.startsWith('transition:')) {
