@@ -5,7 +5,7 @@ import {
   type SuddenBrakeCoachingEvent,
   type SuddenBrakeCoachingSample,
 } from '../coaching/suddenBrakeCoaching'
-import { drivingDynamicsEventId } from './drivingDynamicsEvents'
+import { drivingDynamicsEventId } from './drivingDynamicsEventIdentity'
 
 function seconds(value: number | undefined) {
   return value == null ? '--' : `${value.toFixed(1)} 秒`
