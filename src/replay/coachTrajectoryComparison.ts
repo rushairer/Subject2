@@ -62,6 +62,7 @@ export function coachReferencePathForReplay(
   const plan = subject2CoachPlan(target)
   if (!plan) return []
   const start = subject2StartPose(target)
+  if (!start) return []
 
   return [
     { x: start.x, z: start.z },
