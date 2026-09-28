@@ -360,3 +360,26 @@ test('coach lookahead stops at a stop and gear-change boundary', () => {
 
   assert.ok(Math.abs(result.command.steeringWheelTarget) < 0.05)
 })
+
+
+test('coach critical waypoint cannot be skipped by projection', () => {
+  const plan = {
+    id: 'capture-only',
+    title: 'capture only',
+    waypoints: [
+      { x: 0, z: -1, targetSpeedMps: 0.5, gear: 1 as const },
+      { x: 0, z: -2, targetSpeedMps: 0.4, gear: 1 as const, arrivalRadiusMeters: 0.1, requireCapture: true },
+      { x: 1, z: -3, targetSpeedMps: 0.4, gear: 1 as const },
+    ],
+  }
+
+  const result = stepCoachController(plan, {
+    x: 0,
+    z: -2.6,
+    heading: 0,
+    speed: 0.3,
+    gear: 1,
+  }, { waypointIndex: 1, holdSeconds: 0, completed: false }, 0.02, true)
+
+  assert.equal(result.runtime.waypointIndex, 1)
+})
