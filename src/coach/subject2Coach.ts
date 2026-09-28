@@ -112,7 +112,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const g = REVERSE_PARKING_GEOMETRY
   const bayCenterX = (g.bayMouthX + g.bayBackX) / 2
   const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
-  const reverseStagingX = -0.15
+  const reverseStagingX = -0.30
   const reverseTurnStartZ = 5.0 + rearAxle
   const exitTurnRadius = 4.31
   // Drive far enough out of the bay that the 4.4 m body is substantially
@@ -214,6 +214,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     targetSpeedMps: index < staging.length - 3 ? 0.62 : 0.48,
     gear: 1,
     arrivalRadiusMeters: 0.42,
+    ...(index >= staging.length - 3
+      ? { pathCurvaturePerMeter: 0, headingHoldRadians: Math.PI }
+      : {}),
     label: index < staging.length - 3
       ? '倒车入库示范 · 驶过起始控制线并平顺调整倒库位置'
       : '倒车入库示范 · 保持直线，车身回正',
@@ -236,7 +239,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      label: '第一次倒库 · 闭环对中并直线后倒到转向点',
+      pathCurvaturePerMeter: 0,
+      headingHoldRadians: Math.PI,
+      label: '第一次倒库 · 保持车身朝向并直线后倒到转向点',
     })
   }
 
@@ -251,6 +256,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     targetSpeedMps: 0.4,
     gear: -1,
     arrivalRadiusMeters: 0.12,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: Math.PI,
     requireCapture: true,
     label: '第一次倒库 · 精确对中后进入复合转向',
   })
@@ -343,7 +350,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      label: '第二次倒库 · 闭环对中并直线后倒到转向点',
+      pathCurvaturePerMeter: 0,
+      headingHoldRadians: 0,
+      label: '第二次倒库 · 保持车身朝向并直线后倒到转向点',
     })
   }
 
@@ -358,6 +367,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     targetSpeedMps: 0.4,
     gear: -1,
     arrivalRadiusMeters: 0.12,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
     requireCapture: true,
     label: '第二次倒库 · 精确对中后进入复合转向',
   })
