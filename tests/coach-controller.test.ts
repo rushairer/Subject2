@@ -134,7 +134,16 @@ test('coach right-angle plan drives the real physics through the real judge with
     infractions.push(...judged.infractions.map(item => item.id))
   }
 
-  assert.equal(course.completed, true)
+  assert.equal(
+    course.completed,
+    true,
+    JSON.stringify({
+      vehicle: { x: vehicle.x, z: vehicle.z, heading: vehicle.heading, speed: vehicle.speed },
+      coach,
+      course,
+      infractions: [...new Set(infractions)],
+    }),
+  )
   assert.deepEqual(infractions, [])
 })
 
