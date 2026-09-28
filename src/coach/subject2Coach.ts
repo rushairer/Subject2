@@ -229,13 +229,13 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     label: '倒车入库示范 · 停稳，准备挂倒挡',
   })
 
-  for (let z = northStopZ - 0.4; z > turnStartZ + 0.2; z -= 0.4) {
+  for (let z = northStopZ - 0.3; z > turnStartZ + 0.16; z -= 0.3) {
     push({
       x: reverseStagingX,
       z,
-      targetSpeedMps: 0.62,
+      targetSpeedMps: 0.5,
       gear: -1,
-      arrivalRadiusMeters: 0.46,
+      arrivalRadiusMeters: 0.14,
       label: '第一次倒库 · 直线后倒到转向点',
     })
   }
@@ -337,13 +337,13 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     label: '另一端控制线外停稳 · 准备第二次倒库',
   })
 
-  for (let z = southStopZ + 0.4; z < -turnStartZ - 0.2; z += 0.4) {
+  for (let z = southStopZ + 0.3; z < -turnStartZ - 0.16; z += 0.3) {
     push({
       x: reverseStagingX,
       z,
-      targetSpeedMps: 0.62,
+      targetSpeedMps: 0.5,
       gear: -1,
-      arrivalRadiusMeters: 0.46,
+      arrivalRadiusMeters: 0.14,
       label: '第二次倒库 · 直线后倒到转向点',
     })
   }
