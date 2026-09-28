@@ -321,6 +321,13 @@ test('standalone Subject 3 lane-change drill starts at the targeted slice', asyn
   await expect(page.locator('.project-status')).toContainText(/科目三专项 · 变更车道|下一项目：变更车道/)
   await expect(page.locator('.light-test')).toHaveCount(0)
 
+  const coach = page.getByRole('button', { name: '教练接管' })
+  await expect(coach).toBeVisible()
+  await coach.click()
+  await expect(page.getByRole('complementary', { name: '教练实时讲解' })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await page.getByRole('button', { name: '我来接管' }).click()
+
   await page.getByRole('button', { name: '结束并查看结果' }).click()
   await expect(page.locator('.result-meta')).toContainText('科目三专项 · 变更车道')
   await expect(page.getByText('未完成', { exact: true })).toBeVisible()
