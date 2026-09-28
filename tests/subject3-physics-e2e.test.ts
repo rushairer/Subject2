@@ -39,6 +39,14 @@ function normalizeAngle(angle: number) {
   return value
 }
 
+function targetWorld(progress: number, lateral: number) {
+  const pose = poseAtRouteDistance(progress)
+  return {
+    x: pose.x + pose.rightX * lateral,
+    z: pose.z + pose.rightZ * lateral,
+  }
+}
+
 function runPhysicalSubject3Route(automatic: boolean) {
   const dt = 0.05
   const maxFrames = automatic ? 15_000 : 30_000
