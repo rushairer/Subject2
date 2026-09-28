@@ -5,6 +5,7 @@ import {
   type SuddenBrakeCoachingEvent,
   type SuddenBrakeCoachingSample,
 } from '../coaching/suddenBrakeCoaching'
+import { drivingDynamicsEventId } from './drivingDynamicsEvents'
 
 function seconds(value: number | undefined) {
   return value == null ? '--' : `${value.toFixed(1)} 秒`
@@ -47,10 +48,12 @@ function riskSummary(event: SuddenBrakeCoachingEvent) {
 
 export function SuddenBrakeCoachingPanel({
   samples,
+  selectedEventId,
   onSelect,
 }: {
   samples: readonly SuddenBrakeCoachingSample[]
-  onSelect: (time: number) => void
+  selectedEventId?: string | null
+  onSelect: (time: number, eventId: string) => void
 }) {
   const report = useMemo(
     () => buildSuddenBrakeCoachingReport(samples),
@@ -92,14 +95,18 @@ export function SuddenBrakeCoachingPanel({
           </article>
         : report.events.map((event, index) => {
             const response = responseSummary(event)
+            const eventId = drivingDynamicsEventId('sudden-brake', event.vehicleId, event.triggerTime)
+            const selected = selectedEventId === eventId
             return <article
-              className="replay-focus-card"
-              key={`${event.vehicleId}-${event.triggerTime}`}
+              className={`replay-focus-card${selected ? ' selected-evidence' : ''}`}
+              key={eventId}
+              data-replay-event-id={eventId}
               aria-label={`前车急减速反应观察 ${index + 1}`}
             >
               <span className="replay-focus-rank">{index + 1}</span>
               <span className="replay-focus-copy">
                 <strong>前车明显急减速 · 反应证据</strong>
+                {selected && <span className="replay-focus-current">时间轴当前事件</span>}
                 <span>{riskSummary(event)}</span>
                 <span className="replay-focus-practice">
                   <b>踏板反应</b>
@@ -114,7 +121,8 @@ export function SuddenBrakeCoachingPanel({
                   <button
                     type="button"
                     className="replay-focus-evidence-btn"
-                    onClick={() => onSelect(event.representativeTime)}
+                    aria-pressed={selected}
+                    onClick={() => onSelect(event.representativeTime, eventId)}
                   >
                     查看这段轨迹证据
                   </button>
