@@ -280,6 +280,15 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Changes to oncoming observation require deterministic coverage in `tests/subject3-lead-vehicle.test.ts`; changes to lighting segmentation/filtering require `tests/night-lighting-coaching.test.ts`.
 - Browser coverage must exercise a real night Subject 3 scene through result/replay and verify both the night-lighting panel and headlamp readout.
 
+## Multi-event hazard replay
+
+- The driving-dynamics hazard browser is a presentation/coaching layer over the existing sudden-brake, cut-in and pedestrian analyzers. It must reuse their emitted events and stable `drivingDynamicsEventId(...)`; do not create a second hazard detector for navigation.
+- Hazard events are ordered chronologically across event kinds. Previous/next navigation updates the shared selected-event identity, the dynamics cursor, the matching coaching evidence highlight and the project replay cursor together.
+- Continuous previous/next browsing must not force-scroll the page away from the hazard browser. Explicit evidence actions such as “查看当前轨迹” may scroll to the corresponding project replay.
+- The browser may summarize existing evidence such as gap, closest distance and reaction time, but it must not add penalty points, mutate infractions or claim an unobserved reaction.
+- A stale or missing selected-event ID falls back safely to the first current event. Empty sessions render no browser.
+- Keyboard left/right navigation is allowed only within the hazard browser and must preserve normal button accessibility.
+
 ## Replay driving dynamics timeline
 
 `src/replay/drivingDynamicsTimeline.ts` owns the session-wide speed/gear timeline model and `DrivingDynamicsTimelinePanel.tsx` owns its replay UI.
