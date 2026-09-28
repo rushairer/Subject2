@@ -95,12 +95,14 @@ function durationLabel(seconds: number) {
 
 export function DrivingDynamicsTimeline({
   samples,
+  selectedEventId,
   projectLabel,
   onSelect,
 }: {
   samples: readonly DrivingDynamicsEventSample[]
+  selectedEventId?: string | null
   projectLabel: (project: string) => string
-  onSelect: (project: string, time: number) => void
+  onSelect: (project: string, time: number, eventId?: string) => void
 }) {
   const model = useMemo(
     () => buildDrivingDynamicsTimeline(samples),
@@ -136,8 +138,11 @@ export function DrivingDynamicsTimeline({
 
   const focusEvent = (event: DrivingDynamicsEventMarker) => {
     setCursorIndex(event.sampleIndex)
-    onSelect(event.project, event.t)
+    onSelect(event.project, event.t, event.id)
   }
+
+  const selectedEvent =
+    events.find(event => event.id === selectedEventId) ?? null
 
   return <section className="replay-dynamics" aria-labelledby="replay-dynamics-title">
     <div className="replay-dynamics-head">
@@ -179,11 +184,21 @@ export function DrivingDynamicsTimeline({
           const x = timeX(event.t, model.startTime, model.durationSeconds)
           const curveY = speedY(event.speedKmh, speedScaleMax)
           const markerY = eventY(event.kind, curveY)
+          const selected = selectedEventId === event.id
           return <g
             key={event.id}
-            className={`replay-dynamics-event ${event.kind}`}
+            className={`replay-dynamics-event ${event.kind}${selected ? ' selected' : ''}`}
             transform={`translate(${x.toFixed(2)} ${markerY.toFixed(2)})`}
+            role="button"
+            tabIndex={0}
+            aria-label={`${event.label} · 点击查看轨迹证据`}
+            aria-pressed={selected}
             onClick={() => focusEvent(event)}
+            onKeyDown={keyboardEvent => {
+              if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return
+              keyboardEvent.preventDefault()
+              focusEvent(event)
+            }}
           >
             <title>{event.label} · 点击查看轨迹证据</title>
             <line x1="0" x2="0" y1="0" y2={(curveY - markerY).toFixed(2)} />
@@ -212,19 +227,28 @@ export function DrivingDynamicsTimeline({
     </div>
 
     {events.length > 0 && <div className="replay-dynamics-events" aria-label="危险交通事件">
-      {events.map(event =>
-        <button
+      {events.map(event => {
+        const selected = selectedEventId === event.id
+        return <button
           type="button"
           key={event.id}
-          className={`replay-dynamics-event-chip ${event.kind}`}
+          className={`replay-dynamics-event-chip ${event.kind}${selected ? ' selected' : ''}`}
+          aria-pressed={selected}
           onClick={() => focusEvent(event)}
         >
           <b>{event.label}</b>
           <small>
             {(event.t - model.startTime).toFixed(1)}s · {event.speedKmh.toFixed(1)} km/h
           </small>
-        </button>,
-      )}
+        </button>
+      })}
+    </div>}
+
+    {selectedEvent && <div className="replay-dynamics-current-event" role="status">
+      <b>当前事件 · {selectedEvent.label}</b>
+      <span>
+        {(selectedEvent.t - model.startTime).toFixed(1)}s · {selectedEvent.speedKmh.toFixed(1)} km/h · 对应教练证据卡已高亮
+      </span>
     </div>}
 
     <input
@@ -246,7 +270,7 @@ export function DrivingDynamicsTimeline({
       <button
         type="button"
         className="replay-focus-evidence-btn"
-        onClick={() => onSelect(current.project, current.t)}
+        onClick={() => onSelect(current.project, current.t, undefined)}
       >
         定位到这段轨迹
       </button>
