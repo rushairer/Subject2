@@ -651,6 +651,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
             automatic,
             session.time === 'night',
             subject3Traffic.current,
+            session.subject3Practice,
           )
         : null
     if (subject3CoachStep) {
@@ -1149,7 +1150,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
   const coachSupported = activeExamId === 'subject3'
-    ? lightTestDone && session.subject3Practice == null
+    ? lightTestDone
     : combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId)
   const coachTeaching = useMemo(
     () => coachActive

@@ -14,6 +14,7 @@ import {
   observeSubject3PedestrianHazard,
 } from '../subject3/subject3HazardObservation'
 import type { Subject3TrafficState } from '../subject3/subject3Traffic'
+import type { Subject3PracticeSliceId } from '../subject3/subject3Practice'
 
 export interface Subject3CoachVehicle {
   x: number
@@ -139,6 +140,24 @@ export function subject3CoachManualGearState(
   return { gear: 3, clutch: 0 }
 }
 
+function subject3CoachPracticeManualGearState(
+  vehicle: Subject3CoachVehicle,
+) {
+  const speed = Math.abs(vehicle.speed)
+  const desiredGear = speed < 2.6 ? 1 : speed < 5.4 ? 2 : 3
+
+  if (vehicle.gear !== desiredGear) {
+    return { gear: desiredGear, clutch: 1 }
+  }
+  if (desiredGear === 1 && speed < 0.3) {
+    return {
+      gear: 1,
+      clutch: DRIVING_RULES.manualTransmission.biteClutchPosition,
+    }
+  }
+  return { gear: desiredGear, clutch: 0 }
+}
+
 function routeTarget(progress: number, lateral: number) {
   const pose = poseAtRouteDistance(progress)
   return {
@@ -222,6 +241,7 @@ export function stepSubject3Coach(
   automatic: boolean,
   night: boolean,
   traffic: Readonly<Subject3TrafficState>,
+  practiceSlice?: Subject3PracticeSliceId,
 ): { runtime: Subject3CoachRuntime; command: Subject3CoachCommand } {
   const runtime = {
     elapsedSeconds: previous.elapsedSeconds + Math.max(0, dt),
@@ -236,7 +256,9 @@ export function stepSubject3Coach(
   const signals = subject3CoachSignalState(progress)
   const manual = automatic
     ? { gear: 1, clutch: 0 }
-    : subject3CoachManualGearState(progress, runtime.elapsedSeconds)
+    : practiceSlice
+      ? subject3CoachPracticeManualGearState(vehicle)
+      : subject3CoachManualGearState(progress, runtime.elapsedSeconds)
 
   let gear = manual.gear
   let clutch = manual.clutch
@@ -295,7 +317,7 @@ export function stepSubject3Coach(
   } else if (
     !automatic &&
     clutch === DRIVING_RULES.manualTransmission.biteClutchPosition &&
-    progress < 5
+    (progress < 5 || practiceSlice != null)
   ) {
     throttle = 0.32
   } else if (speedKmh < targetSpeedKmh - 0.6) {
