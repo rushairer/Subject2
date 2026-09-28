@@ -472,12 +472,14 @@ function ProjectReplay({
   infractions,
   focusTime,
   focusToken,
+  focusScroll = true,
 }: {
   project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   focusTime?: number
   focusToken?: number
+  focusScroll?: boolean
 }) {
   const [cursorIndex, setCursorIndex] = useState(samples.length - 1)
   const articleRef = useRef<HTMLElement>(null)
@@ -498,8 +500,10 @@ function ProjectReplay({
       }
     })
     setCursorIndex(nearestIndex)
-    articleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [focusTime, focusToken, samples])
+    if (focusScroll) {
+      articleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [focusTime, focusToken, focusScroll, samples])
 
   const safeCursorIndex = Math.max(0, Math.min(cursorIndex, samples.length - 1))
   const current = samples[safeCursorIndex]
@@ -590,18 +594,21 @@ export function ExamReplay({
     project: string
     t: number
     token: number
+    scroll: boolean
   } | null>(null)
   const [selectedHazardEventId, setSelectedHazardEventId] = useState<string | null>(null)
   const focusReplay = useCallback((
     project: string,
     t: number,
     hazardEventId?: string,
+    options?: { scroll?: boolean },
   ) => {
     setSelectedHazardEventId(hazardEventId ?? null)
     setFocusRequest(previous => ({
       project,
       t,
       token: (previous?.token ?? 0) + 1,
+      scroll: options?.scroll ?? true,
     }))
   }, [])
 
@@ -676,7 +683,7 @@ export function ExamReplay({
       samples={samples}
       selectedEventId={selectedHazardEventId}
       projectLabel={projectLabel}
-      onSelect={(project, t, eventId) => focusReplay(project, t, eventId)}
+      onSelect={(project, t, eventId, options) => focusReplay(project, t, eventId, options)}
     />
 
     <div className="replay-projects">
@@ -691,6 +698,7 @@ export function ExamReplay({
           infractions={projectInfractions}
           focusTime={focusRequest?.project === project ? focusRequest.t : undefined}
           focusToken={focusRequest?.project === project ? focusRequest.token : undefined}
+          focusScroll={focusRequest?.project === project ? focusRequest.scroll : undefined}
         />
       })}
     </div>
