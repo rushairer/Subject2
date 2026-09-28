@@ -343,6 +343,7 @@ function HazardSessionOverview({
                 aria-label={`${marker.label}，整场第 ${sessionTimeLabel(Math.max(0, marker.relativeTime))} 触发`}
                 aria-pressed={selected}
                 aria-disabled={!included}
+                disabled={!included}
                 tabIndex={included ? 0 : -1}
                 title={included
                   ? `${marker.label} · ${sessionTimeLabel(Math.max(0, marker.relativeTime))}`
@@ -848,6 +849,10 @@ export function DrivingDynamicsTimeline({
             </button>
           </span>
         </div>
+
+        {selection.total === 0 && <div className="replay-hazard-filter-empty" role="status">
+          当前筛选组合没有风险事件。可以调整事件类型或证据状态，或在上方清除筛选。
+        </div>}
 
         {browserEvent && <div className="replay-hazard-browser-summary" role="status">
           <span className={`replay-hazard-kind ${browserEvent.kind}`}>
