@@ -5,7 +5,7 @@ import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rul
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'
+import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'\nimport { SignPost } from './SignPost'
 
 export const CURVE_DRIVING = {
   radius: 7.5,
@@ -256,6 +256,12 @@ export function CurveDrivingCourse(): ReactElement {
   const leftEdge = useMemo(() => ribbonGeometry(CURVE_ROAD_CENTERLINE, SUBJECT2_BOUNDARY_LINE_WIDTH_METERS, -CURVE_DRIVING.roadWidth / 2), [])
 
   return <group>
+    <SignPost
+      x={CURVE_START.x - CURVE_DRIVING.roadWidth / 2 - 1.15}
+      z={CURVE_START.z - 1.2}
+      heading={0}
+      signText="曲线行驶"
+    />
     <mesh geometry={road} position-y={0.01} receiveShadow><meshStandardMaterial color="#3c4144" roughness={1} /></mesh>
     <mesh geometry={leftEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>
     <mesh geometry={rightEdge} position-y={0.025}><meshBasicMaterial color="#f3d34a" /></mesh>

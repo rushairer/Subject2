@@ -245,6 +245,24 @@ function Marking({ z, width, depth, color }: { z: number; width: number; depth: 
   </mesh>
 }
 
+function StopReferencePole(): ReactElement {
+  const height = 1.8
+  const stripeHeight = 0.3
+  const stripeCount = Math.ceil(height / stripeHeight)
+  return <group position={[
+    SLOPE_GEOMETRY.roadHalf + 0.48,
+    getSlopePose(SLOPE_GEOMETRY.stopLineZ).y,
+    SLOPE_GEOMETRY.stopLineZ,
+  ]}>
+    {Array.from({ length: stripeCount }, (_, index) => (
+      <mesh key={index} position-y={(index + 0.5) * stripeHeight} castShadow>
+        <cylinderGeometry args={[0.02, 0.02, stripeHeight, 10]} />
+        <meshStandardMaterial color={index % 2 === 0 ? '#f3d34a' : '#202427'} roughness={0.65} />
+      </mesh>
+    ))}
+  </group>
+}
+
 export interface SlopeStartCourseProps {
   vehicle?: MutableRefObject<Vehicle>
   placement?: CoursePlacement
@@ -275,23 +293,25 @@ export function SlopeStartCourse({
     <Marking z={SLOPE_GEOMETRY.stopLineZ + SLOPE_START.controlOffset + SLOPE_START.stopLineWidth / 2} width={SLOPE_START.roadWidth} depth={0.08} color="#f3d34a" />
     <Marking z={SLOPE_GEOMETRY.stopLineZ - SLOPE_START.controlOffset - SLOPE_START.stopLineWidth / 2} width={SLOPE_START.roadWidth} depth={0.08} color="#f3d34a" />
 
-    <group position-y={getSlopePose(SLOPE_GEOMETRY.stopLineZ).y}>
-      <SignPost
-        x={SLOPE_GEOMETRY.roadHalf + 0.55}
-        z={SLOPE_GEOMETRY.stopLineZ}
-        vehicle={vehicle}
-        placement={placement}
-        audioContext={audioContext}
-        audioState={audioState}
-        incident={subject2CollisionIncident({
-          id: 'slope-start-sign-post',
-          kind: 'pole',
-          object: 'sign-post',
-          label: '坡道停车标志杆',
-          course: 'slope-start',
-        })}
-        onIncident={onIncident}
-      />
-    </group>
+    <StopReferencePole />
+
+    <SignPost
+      x={-SLOPE_GEOMETRY.roadHalf - 1.15}
+      z={SLOPE_GEOMETRY.roadStartZ - 3.2}
+      heading={0}
+      signText="坡道停车起步"
+      vehicle={vehicle}
+      placement={placement}
+      audioContext={audioContext}
+      audioState={audioState}
+      incident={subject2CollisionIncident({
+        id: 'slope-start-sign-post',
+        kind: 'pole',
+        object: 'sign-post',
+        label: '坡道停车起步指示牌',
+        course: 'slope-start',
+      })}
+      onIncident={onIncident}
+    />
   </group>
 }

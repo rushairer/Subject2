@@ -3,7 +3,7 @@ import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
-import { TrafficCone } from './TrafficCone'
+import { TrafficCone } from './TrafficCone'\nimport { SignPost } from './SignPost'
 import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
@@ -271,6 +271,25 @@ export function RightAngleCourse({
     <Line x={(g.horizontalMinX - g.half) / 2} z={g.cornerCenterZ + g.half} width={innerTopLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={exitCenterX} z={g.cornerCenterZ - g.half} width={exitLength} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={g.horizontalMinX} z={g.cornerCenterZ} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={RIGHT_ANGLE.roadWidth} />
+
+    <SignPost
+      x={-g.half - 1.15}
+      z={g.entryMaxZ - 3.0}
+      heading={0}
+      signText="直角转弯"
+      vehicle={vehicle}
+      placement={placement}
+      audioContext={audioContext}
+      audioState={audioState}
+      incident={subject2CollisionIncident({
+        id: 'right-angle-sign-post',
+        kind: 'pole',
+        object: 'sign-post',
+        label: '直角转弯指示牌',
+        course: 'right-angle',
+      })}
+      onIncident={onIncident}
+    />
 
     {/* Inner corner apex traffic cone */}
     <TrafficCone

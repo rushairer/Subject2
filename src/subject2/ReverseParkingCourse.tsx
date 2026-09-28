@@ -328,8 +328,10 @@ export function ReverseParkingCourse({
     ))}
 
     <SignPost
-      x={-2.45}
-      z={0}
+      x={-g.laneHalf - 1.15}
+      z={g.startControlZ - 1.3}
+      heading={Math.PI}
+      signText="倒车入库"
       vehicle={vehicle}
       placement={placement}
       audioContext={audioContext}
@@ -338,7 +340,7 @@ export function ReverseParkingCourse({
         id: 'reverse-parking-sign-post',
         kind: 'pole',
         object: 'sign-post',
-        label: '倒车入库标志杆',
+        label: '倒车入库指示牌',
         course: 'reverse-parking',
       })}
       onIncident={onIncident}

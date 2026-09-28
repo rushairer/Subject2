@@ -3,7 +3,7 @@ import type { MutableRefObject, ReactElement } from 'react'
 import type { Vehicle } from '../sim/vehicleCollision'
 import type { VehicleAudioState } from '../audio/vehicleAudio'
 import type { CoursePlacement } from './courseTransform'
-import { TrafficCone } from './TrafficCone'
+import { TrafficCone } from './TrafficCone'\nimport { SignPost } from './SignPost'
 import { subject2CollisionIncident, type DrivingIncidentDraft } from '../session/drivingIncident'
 import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rules/subject2RuleProfile'
 import {
@@ -321,6 +321,25 @@ export function SideParkingCourse({
     <Line x={(g.bayMouthX + g.bayBackX) / 2} z={g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={(g.bayMouthX + g.bayBackX) / 2} z={-g.bayHalfLength} width={SIDE_PARKING.bayWidth} depth={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} />
     <Line x={g.bayBackX} z={0} width={SUBJECT2_BOUNDARY_LINE_WIDTH_METERS} depth={SIDE_PARKING.bayLength} />
+
+    <SignPost
+      x={-g.laneHalf - 1.15}
+      z={g.bayHalfLength + 2.0}
+      heading={0}
+      signText="侧方停车"
+      vehicle={vehicle}
+      placement={placement}
+      audioContext={audioContext}
+      audioState={audioState}
+      incident={subject2CollisionIncident({
+        id: 'side-parking-sign-post',
+        kind: 'pole',
+        object: 'sign-post',
+        label: '侧方停车指示牌',
+        course: 'side-parking',
+      })}
+      onIncident={onIncident}
+    />
 
     {[
       [g.bayBackX + 0.25, g.bayHalfLength + 0.3],
