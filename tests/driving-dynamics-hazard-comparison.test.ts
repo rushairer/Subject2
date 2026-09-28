@@ -41,6 +41,11 @@ function event(
   }
 }
 
+function close(actual: number | undefined, expected: number) {
+  assert.notEqual(actual, undefined)
+  assert.ok(Math.abs((actual ?? 0) - expected) < 1e-9)
+}
+
 function sample(
   t: number,
   speedKmh: number,
@@ -109,15 +114,15 @@ test('comparison uses trigger-near speed and post-trigger three-second minimum f
   const [group] = buildDrivingDynamicsHazardComparisons(samples, events)
 
   assert.equal(group.kind, 'cut-in')
-  assert.equal(group.items[0].triggerSpeedKmh, 28)
-  assert.equal(group.items[0].minimumPostTriggerSpeedKmh, 15)
+  close(group.items[0].triggerSpeedKmh, 28)
+  close(group.items[0].minimumPostTriggerSpeedKmh, 15)
   assert.equal(group.items[0].throttleReleaseSeconds, 0.3)
   assert.equal(group.items[0].brakeReactionSeconds, 0.7)
   assert.equal(group.items[0].stopReactionSeconds, undefined)
   assert.equal(group.items[0].steeringChangeTurns, 0.12)
 
-  assert.equal(group.items[1].triggerSpeedKmh, 23)
-  assert.equal(group.items[1].minimumPostTriggerSpeedKmh, 19)
+  close(group.items[1].triggerSpeedKmh, 23)
+  close(group.items[1].minimumPostTriggerSpeedKmh, 19)
 })
 
 test('comparison preserves analyzer timing even when a response occurs beyond the visible three-second context', () => {
@@ -141,9 +146,9 @@ test('comparison preserves analyzer timing even when a response occurs beyond th
   const [group] = buildDrivingDynamicsHazardComparisons(samples, events)
 
   assert.equal(group.items[0].stopReactionSeconds, 3.6)
-  assert.equal(group.items[0].minimumPostTriggerSpeedKmh, 8)
+  close(group.items[0].minimumPostTriggerSpeedKmh, 8)
   assert.equal(group.items[1].stopReactionSeconds, 2.4)
-  assert.equal(group.items[1].minimumPostTriggerSpeedKmh, 0)
+  close(group.items[1].minimumPostTriggerSpeedKmh, 0)
 })
 
 test('comparison leaves missing metrics empty instead of inferring values or borrowing another project', () => {
