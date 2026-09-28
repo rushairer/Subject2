@@ -41,10 +41,14 @@ function timeLabel(value: number) {
 
 function analyzerSteps(
   response: DrivingDynamicsEventResponseEvidence,
+  maximumTimeSeconds: number,
 ): DrivingDynamicsReactionStep[] {
   const steps: DrivingDynamicsReactionStep[] = []
 
-  if (finite(response.throttleReleaseSeconds)) {
+  if (
+    finite(response.throttleReleaseSeconds) &&
+    response.throttleReleaseSeconds <= maximumTimeSeconds + 1e-6
+  ) {
     steps.push({
       kind: 'throttle',
       timeSeconds: response.throttleReleaseSeconds,
@@ -54,7 +58,10 @@ function analyzerSteps(
     })
   }
 
-  if (finite(response.brakeReactionSeconds)) {
+  if (
+    finite(response.brakeReactionSeconds) &&
+    response.brakeReactionSeconds <= maximumTimeSeconds + 1e-6
+  ) {
     steps.push({
       kind: 'brake',
       timeSeconds: response.brakeReactionSeconds,
@@ -66,7 +73,10 @@ function analyzerSteps(
     })
   }
 
-  if (finite(response.stopReactionSeconds)) {
+  if (
+    finite(response.stopReactionSeconds) &&
+    response.stopReactionSeconds <= maximumTimeSeconds + 1e-6
+  ) {
     steps.push({
       kind: 'stop',
       timeSeconds: response.stopReactionSeconds,
@@ -146,9 +156,18 @@ export function buildDrivingDynamicsReactionChain(
     source: 'trajectory',
   }]
 
-  steps.push(...analyzerSteps(response))
+  const maximumObservedResponseTime = Math.min(
+    context.windowSeconds,
+    context.afterCoverageSeconds,
+  )
+  const responseSteps = analyzerSteps(
+    response,
+    maximumObservedResponseTime,
+  )
+  steps.push(...responseSteps)
 
-  if (!finite(response.stopReactionSeconds) && trigger) {
+  const hasObservedStop = responseSteps.some(step => step.kind === 'stop')
+  if (!hasObservedStop && trigger) {
     const minimum = minimumPostTriggerSpeed(context)
     if (
       minimum &&
