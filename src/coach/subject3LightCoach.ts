@@ -5,39 +5,66 @@ import {
   type NightLightVehicleState,
 } from '../subject3/nightLightExam'
 
+export type Subject3LightCoachControl = 'low-toggle' | 'high-toggle'
+
 export interface Subject3LightCoachAction {
   afterMs: number
-  lowBeam: boolean
-  highBeam: boolean
+  control: Subject3LightCoachControl
   label: string
+}
+
+function toggleLightState(
+  state: NightLightVehicleState,
+  control: Subject3LightCoachControl,
+) {
+  if (control === 'low-toggle') {
+    state.lowBeam = !state.lowBeam
+    state.highBeam = false
+    return
+  }
+
+  state.highBeam = !state.highBeam
+  if (state.highBeam) state.lowBeam = true
 }
 
 export function subject3LightCoachSequence(
   answer: NightLightAnswer,
+  initialState: NightLightVehicleState,
 ): Subject3LightCoachAction[] {
-  if (answer === 'low') {
-    return [{
-      afterMs: 550,
-      lowBeam: true,
-      highBeam: false,
-      label: '切换近光灯',
-    }]
+  const state = { ...initialState }
+  const actions: Omit<Subject3LightCoachAction, 'afterMs'>[] = []
+
+  const push = (
+    control: Subject3LightCoachControl,
+    label: string,
+  ) => {
+    actions.push({ control, label })
+    toggleLightState(state, control)
   }
 
-  return [
-    {
-      afterMs: 500,
-      lowBeam: false,
-      highBeam: true,
-      label: '先切远光灯',
-    },
-    {
-      afterMs: 900,
-      lowBeam: true,
-      highBeam: false,
-      label: '再切回近光灯，完成远近光交替',
-    },
-  ]
+  if (answer === 'low') {
+    if (state.highBeam) {
+      push('high-toggle', '关闭远光，回到近光')
+    }
+    if (!state.lowBeam) {
+      push('low-toggle', '切换近光灯')
+    }
+    if (actions.length === 0) {
+      push('low-toggle', '重新操作近光灯开关')
+      push('low-toggle', '再次开启近光灯')
+    }
+  } else {
+    if (state.highBeam) {
+      push('high-toggle', '先关闭已有远光状态')
+    }
+    push('high-toggle', '切换远光灯')
+    push('high-toggle', '切回近光灯，完成远近光交替')
+  }
+
+  return actions.map((action, index) => ({
+    ...action,
+    afterMs: 500 + index * 350,
+  }))
 }
 
 export function applySubject3LightCoachAction(
@@ -45,7 +72,6 @@ export function applySubject3LightCoachAction(
   attempt: NightLightAttempt,
   action: Subject3LightCoachAction,
 ) {
-  vehicle.lowBeam = action.lowBeam
-  vehicle.highBeam = action.highBeam
+  toggleLightState(vehicle, action.control)
   recordNightLightAction(attempt)
 }
