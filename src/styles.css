@@ -342,6 +342,7 @@
 .replay-hazard-context-head small{color:#7493a7;font-size:8px;line-height:1.5}
 .replay-hazard-context-head i{padding:5px 7px;border-radius:999px;background:#102b3d;color:#8fb2c7;font-size:8px;font-style:normal;font-weight:800;white-space:nowrap}
 .replay-hazard-context-head i.truncated{background:#302818;color:#e2c579}
+.replay-hazard-trigger-title{color:#7898ab;font-size:8px;font-weight:800}
 .replay-hazard-trigger-readout{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .replay-hazard-trigger-readout>span{display:grid;gap:2px;min-width:0;padding:7px 8px;border-radius:9px;background:#0d2433;text-align:center}
 .replay-hazard-trigger-readout b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#eaf8ff;font-size:10px}
