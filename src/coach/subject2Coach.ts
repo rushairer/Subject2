@@ -293,9 +293,10 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.46,
       gear: 1,
-      arrivalRadiusMeters: 0.09,
-      pathCurvaturePerMeter: 1 / exitTurnRadius,
-      label: '驶向另一端 · 到达出库转向点',
+      arrivalRadiusMeters: 0.12,
+      pathCurvaturePerMeter: 0,
+      requireCapture: true,
+      label: '驶向另一端 · 精确到达出库转向点',
     })
   }
   for (let index = 1; index <= southArcSteps; index++) {
@@ -403,9 +404,10 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.46,
       gear: 1,
-      arrivalRadiusMeters: 0.09,
-      pathCurvaturePerMeter: -1 / exitTurnRadius,
-      label: '返回起始端 · 到达出库转向点',
+      arrivalRadiusMeters: 0.12,
+      pathCurvaturePerMeter: 0,
+      requireCapture: true,
+      label: '返回起始端 · 精确到达出库转向点',
     })
   }
   for (let index = 1; index <= northArcSteps; index++) {
