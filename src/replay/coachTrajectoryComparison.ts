@@ -75,13 +75,13 @@ export function distanceToCoachPath(
 ): number | null {
   if (path.length === 0) return null
   if (path.length === 1) {
-    return Math.hypot(point.x - path[0].x, point.z - path[0].z)
+    return Math.hypot(point.x - path[0]!.x, point.z - path[0]!.z)
   }
 
   let best = Number.POSITIVE_INFINITY
   for (let index = 1; index < path.length; index++) {
-    const start = path[index - 1]
-    const end = path[index]
+    const start = path[index - 1]!
+    const end = path[index]!
     const dx = end.x - start.x
     const dz = end.z - start.z
     const lengthSquared = dx * dx + dz * dz
