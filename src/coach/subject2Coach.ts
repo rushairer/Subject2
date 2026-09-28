@@ -16,84 +16,74 @@ function curveWaypoints(): CoachWaypoint[] {
 
 function rightAngleWaypoints(): CoachWaypoint[] {
   const g = RIGHT_ANGLE_GEOMETRY
-  const radius = 2.45
+  const radius = 2.3
   const innerCorner = {
     x: -g.half,
     z: g.cornerCenterZ + g.half,
   }
   const approachX = innerCorner.x + radius
-  const waypoints: CoachWaypoint[] = [
-    6.3,
-    4.4,
-    2.5,
-    0.6,
-    -0.7,
-    innerCorner.z,
-  ].map((z, index) => ({
-    x: approachX,
-    z,
-    targetSpeedMps: index < 3 ? 1.0 : 0.85,
-    gear: 1,
-    arrivalRadiusMeters: 0.45,
-    leftIndicator: true,
-    label: index < 3
-      ? '直角转弯示范 · 靠右低速进场'
-      : '直角转弯示范 · 左灯已开启，准备转弯',
-  }))
+  const waypoints: CoachWaypoint[] = []
 
-  const arcSteps = 18
+  for (let z = 6.6; z > innerCorner.z; z -= 0.6) {
+    waypoints.push({
+      x: approachX,
+      z,
+      targetSpeedMps: z > 1 ? 0.95 : 0.82,
+      gear: 1,
+      arrivalRadiusMeters: 0.68,
+      leftIndicator: true,
+      label: z > 1
+        ? '直角转弯示范 · 靠右低速进场'
+        : '直角转弯示范 · 左灯已开启，准备转弯',
+    })
+  }
+  waypoints.push({
+    x: approachX,
+    z: innerCorner.z,
+    targetSpeedMps: 0.78,
+    gear: 1,
+    arrivalRadiusMeters: 0.62,
+    leftIndicator: true,
+    label: '直角转弯示范 · 到达转向起点',
+  })
+
+  const arcSteps = 22
   for (let index = 1; index <= arcSteps; index++) {
     const theta = -Math.PI / 2 * (index / arcSteps)
     waypoints.push({
       x: innerCorner.x + radius * Math.cos(theta),
       z: innerCorner.z + radius * Math.sin(theta),
-      targetSpeedMps: 0.78,
+      targetSpeedMps: 0.72,
       gear: 1,
-      arrivalRadiusMeters: 0.32,
+      arrivalRadiusMeters: 0.48,
       leftIndicator: true,
       label: '直角转弯示范 · 连续左转，保持内轮差余量',
     })
   }
 
   const exitZ = innerCorner.z - radius
-  waypoints.push(
-    {
-      x: -2.8,
+  for (let x = -2.45; x > -7.0; x -= 0.65) {
+    waypoints.push({
+      x,
       z: exitZ,
-      targetSpeedMps: 0.85,
+      targetSpeedMps: x > -4 ? 0.82 : 0.95,
       gear: 1,
-      arrivalRadiusMeters: 0.35,
-      leftIndicator: true,
-      label: '直角转弯示范 · 出弯回正',
-    },
-    {
-      x: -4.35,
-      z: exitZ,
-      targetSpeedMps: 0.95,
-      gear: 1,
-      arrivalRadiusMeters: 0.3,
-      leftIndicator: false,
-      label: '直角转弯示范 · 关闭左转向灯',
-    },
-    {
-      x: -5.9,
-      z: exitZ,
-      targetSpeedMps: 1.0,
-      gear: 1,
-      arrivalRadiusMeters: 0.3,
-      leftIndicator: false,
-      label: '直角转弯示范 · 保持直线驶出',
-    },
-    {
-      x: -7.38,
-      z: exitZ,
-      targetSpeedMps: 0.9,
-      gear: 1,
-      arrivalRadiusMeters: 0.1,
-      leftIndicator: false,
-      label: '直角转弯示范 · 完成项目',
-    },
-  )
+      arrivalRadiusMeters: 0.58,
+      leftIndicator: x > -4.05,
+      label: x > -4.05
+        ? '直角转弯示范 · 出弯回正'
+        : '直角转弯示范 · 关闭左转向灯并直线驶出',
+    })
+  }
+  waypoints.push({
+    x: -7.38,
+    z: exitZ,
+    targetSpeedMps: 0.82,
+    gear: 1,
+    arrivalRadiusMeters: 0.1,
+    leftIndicator: false,
+    label: '直角转弯示范 · 完成项目',
+  })
 
   return waypoints
 }
