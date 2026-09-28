@@ -19,6 +19,10 @@ import {
   buildDrivingDynamicsReactionChain,
   type DrivingDynamicsReactionChain,
 } from './drivingDynamicsReactionChain'
+import {
+  buildDrivingDynamicsSessionOverview,
+  type DrivingDynamicsSessionOverview,
+} from './drivingDynamicsSessionOverview'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -175,6 +179,94 @@ function contextRelativeTimeLabel(value: number | undefined) {
   if (value == null) return '--'
   if (Math.abs(value) < 0.05) return '0.0s'
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}s`
+}
+
+const OVERVIEW_EVENT_ROWS: {
+  kind: DrivingDynamicsEventKind
+  label: string
+}[] = [
+  { kind: 'sudden-brake', label: '前车急刹' },
+  { kind: 'cut-in', label: '电动车加塞' },
+  { kind: 'pedestrian', label: '行人横穿' },
+]
+
+function sessionTimeLabel(seconds: number) {
+  if (seconds < 60) return `${seconds.toFixed(0)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainder = Math.round(seconds % 60)
+  return `${minutes}m ${remainder}s`
+}
+
+function HazardSessionOverview({
+  overview,
+  selectedEventId,
+  onSelect,
+}: {
+  overview: DrivingDynamicsSessionOverview
+  selectedEventId?: string | null
+  onSelect: (eventId: string) => void
+}) {
+  const { counts } = overview
+
+  return <div className="replay-hazard-overview" aria-label="整场风险复盘总览">
+    <div className="replay-hazard-overview-head">
+      <span>
+        <small>SESSION HAZARD OVERVIEW</small>
+        <b>整场风险复盘总览</b>
+      </span>
+      <strong>共 {counts.total} 个风险事件</strong>
+    </div>
+
+    <div className="replay-hazard-overview-counts">
+      <span className="sudden-brake"><b>{counts.suddenBrake}</b><small>前车急刹</small></span>
+      <span className="cut-in"><b>{counts.cutIn}</b><small>电动车加塞</small></span>
+      <span className="pedestrian"><b>{counts.pedestrian}</b><small>行人横穿</small></span>
+    </div>
+
+    <p className="replay-hazard-overview-evidence">
+      记录到：
+      <b>松油门 {counts.withThrottleRelease} 个</b>
+      <b>制动反应 {counts.withBrakeResponse} 个</b>
+      <b>停车 {counts.withStop} 个</b>
+      <b>方向盘明显变化 {counts.withSteeringChange} 个</b>
+      <em>仅汇总已有复盘证据，不代表事件处理质量或考试得分。</em>
+    </p>
+
+    <div className="replay-hazard-overview-timeline">
+      <div className="replay-hazard-overview-time-scale">
+        <span>0s</span>
+        <span>{sessionTimeLabel(overview.durationSeconds)}</span>
+      </div>
+
+      {OVERVIEW_EVENT_ROWS.map(row => {
+        const markers = overview.markers.filter(marker => marker.kind === row.kind)
+        return <div className="replay-hazard-overview-lane" key={row.kind}>
+          <span className="replay-hazard-overview-lane-label">{row.label}</span>
+          <div className="replay-hazard-overview-track">
+            {markers.map(marker => {
+              const selected = marker.id === selectedEventId
+              return <button
+                type="button"
+                key={marker.id}
+                className={`replay-hazard-overview-marker ${marker.kind}${selected ? ' selected' : ''}`}
+                style={{ left: `${(marker.ratio * 100).toFixed(2)}%` }}
+                aria-label={`${marker.label}，整场第 ${sessionTimeLabel(Math.max(0, marker.relativeTime))} 触发`}
+                aria-pressed={selected}
+                title={`${marker.label} · ${sessionTimeLabel(Math.max(0, marker.relativeTime))}`}
+                onClick={() => onSelect(marker.id)}
+              >
+                {marker.glyph}
+              </button>
+            })}
+          </div>
+        </div>
+      })}
+    </div>
+
+    <p className="replay-hazard-overview-note">
+      点击时间带上的事件可直接切换下方详细复盘；位置按真实触发时刻计算。
+    </p>
+  </div>
 }
 
 function HazardEventContextChart({
@@ -409,6 +501,14 @@ export function DrivingDynamicsTimeline({
     () => buildDrivingDynamicsEventMarkers(model.samples),
     [model.samples],
   )
+  const sessionOverview = useMemo(
+    () => buildDrivingDynamicsSessionOverview(
+      events,
+      model.startTime,
+      model.endTime,
+    ),
+    [events, model.endTime, model.startTime],
+  )
   const [cursorIndex, setCursorIndex] = useState(0)
   const selection = drivingDynamicsEventSelection(events, selectedEventId)
   const selectedEvent = selectedEventId ? selection.event : null
@@ -547,6 +647,15 @@ export function DrivingDynamicsTimeline({
     </div>
 
     {events.length > 0 && <>
+      <HazardSessionOverview
+        overview={sessionOverview}
+        selectedEventId={selectedEventId}
+        onSelect={eventId => {
+          const event = events.find(item => item.id === eventId)
+          if (event) focusEvent(event, { scroll: false })
+        }}
+      />
+
       <div
         className="replay-hazard-browser"
         aria-label="多事件快速复盘"
