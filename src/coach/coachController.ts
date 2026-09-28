@@ -79,6 +79,7 @@ function hasPassedWaypoint(
   vehicle: Pick<CoachVehicleState, 'x' | 'z'>,
   previous: Pick<CoachWaypoint, 'x' | 'z'>,
   target: Pick<CoachWaypoint, 'x' | 'z'>,
+  corridorMeters?: number,
 ) {
   const segmentX = target.x - previous.x
   const segmentZ = target.z - previous.z
@@ -91,7 +92,7 @@ function hasPassedWaypoint(
     vehicle.x - target.x,
     vehicle.z - target.z,
   )
-  const passCorridorMeters = Math.max(
+  const passCorridorMeters = corridorMeters ?? Math.max(
     0.9,
     Math.sqrt(segmentLengthSquared) * 2.4,
   )
@@ -155,12 +156,20 @@ export function stepCoachController(
   while (!target.stop && index < lastIndex) {
     const previousTarget = index > 0 ? plan.waypoints[index - 1] : null
     const curvedTarget = Math.abs(target.pathCurvaturePerMeter ?? 0) > 1e-5
-    const captureOnly = curvedTarget || target.requireCapture === true
+    const captureOnly = target.requireCapture === true
+    const passCorridorMeters = curvedTarget
+      ? Math.max(0.28, arrivalRadius * 2.5)
+      : undefined
     const reached =
       distance <= arrivalRadius ||
       (!captureOnly &&
         previousTarget != null &&
-        hasPassedWaypoint(vehicle, previousTarget, target))
+        hasPassedWaypoint(
+          vehicle,
+          previousTarget,
+          target,
+          passCorridorMeters,
+        ))
     if (!reached) break
     index += 1
     target = plan.waypoints[index]
