@@ -37,6 +37,7 @@ import {
   createSubject3CoachRuntime,
   stepSubject3Coach,
 } from './coach/subject3Coach'
+import { buildCoachTeachingHint } from './coach/coachTeaching'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
@@ -1150,6 +1151,17 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const coachSupported = activeExamId === 'subject3'
     ? lightTestDone && session.subject3Practice == null
     : combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId)
+  const coachTeaching = useMemo(
+    () => coachActive
+      ? buildCoachTeachingHint({
+          examId: activeExamId,
+          status: coachStatus,
+          automatic,
+          vehicle: display,
+        })
+      : null,
+    [activeExamId, automatic, coachActive, coachStatus, display],
+  )
   const navigatingToProject = combinedExam && !activeEntryReached
   const hudProjectStatus = navigatingToProject
     ? `连接道路 · 前往${examTitle(activeExamId)} · 距入口约 ${Math.max(1, Math.ceil(activeEntryDistance))} m`
@@ -1274,8 +1286,18 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           setLightTestDone(true)
         }}
       />}
-      {coachActive && coachStatus
-        ? <div className="project-status coach-status">教练驾驶中 · {coachStatus}</div>
+      {coachActive && coachTeaching
+        ? <aside className="coach-teaching-card" aria-label="教练实时讲解">
+            <div className="coach-teaching-head">
+              <span>教练驾驶中</span>
+              <strong>{coachTeaching.action}</strong>
+            </div>
+            <div className="coach-teaching-operation">{coachTeaching.operation}</div>
+            <div className="coach-teaching-grid">
+              <p><b>为什么这样做</b><span>{coachTeaching.reason}</span></p>
+              <p><b>观察重点</b><span>{coachTeaching.watch}</span></p>
+            </div>
+          </aside>
         : hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
       <DrivingHelp automatic={automatic} expanded={helpExpanded} onToggle={toggleHelp} />
       <div className="steering-hud" aria-label="方向盘位置">
