@@ -119,6 +119,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   // inside the 6.7 m lane before beginning the 90-degree forward turn.
   const outboundTurnX = 1.7
   const outboundLaneX = outboundTurnX + rearAxle - exitTurnRadius
+  const exitTurnZ = exitTurnRadius + rearAxle
   const turnStartZ = reverseTurnStartZ
   const northStopZ = g.startControlZ + 0.65
   const southStopZ = g.oppositeControlZ - 0.65
@@ -292,7 +293,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.46,
       gear: 1,
-      arrivalRadiusMeters: 0.28,
+      arrivalRadiusMeters: 0.09,
       pathCurvaturePerMeter: 1 / exitTurnRadius,
       label: '驶向另一端 · 到达出库转向点',
     })
@@ -304,16 +305,16 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.56,
       gear: 1,
-      arrivalRadiusMeters: 0.36,
+      arrivalRadiusMeters: 0.09,
       pathCurvaturePerMeter: 1 / exitTurnRadius,
       label: '驶向另一端 · 按后轴转弯半径进入纵向车道',
     })
   }
 
-  for (let z = -turnStartZ - 0.4; z > southStopZ + 0.22; z -= 0.4) {
+  for (let z = -exitTurnZ - 0.4; z > southStopZ + 0.22; z -= 0.4) {
     const progress = Math.min(
       1,
-      Math.max(0, (-z - turnStartZ) / Math.max(0.8, -southStopZ - turnStartZ - 0.5)),
+      Math.max(0, (-z - exitTurnZ) / Math.max(0.8, -southStopZ - exitTurnZ - 0.5)),
     )
     push({
       x: outboundLaneX + (reverseStagingX - outboundLaneX) * progress,
@@ -402,7 +403,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.46,
       gear: 1,
-      arrivalRadiusMeters: 0.28,
+      arrivalRadiusMeters: 0.09,
       pathCurvaturePerMeter: -1 / exitTurnRadius,
       label: '返回起始端 · 到达出库转向点',
     })
@@ -414,13 +415,13 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       ...point,
       targetSpeedMps: 0.56,
       gear: 1,
-      arrivalRadiusMeters: 0.36,
+      arrivalRadiusMeters: 0.09,
       pathCurvaturePerMeter: -1 / exitTurnRadius,
       label: '返回起始端 · 按后轴转弯半径进入纵向车道',
     })
   }
 
-  for (let z = turnStartZ + 0.4; z < northStopZ - 0.16; z += 0.4) {
+  for (let z = exitTurnZ + 0.4; z < northStopZ - 0.16; z += 0.4) {
     push({
       x: outboundLaneX,
       z,
