@@ -122,7 +122,6 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const exitTurnZ = exitTurnRadius + rearAxle
   const turnStartZ = reverseTurnStartZ
   const northStopZ = g.startControlZ + 0.65
-  const southStopZ = g.oppositeControlZ - 0.65
   const points: CoachWaypoint[] = []
 
   const push = (waypoint: CoachWaypoint) => points.push(waypoint)
@@ -185,6 +184,15 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     { steering: -0.45, distance: 0.25 },
     { steering: 0, distance: 2.9 },
   ] as const
+  const secondReverseParkingSegments = reverseParkingSegments.map(
+    (segment, index) => ({
+      steering: -segment.steering,
+      distance:
+        index === reverseParkingSegments.length - 1
+          ? segment.distance + 0.25
+          : segment.distance,
+    }),
+  )
 
   const forwardExitArcPoint = (theta: number, north: boolean) => {
     const cos = Math.cos(theta)
@@ -318,34 +326,49 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     })
   }
 
-  for (let z = -exitTurnZ - 0.4; z > southStopZ + 0.22; z -= 0.4) {
-    const progress = Math.min(
-      1,
-      Math.max(0, (-z - exitTurnZ) / Math.max(0.8, -southStopZ - exitTurnZ - 0.5)),
-    )
-    push({
-      x: outboundLaneX + (reverseStagingX - outboundLaneX) * progress,
-      z,
-      targetSpeedMps: 0.72,
-      gear: 1,
-      arrivalRadiusMeters: 0.46,
-      label: '驶向另一端 · 直线段平顺调整第二次倒库位置',
-    })
+  const secondSetupStartPose = {
+    x: outboundLaneX,
+    z: -exitTurnZ,
+    heading: 0,
   }
   push({
-    x: reverseStagingX,
-    z: southStopZ,
+    x: secondSetupStartPose.x,
+    z: secondSetupStartPose.z,
+    targetSpeedMps: 0.46,
+    gear: 1,
+    arrivalRadiusMeters: 0.14,
+    requireCapture: true,
+    label: '驶向另一端 · 出库后进入第二次倒库摆位',
+  })
+  const secondStagingPose = appendControlledPath(
+    secondSetupStartPose,
+    1,
+    [
+      { steering: 0.58, distance: 1.65 },
+      { steering: -0.58, distance: 1.65 },
+    ],
+    '驶向另一端 · S 形横移并重新回正车身',
+  )
+  push({
+    x: secondStagingPose.x,
+    z: secondStagingPose.z,
     targetSpeedMps: 0,
     gear: 1,
     stop: true,
     holdSeconds: 0.3,
     arrivalRadiusMeters: 0.18,
-    label: '另一端控制线外停稳 · 准备第二次倒库',
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    label: '另一端控制线外停稳 · 车身已回正，准备第二次倒库',
   })
 
-  for (let z = southStopZ + 0.3; z < -turnStartZ - 0.16; z += 0.3) {
+  for (
+    let z = secondStagingPose.z + 0.3;
+    z < -turnStartZ - 0.16;
+    z += 0.3
+  ) {
     push({
-      x: reverseStagingX,
+      x: secondStagingPose.x,
       z,
       targetSpeedMps: 0.5,
       gear: -1,
@@ -357,7 +380,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   }
 
   const secondTurnPose = {
-    x: reverseStagingX,
+    x: secondStagingPose.x,
     z: -turnStartZ,
     heading: 0,
   }
@@ -375,10 +398,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const secondParkPose = appendControlledPath(
     secondTurnPose,
     -1,
-    reverseParkingSegments.map(segment => ({
-      steering: -segment.steering,
-      distance: segment.distance,
-    })),
+    secondReverseParkingSegments,
     '第二次倒库 · 按车身扫掠余量完成复合转向',
   )
 
