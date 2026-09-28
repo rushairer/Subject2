@@ -236,8 +236,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      pathCurvaturePerMeter: 0,
-      label: '第一次倒库 · 方向回正，直线后倒到转向点',
+      label: '第一次倒库 · 闭环对中并直线后倒到转向点',
     })
   }
 
@@ -252,9 +251,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     targetSpeedMps: 0.4,
     gear: -1,
     arrivalRadiusMeters: 0.12,
-    pathCurvaturePerMeter: 0,
     requireCapture: true,
-    label: '第一次倒库 · 到达复合转向起点',
+    label: '第一次倒库 · 精确对中后进入复合转向',
   })
   const firstParkPose = appendControlledPath(
     firstTurnPose,
@@ -345,8 +343,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      pathCurvaturePerMeter: 0,
-      label: '第二次倒库 · 方向回正，直线后倒到转向点',
+      label: '第二次倒库 · 闭环对中并直线后倒到转向点',
     })
   }
 
@@ -361,9 +358,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     targetSpeedMps: 0.4,
     gear: -1,
     arrivalRadiusMeters: 0.12,
-    pathCurvaturePerMeter: 0,
     requireCapture: true,
-    label: '第二次倒库 · 到达复合转向起点',
+    label: '第二次倒库 · 精确对中后进入复合转向',
   })
   const secondParkPose = appendControlledPath(
     secondTurnPose,
