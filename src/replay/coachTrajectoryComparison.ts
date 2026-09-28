@@ -3,6 +3,11 @@ import {
   subject2ContinuousCoachPlan,
 } from '../coach/subject2Coach'
 import {
+  SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
+  subject3CoachDesiredLateral,
+} from '../coach/subject3Coach'
+import { poseAtRouteDistance } from '../subject3/subject3Route'
+import {
   subject2ExamTransitions,
 } from '../subject2/subject2ExamLayout'
 import {
@@ -29,10 +34,44 @@ function subject2Project(project: string): Subject2ProjectId | null {
     : null
 }
 
+const SUBJECT3_COACH_REFERENCE_STEP_METERS = 5
+
+function subject3CoachReferencePath(): CoachReferencePoint[] {
+  const points: CoachReferencePoint[] = []
+  for (
+    let progress = 0;
+    progress < SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS;
+    progress += SUBJECT3_COACH_REFERENCE_STEP_METERS
+  ) {
+    const pose = poseAtRouteDistance(progress)
+    const lateral = subject3CoachDesiredLateral(progress)
+    points.push({
+      x: pose.x + pose.rightX * lateral,
+      z: pose.z + pose.rightZ * lateral,
+    })
+  }
+
+  const stopPose = poseAtRouteDistance(
+    SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
+  )
+  const stopLateral = subject3CoachDesiredLateral(
+    SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
+  )
+  points.push({
+    x: stopPose.x + stopPose.rightX * stopLateral,
+    z: stopPose.z + stopPose.rightZ * stopLateral,
+  })
+  return points
+}
+
 export function coachReferencePathForReplay(
   project: string,
   automatic: boolean,
 ): CoachReferencePoint[] {
+  if (project === 'subject3') {
+    return subject3CoachReferencePath()
+  }
+
   if (project.startsWith('transition:')) {
     const [, from, to] = project.split(':')
     const target = subject2Project(to)

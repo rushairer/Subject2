@@ -8,6 +8,8 @@ import {
 } from '../src/replay/coachTrajectoryComparison'
 import { subject2StartPose } from '../src/subject2/courseStartPoses'
 import { subject2ExamTransitions } from '../src/subject2/subject2ExamLayout'
+import { SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS } from '../src/coach/subject3Coach'
+import { projectToSubject3Route } from '../src/subject3/subject3Route'
 
 test('standalone Subject 2 replay uses the local golden-driver path', () => {
   const project = 'right-angle'
@@ -74,8 +76,41 @@ test('coach deviation stats expose average, maximum and the max sample index', (
   assert.deepEqual(stats.distances, [0, 1, 2])
 })
 
-test('Subject 3 replay has no Subject 2 coach reference overlay', () => {
-  assert.deepEqual(coachReferencePathForReplay('subject3', true), [])
+test('Subject 3 replay uses the production Golden Driver road geometry', () => {
+  const c1 = coachReferencePathForReplay('subject3', false)
+  const c2 = coachReferencePathForReplay('subject3', true)
+
+  assert.deepEqual(c1, c2)
+  assert.ok(c1.length > 800)
+
+  const start = projectToSubject3Route(c1[0]!.x, c1[0]!.z)
+  assert.ok(start.progress < 0.2)
+  assert.ok(Math.abs(start.lateral) < 0.05)
+
+  const laneChange = c1[Math.round(1950 / 5)]!
+  const laneChangeProjection = projectToSubject3Route(
+    laneChange.x,
+    laneChange.z,
+  )
+  assert.ok(Math.abs(laneChangeProjection.progress - 1950) < 0.3)
+  assert.ok(Math.abs(laneChangeProjection.lateral + 2.2) < 0.05)
+
+  const overtake = c1[Math.round(2130 / 5)]!
+  const overtakeProjection = projectToSubject3Route(
+    overtake.x,
+    overtake.z,
+  )
+  assert.ok(Math.abs(overtakeProjection.progress - 2130) < 0.3)
+  assert.ok(Math.abs(overtakeProjection.lateral + 2.2) < 0.05)
+
+  const stop = projectToSubject3Route(
+    c1[c1.length - 1]!.x,
+    c1[c1.length - 1]!.z,
+  )
+  assert.ok(
+    Math.abs(stop.progress - SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS) < 0.3,
+  )
+  assert.ok(Math.abs(stop.lateral - 0.6) < 0.05)
 })
 
 const replaySource = readFileSync(

@@ -53,6 +53,8 @@ const clamp = (value: number, min: number, max: number) =>
 const lerp = (a: number, b: number, t: number) =>
   a + (b - a) * clamp(t, 0, 1)
 
+export const SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS = 4180
+
 export function createSubject3CoachRuntime(): Subject3CoachRuntime {
   return { elapsedSeconds: 0 }
 }
@@ -227,7 +229,7 @@ export function stepSubject3Coach(
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
   const progress = projection.progress
   const waitingForStart = progress < 5 && runtime.elapsedSeconds < 3.3
-  const stoppingForPullOver = progress >= 4180
+  const stoppingForPullOver = progress >= SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS
   const securedPullOver =
     stoppingForPullOver && Math.abs(vehicle.speed) < 0.05
 
