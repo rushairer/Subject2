@@ -585,3 +585,29 @@ test('C1 sequential keys shift once per press, pedals show clutch, and help pres
   await page.keyboard.up('j')
   expect(errors).toEqual([])
 })
+
+
+test('coach takeover shows structured live teaching and returns control cleanly', async ({ page }) => {
+  test.setTimeout(60_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '教练讲解 E2E')
+
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+
+  const takeover = page.getByRole('button', { name: '教练接管' })
+  await expect(takeover).toBeVisible()
+  await takeover.click()
+
+  const teaching = page.getByRole('complementary', { name: '教练实时讲解' })
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
+  await expect(teaching).toContainText('教练驾驶中')
+  await expect(teaching).toContainText('为什么这样做')
+  await expect(teaching).toContainText('观察重点')
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+
+  await page.getByRole('button', { name: '我来接管' }).click()
+  await expect(teaching).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
