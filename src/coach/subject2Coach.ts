@@ -176,7 +176,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     { steering: -0.15, distance: 0.25 },
     { steering: -0.58, distance: 3.5 },
     { steering: -0.45, distance: 0.25 },
-    { steering: 0, distance: 1.5 },
+    { steering: 0, distance: 2.9 },
   ] as const
 
   const reverseNorthArcPoint = (theta: number, south: boolean) => {
@@ -254,8 +254,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     z: firstTurnPose.z,
     targetSpeedMps: 0.4,
     gear: -1,
-    arrivalRadiusMeters: 0.3,
+    arrivalRadiusMeters: 0.12,
     pathCurvaturePerMeter: 0,
+    requireCapture: true,
     label: '第一次倒库 · 到达复合转向起点',
   })
   const firstParkPose = appendControlledPath(
@@ -360,8 +361,9 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     z: secondTurnPose.z,
     targetSpeedMps: 0.4,
     gear: -1,
-    arrivalRadiusMeters: 0.3,
+    arrivalRadiusMeters: 0.12,
     pathCurvaturePerMeter: 0,
+    requireCapture: true,
     label: '第二次倒库 · 到达复合转向起点',
   })
   const secondParkPose = appendControlledPath(
