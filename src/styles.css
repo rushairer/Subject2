@@ -561,3 +561,13 @@
 .result-incidents strong{flex:0 0 auto;color:#f1c66f}
 .result-incidents span{min-width:0}
 @media(max-width:560px){.result-incidents{flex-direction:column;gap:4px}}
+
+
+/* Coach reference overlay: advisory replay comparison, never scoring. */
+.replay-section{--replay-coach:#b99cff}
+.replay-legend-line{display:inline-block;width:22px;height:0;border-top:2px dashed #789;vertical-align:middle}
+.replay-legend-line.coach{border-top-color:var(--replay-coach)}
+.replay-coach-path{fill:none;stroke:var(--replay-coach);stroke-width:2.4;stroke-dasharray:8 6;stroke-linecap:round;stroke-linejoin:round;opacity:.88}
+.replay-project-title .replay-coach-stat{background:#241b3a;color:#d9c9ff;border:1px solid #49396a}
+.replay-live-readout .replay-coach-deviation{background:#211a35;box-shadow:inset 0 0 0 1px #4c3a70}
+.replay-live-readout .replay-coach-deviation b{color:#e6d9ff}
