@@ -305,7 +305,7 @@ function HazardPeerComparison({
           </thead>
           <tbody>
             <tr>
-              <th scope="row">触发速度</th>
+              <th scope="row">触发附近速度</th>
               {group.items.map(item => <td key={item.id}>
                 {comparisonSpeed(item.triggerSpeedKmh)}
               </td>)}
@@ -329,7 +329,7 @@ function HazardPeerComparison({
               </td>)}
             </tr>
             <tr>
-              <th scope="row">触发后 3 秒最低车速</th>
+              <th scope="row">触发后 ≤3 秒最低车速</th>
               {group.items.map(item => <td key={item.id}>
                 {comparisonSpeed(item.minimumPostTriggerSpeedKmh)}
               </td>)}
@@ -346,7 +346,7 @@ function HazardPeerComparison({
 
       <p>
         “—”表示当前证据没有该指标。松油门/制动/停车来自既有教练分析器；
-        最低车速固定取触发后 3 秒真实轨迹窗口，方向盘变化仅显示已有结构化证据。
+        最低车速最多取触发后 3 秒真实轨迹，录像边界不足时只使用实际覆盖；方向盘变化仅显示已有结构化证据。
       </p>
     </section>)}
   </div>
