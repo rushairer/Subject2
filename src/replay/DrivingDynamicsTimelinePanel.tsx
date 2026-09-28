@@ -39,6 +39,10 @@ import {
   buildDrivingDynamicsHazardInsights,
   type DrivingDynamicsHazardInsightGroup,
 } from './drivingDynamicsHazardInsights'
+import {
+  buildDrivingDynamicsSingleEventSummary,
+  type DrivingDynamicsSingleEventSummary,
+} from './drivingDynamicsSingleEventSummary'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -521,6 +525,41 @@ function HazardSessionOverview({
   </div>
 }
 
+function HazardSingleEventSummary({
+  summary,
+}: {
+  summary: DrivingDynamicsSingleEventSummary
+}) {
+  return <div
+    className="replay-hazard-single-summary"
+    aria-label="单次风险事件四段式摘要"
+  >
+    <div className="replay-hazard-single-summary-head">
+      <span>
+        <small>SINGLE EVENT SUMMARY</small>
+        <b>单次事件快速摘要</b>
+      </span>
+      <em>只整理已记录证据，不参与评分。</em>
+    </div>
+
+    <div className="replay-hazard-single-summary-grid">
+      {summary.sections.map((section, index) => <article
+        key={section.kind}
+        className={`replay-hazard-single-summary-card ${section.kind}`}
+      >
+        <div className="replay-hazard-single-summary-title">
+          <i>{index + 1}</i>
+          <b>{section.title}</b>
+        </div>
+        <p>{section.text}</p>
+        <ul>
+          {section.details.map(detail => <li key={detail}>{detail}</li>)}
+        </ul>
+      </article>)}
+    </div>
+  </div>
+}
+
 function HazardEventContextChart({
   context,
   reactionChain,
@@ -806,6 +845,12 @@ export function DrivingDynamicsTimeline({
       : null,
     [browserContext, browserEvent],
   )
+  const browserSingleEventSummary = useMemo(
+    () => browserEvent && browserContext
+      ? buildDrivingDynamicsSingleEventSummary(browserEvent, browserContext)
+      : null,
+    [browserContext, browserEvent],
+  )
 
   useEffect(() => {
     const selectedInFilter = selectedEventId
@@ -1054,6 +1099,10 @@ export function DrivingDynamicsTimeline({
             查看当前轨迹
           </button>
         </div>}
+
+        {browserSingleEventSummary && <HazardSingleEventSummary
+          summary={browserSingleEventSummary}
+        />}
 
         {browserContext && browserReactionChain && <HazardEventContextChart
           context={browserContext}
