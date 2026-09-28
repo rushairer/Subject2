@@ -571,3 +571,79 @@
 .replay-project-title .replay-coach-stat{background:#241b3a;color:#d9c9ff;border:1px solid #49396a}
 .replay-live-readout .replay-coach-deviation{background:#211a35;box-shadow:inset 0 0 0 1px #4c3a70}
 .replay-live-readout .replay-coach-deviation b{color:#e6d9ff}
+
+
+/* Coach teaching overlay: explanation only, never part of exam scoring. */
+.coach-teaching-card{
+  position:absolute;
+  z-index:4;
+  top:72px;
+  left:50%;
+  transform:translateX(-50%);
+  width:min(620px,calc(100% - 380px));
+  padding:13px 15px 14px;
+  border:1px solid #7bcfff66;
+  border-radius:16px;
+  background:#071522e8;
+  box-shadow:0 16px 42px #0008,0 0 28px #5dcfff12;
+  backdrop-filter:blur(14px);
+  pointer-events:none;
+}
+.coach-teaching-head{display:flex;align-items:baseline;gap:9px;min-width:0}
+.coach-teaching-head>span{
+  flex:0 0 auto;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#124260;
+  color:#9be3ff;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.coach-teaching-head>strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:#f1fbff;
+  font-size:13px;
+}
+.coach-teaching-operation{
+  margin-top:7px;
+  padding:6px 8px;
+  border-radius:9px;
+  background:#0c2232;
+  color:#8fc6df;
+  font-size:10px;
+  font-variant-numeric:tabular-nums;
+  line-height:1.45;
+}
+.coach-teaching-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin-top:9px;
+}
+.coach-teaching-grid p{
+  display:grid;
+  gap:3px;
+  min-width:0;
+  margin:0;
+  padding:8px 9px;
+  border:1px solid #1d3c50;
+  border-radius:10px;
+  background:#091c2a;
+  line-height:1.45;
+}
+.coach-teaching-grid b{color:#7fd7ff;font-size:9px;letter-spacing:.04em}
+.coach-teaching-grid span{color:#a9becd;font-size:10px}
+@media(max-width:760px){
+  .coach-teaching-card{
+    top:126px;
+    width:calc(100% - 24px);
+    padding:11px 12px;
+  }
+  .coach-teaching-grid{grid-template-columns:1fr}
+  .coach-teaching-head{align-items:flex-start;flex-direction:column;gap:5px}
+  .coach-teaching-head>strong{white-space:normal}
+}
