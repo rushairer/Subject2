@@ -48,6 +48,7 @@ test('coach curve plan drives the real physics through the real judge without pe
   let coach = createCoachRuntime()
   let course = createCurveRuntime()
   const infractions: string[] = []
+  let firstInfraction: { frame: number; x: number; z: number; heading: number; phase: string; ids: string[] } | null = null
   const dt = 0.02
 
   for (let frame = 0; frame < 5000 && !course.completed; frame++) {
@@ -131,6 +132,16 @@ test('coach right-angle plan drives the real physics through the real judge with
 
     const judged = updateRightAngle(vehicle, course, dt)
     course = judged.runtime
+    if (!firstInfraction && judged.infractions.length > 0) {
+      firstInfraction = {
+        frame,
+        x: vehicle.x,
+        z: vehicle.z,
+        heading: vehicle.heading,
+        phase: course.phase,
+        ids: judged.infractions.map(item => item.id),
+      }
+    }
     infractions.push(...judged.infractions.map(item => item.id))
   }
 
@@ -144,7 +155,7 @@ test('coach right-angle plan drives the real physics through the real judge with
       infractions: [...new Set(infractions)],
     }),
   )
-  assert.deepEqual(infractions, [])
+  assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
 })
 
 test('coach controller only completes after reaching the final waypoint', () => {
