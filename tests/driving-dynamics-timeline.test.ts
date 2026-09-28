@@ -350,7 +350,7 @@ test('hazard context window keeps only same-project samples within three seconds
   assert.equal(context.afterCoverageSeconds, 3)
   assert.equal(context.speedScaleMaxKmh, 30)
   assert.equal(context.steeringScaleTurns, 0.5)
-  assert.equal(context.triggerSample?.relativeTime, -0.09999999999999964)
+  assert.ok(Math.abs((context.triggerSample?.relativeTime ?? 99) + 0.1) < 1e-9)
   assert.equal(context.triggerSample?.throttlePercent, 20)
   assert.equal(context.triggerSample?.brakePercent, 30)
 })
@@ -380,7 +380,7 @@ test('hazard context window reports truncated recording coverage without inventi
   assert.equal(context.afterCoverageSeconds, 1.4)
   assert.equal(context.samples[0].throttlePercent, 100)
   assert.equal(context.samples[0].brakePercent, 0)
-  assert.equal(context.samples.at(-1)?.relativeTime, 1.4)
+  assert.equal(context.samples[context.samples.length - 1]?.relativeTime, 1.4)
   assert.equal(context.triggerSample?.relativeTime, 0)
 })
 
