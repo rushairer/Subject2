@@ -150,3 +150,30 @@ test('reaction chain ignores tiny speed and steering fluctuations used only as d
 
   assert.deepEqual(chain.steps.map(step => step.kind), ['trigger'])
 })
+
+
+test('reaction chain omits analyzer nodes beyond the visible or recorded context window', () => {
+  const marker = event({
+    kind: 'pedestrian',
+    label: '行人横穿',
+    response: {
+      brakeReactionSeconds: 0.5,
+      stopReactionSeconds: 3.5,
+      maximumBrake: 0.8,
+    },
+  })
+  const context = buildDrivingDynamicsEventContext([
+    sample(10, { speed: 15 / 3.6 }),
+    sample(10.5, { speed: 12 / 3.6, brake: 0.2 }),
+    sample(12, { speed: 8 / 3.6, brake: 0.8 }),
+  ], marker)
+
+  const chain = buildDrivingDynamicsReactionChain(context, marker)
+
+  assert.deepEqual(chain.steps.map(step => step.kind), [
+    'trigger',
+    'brake',
+    'speed',
+  ])
+  assert.equal(chain.steps.some(step => step.label === '车辆停止'), false)
+})
