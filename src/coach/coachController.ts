@@ -18,6 +18,8 @@ export interface CoachWaypoint {
   arrivalRadiusMeters?: number
   stop?: boolean
   holdSeconds?: number
+  /** Apply the parking brake after the vehicle has settled on this stop. */
+  handbrake?: boolean
   leftIndicator?: boolean
   rightIndicator?: boolean
   /** Signed curvature of the desired travel path, positive turns right. */
@@ -307,7 +309,10 @@ export function stepCoachController(
       steeringWheelTarget: runtime.completed ? 0 : steeringWheelTarget,
       gear: target.gear,
       engineOn: true,
-      handbrake: runtime.completed,
+      handbrake:
+        target.handbrake === true &&
+        nearStop &&
+        Math.abs(vehicle.speed) <= 0.06,
       seatbelt: true,
       leftIndicator: target.leftIndicator ?? false,
       rightIndicator: target.rightIndicator ?? false,
