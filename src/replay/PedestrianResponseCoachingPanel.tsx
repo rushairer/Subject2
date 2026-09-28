@@ -5,7 +5,7 @@ import {
   type PedestrianResponseCoachingEvent,
   type PedestrianResponseCoachingSample,
 } from '../coaching/pedestrianResponseCoaching'
-import { drivingDynamicsEventId } from './drivingDynamicsEvents'
+import { drivingDynamicsEventId } from './drivingDynamicsEventIdentity'
 
 function seconds(value: number | undefined) {
   return value == null ? '--' : `${value.toFixed(1)} 秒`
