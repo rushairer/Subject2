@@ -38,9 +38,17 @@ export function coachReferencePathForReplay(
     const target = subject2Project(to)
     if (!target) return []
 
-    const transition = subject2ExamTransitions(automatic)
+    let transitionAutomatic = automatic
+    let transition = subject2ExamTransitions(transitionAutomatic)
       .find(item => item.from === from && item.to === target)
-    const plan = subject2ContinuousCoachPlan(target, false, automatic)
+    if (!transition) {
+      transitionAutomatic = !automatic
+      transition = subject2ExamTransitions(transitionAutomatic)
+        .find(item => item.from === from && item.to === target)
+    }
+    const plan = transition
+      ? subject2ContinuousCoachPlan(target, false, transitionAutomatic)
+      : null
     if (!transition || !plan) return []
 
     return [
