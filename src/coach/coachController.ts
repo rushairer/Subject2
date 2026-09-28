@@ -20,6 +20,12 @@ export interface CoachWaypoint {
   holdSeconds?: number
   leftIndicator?: boolean
   rightIndicator?: boolean
+  /** Signed curvature of the desired travel path, positive turns right. */
+  pathCurvaturePerMeter?: number
+  /** Optional body-heading hold used on deterministic straight maneuver segments. */
+  headingHoldRadians?: number
+  /** Critical geometry points must be physically captured, never skipped by projection. */
+  requireCapture?: boolean
   label?: string
 }
 
@@ -28,6 +34,8 @@ export interface CoachPlan {
   title: string
   waypoints: readonly CoachWaypoint[]
   lookAheadWaypoints?: number
+  steeringGain?: number
+  curvatureFeedforwardBlend?: number
 }
 
 export interface CoachRuntime {
@@ -67,6 +75,30 @@ function distanceTo(
   to: Pick<CoachWaypoint, 'x' | 'z'>,
 ) {
   return Math.hypot(to.x - from.x, to.z - from.z)
+}
+
+function hasPassedWaypoint(
+  vehicle: Pick<CoachVehicleState, 'x' | 'z'>,
+  previous: Pick<CoachWaypoint, 'x' | 'z'>,
+  target: Pick<CoachWaypoint, 'x' | 'z'>,
+  corridorMeters?: number,
+) {
+  const segmentX = target.x - previous.x
+  const segmentZ = target.z - previous.z
+  const segmentLengthSquared = segmentX * segmentX + segmentZ * segmentZ
+  if (segmentLengthSquared < 1e-6) return false
+  const passedProjection =
+    (vehicle.x - target.x) * segmentX +
+    (vehicle.z - target.z) * segmentZ
+  const distanceFromTarget = Math.hypot(
+    vehicle.x - target.x,
+    vehicle.z - target.z,
+  )
+  const passCorridorMeters = corridorMeters ?? Math.max(
+    0.9,
+    Math.sqrt(segmentLengthSquared) * 2.4,
+  )
+  return passedProjection >= 0 && distanceFromTarget <= passCorridorMeters
 }
 
 export function createCoachRuntime(): CoachRuntime {
@@ -123,7 +155,24 @@ export function stepCoachController(
   let distance = distanceTo(vehicle, target)
   const arrivalRadius = target.arrivalRadiusMeters ?? 0.75
 
-  while (!target.stop && index < lastIndex && distance <= arrivalRadius) {
+  while (!target.stop && index < lastIndex) {
+    const previousTarget = index > 0 ? plan.waypoints[index - 1] : null
+    const curvedTarget = Math.abs(target.pathCurvaturePerMeter ?? 0) > 1e-5
+    const captureOnly = target.requireCapture === true
+    const passCorridorMeters = curvedTarget
+      ? Math.max(0.28, arrivalRadius * 2.5)
+      : undefined
+    const reached =
+      distance <= arrivalRadius ||
+      (!captureOnly &&
+        previousTarget != null &&
+        hasPassedWaypoint(
+          vehicle,
+          previousTarget,
+          target,
+          passCorridorMeters,
+        ))
+    if (!reached) break
     index += 1
     target = plan.waypoints[index]
     distance = distanceTo(vehicle, target)
@@ -152,10 +201,20 @@ export function stepCoachController(
   }
 
   const direction = target.gear
-  const steeringIndex = Math.min(
-    lastIndex,
-    runtime.waypointIndex + (plan.lookAheadWaypoints ?? 3),
-  )
+  let steeringIndex = runtime.waypointIndex
+  if (!target.stop) {
+    const lookAhead = plan.lookAheadWaypoints ?? 3
+    const segmentCurvature = target.pathCurvaturePerMeter ?? 0
+    for (let step = 0; step < lookAhead && steeringIndex < lastIndex; step++) {
+      const candidateIndex = steeringIndex + 1
+      const candidate = plan.waypoints[candidateIndex]
+      if (candidate.gear !== direction) break
+      const candidateCurvature = candidate.pathCurvaturePerMeter ?? 0
+      if (Math.abs(candidateCurvature - segmentCurvature) > 1e-5) break
+      steeringIndex = candidateIndex
+      if (candidate.stop) break
+    }
+  }
   const steeringTarget = plan.waypoints[steeringIndex]
   const steeringDistance = Math.max(0.5, distanceTo(vehicle, steeringTarget))
   const travelBearing = bearingTo(vehicle, steeringTarget)
@@ -163,9 +222,42 @@ export function stepCoachController(
     vehicle.heading + (direction < 0 ? Math.PI : 0),
   )
   const alpha = normalizeHeadingDelta(travelBearing - travelHeading)
-  const curvature = 2 * Math.sin(alpha) / steeringDistance
+  const pursuitCurvature =
+    2 * Math.sin(alpha) / steeringDistance * (plan.steeringGain ?? 1)
+  const feedforwardBlend = clamp(plan.curvatureFeedforwardBlend ?? 0, 0, 1)
+  let commandedCurvature = target.pathCurvaturePerMeter == null
+    ? pursuitCurvature
+    : target.pathCurvaturePerMeter * feedforwardBlend +
+      pursuitCurvature * (1 - feedforwardBlend)
+  if (target.headingHoldRadians != null) {
+    const reverseOffset = direction < 0 ? Math.PI : 0
+    const baseTravelHeading = normalizeHeadingDelta(
+      target.headingHoldRadians + reverseOffset,
+    )
+    const pathRightX = Math.cos(baseTravelHeading)
+    const pathRightZ = Math.sin(baseTravelHeading)
+    const crossTrackMeters =
+      (vehicle.x - target.x) * pathRightX +
+      (vehicle.z - target.z) * pathRightZ
+    const crossTrackHeading = clamp(
+      -Math.atan(crossTrackMeters * 0.75),
+      -0.18,
+      0.18,
+    )
+    const desiredTravelHeading = normalizeHeadingDelta(
+      baseTravelHeading + crossTrackHeading,
+    )
+    const desiredBodyHeading = normalizeHeadingDelta(
+      desiredTravelHeading - reverseOffset,
+    )
+    const headingError = normalizeHeadingDelta(
+      desiredBodyHeading - vehicle.heading,
+    )
+    commandedCurvature += clamp(headingError * 0.7, -0.08, 0.08)
+  }
   const roadWheelTarget = clamp(
-    Math.atan(DRIVING_RULES.steering.wheelbaseMeters * curvature) * direction,
+    Math.atan(DRIVING_RULES.steering.wheelbaseMeters * commandedCurvature) *
+      direction,
     -DRIVING_RULES.steering.roadWheelMaxAngleRadians,
     DRIVING_RULES.steering.roadWheelMaxAngleRadians,
   )
@@ -176,16 +268,27 @@ export function stepCoachController(
     DRIVING_RULES.steering.roadWheelMaxAngleRadians *
     maxSteeringWheelAngle
 
-  const requestedSpeed = nearStop ? 0 : Math.max(0, target.targetSpeedMps)
+  const requestedSpeed = nearStop
+    ? 0
+    : target.stop
+      ? clamp(distance * 0.5, 0.04, 0.48)
+      : Math.max(0, target.targetSpeedMps)
   const alongSpeed = vehicle.speed * direction
   let throttle = 0
   let brake = 0
 
-  if (alongSpeed < -0.04) {
+  if (nearStop) {
+    brake = 0.58
+  } else if (alongSpeed < -0.04) {
     brake = 0.85
-  } else if (alongSpeed > requestedSpeed + 0.12) {
+  } else if (target.stop && alongSpeed > requestedSpeed + 0.02) {
+    // Automatic creep is strong enough to drift through a precision stop if
+    // we reuse the normal cruising dead-band. Keep a light brake bias while
+    // converging on a stop point, then clamp firmly inside its capture radius.
+    brake = clamp(0.1 + (alongSpeed - requestedSpeed) * 1.1, 0.1, 0.68)
+  } else if (!target.stop && alongSpeed > requestedSpeed + 0.12) {
     brake = clamp((alongSpeed - requestedSpeed) * 0.75, 0.12, 0.7)
-  } else if (requestedSpeed > 0 && alongSpeed < requestedSpeed - 0.05) {
+  } else if (!target.stop && requestedSpeed > 0 && alongSpeed < requestedSpeed - 0.05) {
     throttle = clamp(0.18 + (requestedSpeed - Math.max(0, alongSpeed)) * 0.2, 0.18, 0.42)
   }
 
