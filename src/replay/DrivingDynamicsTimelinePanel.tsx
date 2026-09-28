@@ -31,6 +31,10 @@ import {
   type DrivingDynamicsHazardFilter,
   type DrivingDynamicsHazardKindFilter,
 } from './drivingDynamicsHazardFilter'
+import {
+  buildDrivingDynamicsHazardComparisons,
+  type DrivingDynamicsHazardComparisonGroup,
+} from './drivingDynamicsHazardComparison'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -224,6 +228,128 @@ function sessionTimeLabel(seconds: number) {
   const minutes = Math.floor(seconds / 60)
   const remainder = Math.round(seconds % 60)
   return `${minutes}m ${remainder}s`
+}
+
+function comparisonSeconds(value: number | undefined) {
+  return value == null ? '—' : `${value.toFixed(1)}s`
+}
+
+function comparisonSpeed(value: number | undefined) {
+  return value == null ? '—' : `${value.toFixed(1)} km/h`
+}
+
+function comparisonSteering(value: number | undefined) {
+  return value == null ? '—' : `${value.toFixed(2)} 圈`
+}
+
+function HazardPeerComparison({
+  groups,
+  sessionStartTime,
+  selectedEventId,
+  onSelect,
+}: {
+  groups: readonly DrivingDynamicsHazardComparisonGroup[]
+  sessionStartTime: number
+  selectedEventId?: string | null
+  onSelect: (eventId: string) => void
+}) {
+  if (groups.length === 0) return null
+
+  return <div className="replay-hazard-comparison" aria-label="同类风险事件横向对比">
+    <div className="replay-hazard-comparison-head">
+      <span>
+        <small>PEER EVENT COMPARISON</small>
+        <b>同类风险事件横向对比</b>
+      </span>
+      <em>只比较当前筛选结果中重复出现的同类事件，不做排名或评分。</em>
+    </div>
+
+    {groups.map(group => <section
+      className={`replay-hazard-comparison-group ${group.kind}`}
+      key={group.kind}
+      aria-label={`${group.label}横向对比`}
+    >
+      <div className="replay-hazard-comparison-group-head">
+        <span className={`replay-hazard-kind ${group.kind}`}>{group.glyph}</span>
+        <span>
+          <b>{group.label}</b>
+          <small>{group.items.length} 次同类事件 · 按真实触发时间排序</small>
+        </span>
+      </div>
+
+      <div className="replay-hazard-comparison-table-wrap">
+        <table className="replay-hazard-comparison-table">
+          <thead>
+            <tr>
+              <th scope="col">对比项</th>
+              {group.items.map((item, index) => {
+                const selected = item.id === selectedEventId
+                return <th
+                  scope="col"
+                  key={item.id}
+                  className={selected ? 'selected' : ''}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => onSelect(item.id)}
+                  >
+                    <b>第 {index + 1} 次</b>
+                    <small>
+                      {sessionTimeLabel(Math.max(0, item.triggerTime - sessionStartTime))}
+                    </small>
+                  </button>
+                </th>
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">触发速度</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSpeed(item.triggerSpeedKmh)}
+              </td>)}
+            </tr>
+            <tr>
+              <th scope="row">松油门</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSeconds(item.throttleReleaseSeconds)}
+              </td>)}
+            </tr>
+            <tr>
+              <th scope="row">开始制动</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSeconds(item.brakeReactionSeconds)}
+              </td>)}
+            </tr>
+            <tr>
+              <th scope="row">车辆停止</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSeconds(item.stopReactionSeconds)}
+              </td>)}
+            </tr>
+            <tr>
+              <th scope="row">触发后 3 秒最低车速</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSpeed(item.minimumPostTriggerSpeedKmh)}
+              </td>)}
+            </tr>
+            <tr>
+              <th scope="row">方向盘变化</th>
+              {group.items.map(item => <td key={item.id}>
+                {comparisonSteering(item.steeringChangeTurns)}
+              </td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        “—”表示当前证据没有该指标。松油门/制动/停车来自既有教练分析器；
+        最低车速固定取触发后 3 秒真实轨迹窗口，方向盘变化仅显示已有结构化证据。
+      </p>
+    </section>)}
+  </div>
 }
 
 function HazardSessionOverview({
@@ -622,6 +748,13 @@ export function DrivingDynamicsTimeline({
     () => new Set(filteredEvents.map(event => event.id)),
     [filteredEvents],
   )
+  const hazardComparisons = useMemo(
+    () => buildDrivingDynamicsHazardComparisons(
+      model.samples,
+      filteredEvents,
+    ),
+    [filteredEvents, model.samples],
+  )
   const [cursorIndex, setCursorIndex] = useState(0)
   const selection = drivingDynamicsEventSelection(filteredEvents, selectedEventId)
   const selectedEvent = selectedEventId
@@ -801,6 +934,16 @@ export function DrivingDynamicsTimeline({
         filteredEventIds={filteredEventIds}
         filteredCount={filterResult.filtered}
         onFilterChange={setHazardFilter}
+        onSelect={eventId => {
+          const event = filteredEvents.find(item => item.id === eventId)
+          if (event) focusEvent(event, { scroll: false })
+        }}
+      />
+
+      <HazardPeerComparison
+        groups={hazardComparisons}
+        sessionStartTime={model.startTime}
+        selectedEventId={selectedEventId}
         onSelect={eventId => {
           const event = filteredEvents.find(item => item.id === eventId)
           if (event) focusEvent(event, { scroll: false })
