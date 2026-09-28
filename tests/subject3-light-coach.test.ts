@@ -12,10 +12,13 @@ import {
   type NightLightAnswer,
 } from '../src/subject3/nightLightExam'
 
-function runCoachAnswer(answer: NightLightAnswer) {
-  const vehicle = { lowBeam: false, highBeam: false }
+function runCoachAnswer(
+  answer: NightLightAnswer,
+  initial = { lowBeam: false, highBeam: false },
+) {
+  const vehicle = { ...initial }
   const attempt = createNightLightAttempt()
-  const sequence = subject3LightCoachSequence(answer)
+  const sequence = subject3LightCoachSequence(answer, vehicle)
 
   for (const action of sequence) {
     applySubject3LightCoachAction(vehicle, attempt, action)
@@ -29,6 +32,7 @@ test('coach near-beam preflight still requires one real recorded action', () => 
   const { vehicle, attempt, sequence } = runCoachAnswer('low')
 
   assert.equal(sequence.length, 1)
+  assert.equal(sequence[0]!.control, 'low-toggle')
   assert.equal(attempt.actionCount, 1)
   assert.equal(vehicle.lowBeam, true)
   assert.equal(vehicle.highBeam, false)
@@ -38,13 +42,72 @@ test('coach near-beam preflight still requires one real recorded action', () => 
   )
 })
 
-test('coach flash preflight performs high beam then returns to low beam', () => {
+test('near-beam prompt performs two real L toggles when low beam is already on', () => {
+  const { vehicle, attempt, sequence } = runCoachAnswer(
+    'low',
+    { lowBeam: true, highBeam: false },
+  )
+
+  assert.deepEqual(
+    sequence.map(action => action.control),
+    ['low-toggle', 'low-toggle'],
+  )
+  assert.equal(attempt.actionCount, 2)
+  assert.equal(vehicle.lowBeam, true)
+  assert.equal(vehicle.highBeam, false)
+  assert.equal(
+    nightLightAnswerSatisfied('low', attempt, vehicle),
+    true,
+  )
+})
+
+test('near-beam prompt closes an existing high beam with the real K toggle', () => {
+  const { vehicle, attempt, sequence } = runCoachAnswer(
+    'low',
+    { lowBeam: true, highBeam: true },
+  )
+
+  assert.deepEqual(
+    sequence.map(action => action.control),
+    ['high-toggle'],
+  )
+  assert.equal(vehicle.lowBeam, true)
+  assert.equal(vehicle.highBeam, false)
+  assert.equal(
+    nightLightAnswerSatisfied('low', attempt, vehicle),
+    true,
+  )
+})
+
+test('coach flash preflight mirrors K on then K off and returns to low beam', () => {
   const { vehicle, attempt, sequence } = runCoachAnswer('flash')
 
-  assert.equal(sequence.length, 2)
-  assert.equal(sequence[0]!.highBeam, true)
-  assert.equal(sequence[1]!.lowBeam, true)
+  assert.deepEqual(
+    sequence.map(action => action.control),
+    ['high-toggle', 'high-toggle'],
+  )
   assert.equal(attempt.actionCount, 2)
+  assert.equal(attempt.sawHighBeam, true)
+  assert.equal(attempt.sawLowBeamAfterHigh, true)
+  assert.equal(vehicle.lowBeam, true)
+  assert.equal(vehicle.highBeam, false)
+  assert.equal(
+    nightLightAnswerSatisfied('flash', attempt, vehicle),
+    true,
+  )
+})
+
+test('flash prompt first clears a pre-existing high beam before starting a fresh flash attempt', () => {
+  const { vehicle, attempt, sequence } = runCoachAnswer(
+    'flash',
+    { lowBeam: true, highBeam: true },
+  )
+
+  assert.deepEqual(
+    sequence.map(action => action.control),
+    ['high-toggle', 'high-toggle', 'high-toggle'],
+  )
+  assert.equal(attempt.actionCount, 3)
   assert.equal(attempt.sawHighBeam, true)
   assert.equal(attempt.sawLowBeamAfterHigh, true)
   assert.equal(vehicle.lowBeam, true)
