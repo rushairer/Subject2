@@ -84,6 +84,12 @@ function subject2Teaching(action: string): Pick<CoachTeachingHint, 'reason' | 'w
 }
 
 function subject3Teaching(action: string): Pick<CoachTeachingHint, 'reason' | 'watch'> {
+  if (/灯光预检/.test(action)) {
+    return {
+      reason: '模拟灯光考试按语音口令逐题操作：会车和近距离跟车保持近光，通过无信号路口或人行横道要完成远光再切回近光的完整交替。',
+      watch: '先听完整口令再操作；近光题确认远光关闭，交替题确认出现过远光且最终回到近光。',
+    }
+  }
   if (/急刹/.test(action)) {
     return {
       reason: '前车速度骤降时先释放动力并建立制动，优先恢复安全纵向间距，而不是临时急打方向。',
