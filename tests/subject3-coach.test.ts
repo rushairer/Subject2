@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS,
   createSubject3CoachRuntime,
   stepSubject3Coach,
 } from '../src/coach/subject3Coach'
@@ -22,6 +23,12 @@ import {
   updateSubject3TrafficHazard,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
+import {
+  SUBJECT3_PRACTICE_SLICES,
+  subject3PracticeRuntimeSeed,
+  subject3PracticeSliceById,
+  type Subject3PracticeSliceId,
+} from '../src/subject3/subject3Practice'
 
 type IntegratedVehicle = PhysicsVehicle & Subject3Vehicle
 
@@ -115,7 +122,7 @@ function runSubject3Coach(automatic: boolean) {
       : 0
 
     if (
-      projectToSubject3Route(vehicle.x, vehicle.z).progress >= 4180 &&
+      projectToSubject3Route(vehicle.x, vehicle.z).progress >= SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS &&
       Math.abs(vehicle.speed) < 0.05
     ) {
       vehicle.speed = 0
@@ -176,6 +183,134 @@ for (const automatic of [false, true]) {
   test(`${automatic ? 'C2' : 'C1'} production Subject 3 coach completes the full real-physics route without infractions`, () => {
     runSubject3Coach(automatic)
   })
+}
+
+function runSubject3PracticeCoach(
+  automatic: boolean,
+  practiceSlice: Subject3PracticeSliceId,
+) {
+  const dt = 0.05
+  const slice = subject3PracticeSliceById(practiceSlice)
+  const vehicle = vehicleAtProgress(slice.startDistance)
+  vehicle.engineOn = false
+  vehicle.gear = 0
+  vehicle.handbrake = true
+  vehicle.clutch = automatic ? 0 : 1
+
+  let coach = createSubject3CoachRuntime()
+  let course = createSubject3Runtime(
+    subject3PracticeRuntimeSeed(practiceSlice),
+  )
+  const traffic = createSubject3TrafficState()
+  let stallCount = 0
+
+  for (let frame = 0; frame < 12_000 && !course.completed; frame++) {
+    const next = stepSubject3Coach(
+      vehicle,
+      coach,
+      dt,
+      automatic,
+      false,
+      traffic,
+      practiceSlice,
+    )
+    coach = next.runtime
+    const command = next.command
+
+    vehicle.engineOn = command.engineOn
+    vehicle.handbrake = command.handbrake
+    vehicle.seatbelt = command.seatbelt
+    vehicle.gear = command.gear
+    vehicle.leftIndicator = command.leftIndicator
+    vehicle.rightIndicator = command.rightIndicator
+    vehicle.lowBeam = command.lowBeam
+    vehicle.highBeam = command.highBeam
+    vehicle.horn = command.horn
+    vehicle.lookLeft = command.lookLeft
+    vehicle.lookRight = command.lookRight
+    vehicle.lookBack = command.lookBack
+
+    const physics = stepVehiclePhysics(vehicle, {
+      throttle: command.throttle,
+      brake: command.brake,
+      clutch: command.clutch,
+      steer: 0,
+      steeringWheelTarget: command.steeringWheelTarget,
+    }, dt, {
+      automatic,
+      grade: 0,
+    })
+    if (physics.stalled) stallCount += 1
+
+    vehicle.leftSignalAge = vehicle.leftIndicator
+      ? vehicle.leftSignalAge + dt
+      : 0
+    vehicle.rightSignalAge = vehicle.rightIndicator
+      ? vehicle.rightSignalAge + dt
+      : 0
+
+    if (
+      practiceSlice === 'pull-over' &&
+      projectToSubject3Route(vehicle.x, vehicle.z).progress >=
+        SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS &&
+      Math.abs(vehicle.speed) < 0.05
+    ) {
+      vehicle.speed = 0
+      vehicle.gear = 0
+      vehicle.handbrake = true
+      if (!automatic) vehicle.clutch = 1
+    }
+
+    const result = updateSubject3(
+      vehicle,
+      course,
+      automatic,
+      false,
+      dt,
+      traffic,
+      false,
+      practiceSlice,
+    )
+    course = result.runtime
+    const projection = projectToSubject3Route(vehicle.x, vehicle.z)
+
+    assert.deepEqual(
+      result.infractions,
+      [],
+      JSON.stringify({
+        automatic,
+        practiceSlice,
+        frame,
+        progress: projection.progress,
+        lateral: projection.lateral,
+        speedKmh: Math.abs(vehicle.speed) * 3.6,
+        gear: vehicle.gear,
+        clutch: vehicle.clutch,
+        event: SUBJECT3_EVENTS[course.eventIndex]?.id ?? 'done',
+        status: command.status,
+        infractions: result.infractions.map(item => item.id),
+      }),
+    )
+  }
+
+  assert.equal(
+    stallCount,
+    0,
+    `${automatic ? 'C2' : 'C1'} ${practiceSlice} must not stall`,
+  )
+  assert.equal(
+    course.completed,
+    true,
+    `${automatic ? 'C2' : 'C1'} ${practiceSlice} should complete`,
+  )
+}
+
+for (const automatic of [false, true]) {
+  for (const slice of SUBJECT3_PRACTICE_SLICES) {
+    test(`${automatic ? 'C2' : 'C1'} Subject 3 coach completes ${slice.id} practice through real physics without infractions`, () => {
+      runSubject3PracticeCoach(automatic, slice.id)
+    })
+  }
 }
 
 test('Subject 3 coach brakes for a same-lane sudden-brake vehicle', () => {
@@ -269,9 +404,11 @@ test('Subject 3 coach stops for a live pedestrian conflict', () => {
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 
-test('full Subject 3 exposes coach takeover only after the light preflight', () => {
+test('full and targeted Subject 3 sessions expose the same production coach after preflight', () => {
   assert.match(app, /stepSubject3Coach\(/)
+  assert.match(app, /session\.subject3Practice/)
   assert.match(app, /activeExamId === 'subject3'/)
-  assert.match(app, /lightTestDone && session\.subject3Practice == null/)
+  assert.match(app, /\? lightTestDone/)
+  assert.doesNotMatch(app, /lightTestDone && session\.subject3Practice == null/)
   assert.match(app, /subject3Traffic\.current/)
 })
