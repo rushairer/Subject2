@@ -5,6 +5,12 @@ import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY, SLOPE_START } from '../subject2/SlopeStartCourse'
 import type { Subject2ProjectId } from '../subject2/courseStartPoses'
+import { normalizeHeadingDelta } from '../sim/vehicleFrame'
+import { localPointToWorld } from '../subject2/courseTransform'
+import {
+  SUBJECT2_EXAM_PLACEMENTS,
+  subject2ExamTransitions,
+} from '../subject2/subject2ExamLayout'
 import type { CoachPlan, CoachWaypoint } from './coachController'
 
 function curveWaypoints(): CoachWaypoint[] {
@@ -751,4 +757,80 @@ export function subject2CoachPlan(project: Subject2ProjectId): CoachPlan | null 
 
 export function subject2CoachSupported(project: Subject2ProjectId) {
   return subject2CoachPlan(project) !== null
+}
+
+function worldCoachPlan(
+  project: Subject2ProjectId,
+  localPlan: CoachPlan,
+): CoachPlan {
+  const placement = SUBJECT2_EXAM_PLACEMENTS[project]
+  return {
+    ...localPlan,
+    id: `continuous:${project}`,
+    title: `${localPlan.title} · 连续考试`,
+    waypoints: localPlan.waypoints.map(waypoint => {
+      const point = localPointToWorld(waypoint, placement)
+      return {
+        ...waypoint,
+        ...point,
+        headingHoldRadians:
+          waypoint.headingHoldRadians == null
+            ? undefined
+            : normalizeHeadingDelta(
+                waypoint.headingHoldRadians + placement.heading,
+              ),
+      }
+    }),
+  }
+}
+
+function transitionCoachPlan(
+  project: Subject2ProjectId,
+  automatic: boolean,
+): CoachPlan | null {
+  const transition = subject2ExamTransitions(automatic)
+    .find(item => item.to === project)
+  if (!transition) return null
+
+  const dx = transition.end.x - transition.start.x
+  const dz = transition.end.z - transition.start.z
+  const distance = Math.hypot(dx, dz)
+  if (distance < 0.1) return null
+  const heading = Math.atan2(dx, -dz)
+  const steps = Math.max(2, Math.ceil(distance / 2.2))
+  const waypoints: CoachWaypoint[] = []
+
+  for (let index = 1; index <= steps; index++) {
+    const progress = index / steps
+    waypoints.push({
+      x: transition.start.x + dx * progress,
+      z: transition.start.z + dz * progress,
+      targetSpeedMps: index === steps ? 0.9 : 1.45,
+      gear: 1,
+      arrivalRadiusMeters: index === steps ? 0.55 : 0.9,
+      pathCurvaturePerMeter: 0,
+      headingHoldRadians: heading,
+      label: `连接道路 · 前往${subject2CoachPlan(project)?.title.replace('教练示范', '') ?? project}`,
+    })
+  }
+
+  return {
+    id: `continuous-transition:${transition.from}:${transition.to}`,
+    title: `连接道路 · ${transition.from} → ${transition.to}`,
+    waypoints,
+    lookAheadWaypoints: 3,
+    steeringGain: 0.65,
+    curvatureFeedforwardBlend: 1,
+  }
+}
+
+export function subject2ContinuousCoachPlan(
+  project: Subject2ProjectId,
+  entered: boolean,
+  automatic: boolean,
+): CoachPlan | null {
+  const localPlan = subject2CoachPlan(project)
+  if (!localPlan) return null
+  if (entered) return worldCoachPlan(project, localPlan)
+  return transitionCoachPlan(project, automatic)
 }

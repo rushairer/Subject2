@@ -8,7 +8,7 @@ import { RightAngleCourse, createRightAngleRuntime, updateRightAngle } from './s
 import { CurveDrivingCourse, createCurveRuntime, updateCurveDriving } from './subject2/CurveDrivingCourse'
 import { subject2StartPose, type Subject2ProjectId } from './subject2/courseStartPoses'
 import { Subject2ExamCourse } from './subject2/Subject2ExamCourse'
-import { SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose, subject2ProjectJudgingEnabled } from './subject2/subject2ExamLayout'
+import { SUBJECT2_EXAM_ENTRY_CAPTURE_METERS, SUBJECT2_EXAM_PLACEMENTS, subject2ExamDistanceToStart, subject2ExamLocalVehicle, subject2ExamSequence, subject2ExamWorldStartPose, subject2ProjectJudgingEnabled } from './subject2/subject2ExamLayout'
 import { SlopeStartCourse, createSlopeRuntime, getSlopePose, updateSlopeStart } from './subject2/SlopeStartCourse'
 import { DrivingCockpit } from './cockpit/DrivingCockpit'
 import { DrivingLighting } from './cockpit/DrivingLighting'
@@ -32,7 +32,7 @@ import {
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { createCoachRuntime, stepCoachController } from './coach/coachController'
-import { subject2CoachPlan, subject2CoachSupported } from './coach/subject2Coach'
+import { subject2CoachPlan, subject2CoachSupported, subject2ContinuousCoachPlan } from './coach/subject2Coach'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
@@ -439,6 +439,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const coachRuntime = useRef(createCoachRuntime())
   const coachWasActive = useRef(false)
   const lastCoachStatus = useRef('')
+  const activeCoachPlanId = useRef('')
 
   const startHorn = () => {
     if (hornNodes.current) return
@@ -578,6 +579,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       coachRuntime.current = createCoachRuntime()
       coachWasActive.current = false
       lastCoachStatus.current = ''
+      activeCoachPlanId.current = ''
     }
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
@@ -605,9 +607,20 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       dt,
     })
 
-    const coachPlan = !continuousExam && session.examId !== 'subject3'
-      ? subject2CoachPlan(session.examId as Subject2ProjectId)
-      : null
+    const coachPlan = session.examId === 'subject3'
+      ? null
+      : continuousExam
+        ? subject2ContinuousCoachPlan(
+            session.examId as Subject2ProjectId,
+            projectJudgingEnabled,
+            automatic,
+          )
+        : subject2CoachPlan(session.examId as Subject2ProjectId)
+    if ((coachPlan?.id ?? '') !== activeCoachPlanId.current) {
+      activeCoachPlanId.current = coachPlan?.id ?? ''
+      coachRuntime.current = createCoachRuntime()
+      lastCoachStatus.current = ''
+    }
     if (coachActive && !coachWasActive.current) {
       coachRuntime.current = createCoachRuntime()
       lastCoachStatus.current = ''
@@ -1099,20 +1112,20 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
-  const coachSupported = !combinedExam && activeExamId !== 'subject3' && subject2CoachSupported(activeExamId as Subject2ProjectId)
+  const coachSupported = activeExamId !== 'subject3' && (combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId))
   const navigatingToProject = combinedExam && !activeEntryReached
   const hudProjectStatus = navigatingToProject
     ? `连接道路 · 前往${examTitle(activeExamId)} · 距入口约 ${Math.max(1, Math.ceil(activeEntryDistance))} m`
     : projectStatus
 
   useEffect(() => {
-    setCoachActive(false)
+    if (!combinedExam) setCoachActive(false)
     setCoachStatus('')
-  }, [activeExamId])
+  }, [activeExamId, combinedExam])
 
   useEffect(() => {
     if (!combinedExam || activeEntryReached) return
-    if (activeEntryDistance <= 6) setProgress(current => enterExamProject(current, activeExamId))
+    if (activeEntryDistance <= SUBJECT2_EXAM_ENTRY_CAPTURE_METERS) setProgress(current => enterExamProject(current, activeExamId))
   }, [activeEntryDistance, activeEntryReached, activeExamId, combinedExam])
 
   useEffect(() => {
