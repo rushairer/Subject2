@@ -297,6 +297,10 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Only nodes inside the actual visible context coverage may appear in the chain. Analyzer evidence beyond the current ±3 s window stays out of the summary even when a wider coaching analyzer observed it.
 - Trajectory-derived speed wording may surface only when the post-trigger recorded minimum is at least 1 km/h below the trigger-near sample. Steering wording is allowed only when the existing analyzer already reported at least 0.05 turns of change and the context samples corroborate it. These are display-noise filters, never scoring thresholds.
 - When the evidence supports no post-trigger node, render the trigger alone and explicitly tell the user to inspect the continuous curves rather than inventing a response.
+- Session-wide hazard overview counts must aggregate only the already-built replay event markers and their structured response evidence. Do not rerun hazard detection, infer missing responses, or convert aggregate counts into scores or quality labels.
+- Session overview timeline positions use each event's real `triggerTime` against the recorded replay start/end range. The overview may sort by trigger time even when a detail marker uses a later representative evidence time.
+- Overview response counts must be worded as “recorded” evidence (for example recorded brake response or recorded stop), never as proof that uncounted events lacked a valid evasive response.
+- Clicking an overview marker must reuse the shared event selection/focus path and keep the overview in place for rapid browsing.
 
 ## Replay driving dynamics timeline
 
