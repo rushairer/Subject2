@@ -1,3 +1,4 @@
+import { DRIVING_RULES } from '../rules/drivingRules'
 import { CURVE_CENTERLINE } from '../subject2/CurveDrivingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import type { Subject2ProjectId } from '../subject2/courseStartPoses'
@@ -16,21 +17,29 @@ function curveWaypoints(): CoachWaypoint[] {
 
 function rightAngleWaypoints(): CoachWaypoint[] {
   const g = RIGHT_ANGLE_GEOMETRY
-  const radius = 2.3
-  const innerCorner = {
-    x: -g.half,
-    z: g.cornerCenterZ + g.half,
+  const approachX = 0.62
+  const turnStartZ = -1.18
+  const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
+  const rearTurnRadius =
+    DRIVING_RULES.steering.wheelbaseMeters /
+    Math.tan(DRIVING_RULES.steering.roadWheelMaxAngleRadians)
+  const turnCenter = {
+    x: approachX - rearTurnRadius,
+    z: turnStartZ + rearAxle,
   }
-  const approachX = innerCorner.x + radius
+  const startVector = {
+    x: rearTurnRadius,
+    z: -rearAxle,
+  }
   const waypoints: CoachWaypoint[] = []
 
-  for (let z = 6.6; z > innerCorner.z; z -= 0.6) {
+  for (let z = 6.6; z > turnStartZ; z -= 0.55) {
     waypoints.push({
       x: approachX,
       z,
-      targetSpeedMps: z > 1 ? 0.95 : 0.82,
+      targetSpeedMps: z > 1 ? 0.92 : 0.72,
       gear: 1,
-      arrivalRadiusMeters: 0.68,
+      arrivalRadiusMeters: 0.62,
       leftIndicator: true,
       label: z > 1
         ? '直角转弯示范 · 靠右低速进场'
@@ -39,46 +48,55 @@ function rightAngleWaypoints(): CoachWaypoint[] {
   }
   waypoints.push({
     x: approachX,
-    z: innerCorner.z,
-    targetSpeedMps: 0.78,
+    z: turnStartZ,
+    targetSpeedMps: 0.65,
     gear: 1,
-    arrivalRadiusMeters: 0.62,
+    arrivalRadiusMeters: 0.5,
     leftIndicator: true,
     label: '直角转弯示范 · 到达转向起点',
   })
 
-  const arcSteps = 22
+  const arcSteps = 30
+  let exitX = approachX
+  let exitZ = turnStartZ
   for (let index = 1; index <= arcSteps; index++) {
     const theta = -Math.PI / 2 * (index / arcSteps)
+    const cos = Math.cos(theta)
+    const sin = Math.sin(theta)
+    const rotatedX = startVector.x * cos - startVector.z * sin
+    const rotatedZ = startVector.x * sin + startVector.z * cos
+    const x = turnCenter.x + rotatedX
+    const z = turnCenter.z + rotatedZ
+    exitX = x
+    exitZ = z
     waypoints.push({
-      x: innerCorner.x + radius * Math.cos(theta),
-      z: innerCorner.z + radius * Math.sin(theta),
-      targetSpeedMps: 0.72,
+      x,
+      z,
+      targetSpeedMps: 0.62,
       gear: 1,
       arrivalRadiusMeters: 0.48,
-      leftIndicator: true,
-      label: '直角转弯示范 · 连续左转，保持内轮差余量',
+      leftIndicator: theta > -1.28,
+      label: theta > -1.28
+        ? '直角转弯示范 · 按车辆最小转弯半径连续左转'
+        : '直角转弯示范 · 出弯回正并关闭左转向灯',
     })
   }
 
-  const exitZ = innerCorner.z - radius
-  for (let x = -2.45; x > -7.0; x -= 0.65) {
+  for (let x = exitX - 0.55; x > -7.0; x -= 0.55) {
     waypoints.push({
       x,
       z: exitZ,
-      targetSpeedMps: x > -4 ? 0.82 : 0.95,
+      targetSpeedMps: 0.82,
       gear: 1,
-      arrivalRadiusMeters: 0.58,
-      leftIndicator: x > -4.05,
-      label: x > -4.05
-        ? '直角转弯示范 · 出弯回正'
-        : '直角转弯示范 · 关闭左转向灯并直线驶出',
+      arrivalRadiusMeters: 0.52,
+      leftIndicator: false,
+      label: '直角转弯示范 · 保持直线驶出',
     })
   }
   waypoints.push({
     x: -7.38,
     z: exitZ,
-    targetSpeedMps: 0.82,
+    targetSpeedMps: 0.78,
     gear: 1,
     arrivalRadiusMeters: 0.1,
     leftIndicator: false,
