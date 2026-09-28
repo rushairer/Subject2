@@ -4,8 +4,9 @@ import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
 import { SLOPE_GEOMETRY } from '../subject2/SlopeStartCourse'
-import { SUBJECT3_ROUTE } from '../subject3/subject3Route'
+import { SUBJECT3_ROUTE, poseAtRouteDistance } from '../subject3/subject3Route'
 import {
+  subject3PracticeSliceById,
   subject3PracticeSliceTitle,
   type Subject3PracticeSliceId,
 } from '../subject3/subject3Practice'
@@ -158,7 +159,10 @@ function offsetPolyline(points: ReplayPoint[], offset: number): ReplayPoint[] {
   })
 }
 
-function referenceLinesForProject(project: string): ReferenceLine[] {
+function referenceLinesForProject(
+  project: string,
+  subject3Practice?: Subject3PracticeSliceId,
+): ReferenceLine[] {
   if (project === 'reverse-parking') {
     const g = REVERSE_PARKING_GEOMETRY
     return [
@@ -203,7 +207,24 @@ function referenceLinesForProject(project: string): ReferenceLine[] {
   }
 
   if (project === 'subject3') {
-    return [{ points: SUBJECT3_ROUTE, kind: 'guide' }]
+    if (!subject3Practice) {
+      return [{ points: SUBJECT3_ROUTE, kind: 'guide' }]
+    }
+
+    const slice = subject3PracticeSliceById(subject3Practice)
+    const points: ReplayPoint[] = []
+    const stepMeters = 5
+    for (
+      let progress = slice.startDistance;
+      progress < slice.endDistance;
+      progress += stepMeters
+    ) {
+      const pose = poseAtRouteDistance(progress)
+      points.push({ x: pose.x, z: pose.z })
+    }
+    const end = poseAtRouteDistance(slice.endDistance)
+    points.push({ x: end.x, z: end.z })
+    return [{ points, kind: 'guide' }]
   }
 
   return []
@@ -215,12 +236,14 @@ function PathMap({
   infractions,
   cursorIndex,
   coachReference,
+  subject3Practice,
 }: {
   project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   cursorIndex: number
   coachReference: CoachReferencePoint[]
+  subject3Practice?: Subject3PracticeSliceId
 }) {
   const width = 640
   const height = 310
@@ -232,7 +255,10 @@ function PathMap({
     ...sample,
     ...toReplayLocal(sample, frame),
   }))
-  const localReferences = referenceLinesForProject(project).map(line => ({
+  const localReferences = referenceLinesForProject(
+    project,
+    subject3Practice,
+  ).map(line => ({
     ...line,
     points: line.points.map(point => toReplayLocal(point, frame)),
   }))
@@ -489,6 +515,7 @@ function ProjectReplay({
   focusTime,
   focusToken,
   focusScroll = true,
+  subject3Practice,
 }: {
   project: string
   samples: TrajectorySample[]
@@ -496,6 +523,7 @@ function ProjectReplay({
   focusTime?: number
   focusToken?: number
   focusScroll?: boolean
+  subject3Practice?: Subject3PracticeSliceId
 }) {
   const [cursorIndex, setCursorIndex] = useState(samples.length - 1)
   const articleRef = useRef<HTMLElement>(null)
@@ -526,8 +554,12 @@ function ProjectReplay({
   const stats = pathStats(samples)
   const automatic = samples.find(sample => sample.automatic != null)?.automatic ?? true
   const coachReference = useMemo(
-    () => coachReferencePathForReplay(project, automatic),
-    [project, automatic],
+    () => coachReferencePathForReplay(
+      project,
+      automatic,
+      project === 'subject3' ? subject3Practice : undefined,
+    ),
+    [project, automatic, subject3Practice],
   )
   const coachDeviation = useMemo(
     () => coachDeviationStats(samples, coachReference),
@@ -538,7 +570,11 @@ function ProjectReplay({
 
   return <article className="replay-project" ref={articleRef}>
     <div className="replay-project-title">
-      <strong>{projectLabel(project)}</strong>
+      <strong>{
+        project === 'subject3' && subject3Practice
+          ? `科目三专项 · ${subject3PracticeSliceById(subject3Practice).title}`
+          : projectLabel(project)
+      }</strong>
       <div>
         <span>{stats.distance >= 1000 ? `${(stats.distance / 1000).toFixed(2)} km` : `${Math.round(stats.distance)} m`}</span>
         <span>最高 {Math.round(stats.maxSpeed)} km/h</span>
@@ -554,6 +590,7 @@ function ProjectReplay({
       infractions={infractions}
       cursorIndex={safeCursorIndex}
       coachReference={coachReference}
+      subject3Practice={subject3Practice}
     />
 
     <div className="replay-scrubber">
@@ -617,12 +654,14 @@ export function ExamReplay({
   onStartTraining,
   onStartTrainingPack,
   onStartSubject3Practice,
+  subject3Practice,
 }: {
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   onStartTraining?: (project: ReplayTrainingProjectId) => void
   onStartTrainingPack?: (packId: TrainingPackId) => void
   onStartSubject3Practice?: (slice: Subject3PracticeSliceId) => void
+  subject3Practice?: Subject3PracticeSliceId
 }): ReactElement | null {
   const [focusRequest, setFocusRequest] = useState<{
     project: string
@@ -733,6 +772,7 @@ export function ExamReplay({
           focusTime={focusRequest?.project === project ? focusRequest.t : undefined}
           focusToken={focusRequest?.project === project ? focusRequest.token : undefined}
           focusScroll={focusRequest?.project === project ? focusRequest.scroll : undefined}
+          subject3Practice={project === 'subject3' ? subject3Practice : undefined}
         />
       })}
     </div>
