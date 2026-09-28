@@ -7,6 +7,7 @@ import {
 } from '../src/replay/drivingDynamicsTimeline'
 import {
   buildDrivingDynamicsEventMarkers,
+  drivingDynamicsEventSelection,
   type DrivingDynamicsEventSample,
 } from '../src/replay/drivingDynamicsEvents'
 import { drivingDynamicsEventId } from '../src/replay/drivingDynamicsEventIdentity'
@@ -264,6 +265,33 @@ test('dynamics event markers reuse the three coaching evidence moments', () => {
     drivingDynamicsEventId('cut-in', 'cut-a', 5.2),
     drivingDynamicsEventId('pedestrian', 'ped-a', 10.2),
   ])
+
+  assert.match(markers[0].summary, /最小时距 1\.8 秒/)
+  assert.match(markers[0].summary, /未记录到明显制动反应/)
+  assert.match(markers[1].summary, /最近距离/)
+  assert.match(markers[2].summary, /最低车速/)
+
+  const first = drivingDynamicsEventSelection(markers, null)
+  assert.equal(first.index, 0)
+  assert.equal(first.total, 3)
+  assert.equal(first.event?.id, markers[0].id)
+  assert.equal(first.previous, null)
+  assert.equal(first.next?.id, markers[1].id)
+
+  const middle = drivingDynamicsEventSelection(markers, markers[1].id)
+  assert.equal(middle.index, 1)
+  assert.equal(middle.previous?.id, markers[0].id)
+  assert.equal(middle.event?.id, markers[1].id)
+  assert.equal(middle.next?.id, markers[2].id)
+
+  const last = drivingDynamicsEventSelection(markers, markers[2].id)
+  assert.equal(last.index, 2)
+  assert.equal(last.previous?.id, markers[1].id)
+  assert.equal(last.next, null)
+
+  const stale = drivingDynamicsEventSelection(markers, 'missing-event')
+  assert.equal(stale.index, 0)
+  assert.equal(stale.event?.id, markers[0].id)
 })
 
 test('defensive event identity is stable to millisecond trigger precision', () => {

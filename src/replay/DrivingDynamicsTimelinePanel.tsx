@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   buildDrivingDynamicsEventMarkers,
+  drivingDynamicsEventSelection,
   type DrivingDynamicsEventKind,
   type DrivingDynamicsEventMarker,
   type DrivingDynamicsEventSample,
@@ -102,7 +103,7 @@ export function DrivingDynamicsTimeline({
   samples: readonly DrivingDynamicsEventSample[]
   selectedEventId?: string | null
   projectLabel: (project: string) => string
-  onSelect: (project: string, time: number, eventId?: string) => void
+  onSelect: (project: string, time: number, eventId?: string, options?: { scroll?: boolean }) => void
 }) {
   const model = useMemo(
     () => buildDrivingDynamicsTimeline(samples),
@@ -113,6 +114,16 @@ export function DrivingDynamicsTimeline({
     [model.samples],
   )
   const [cursorIndex, setCursorIndex] = useState(0)
+  const selection = drivingDynamicsEventSelection(events, selectedEventId)
+  const selectedEvent = selectedEventId ? selection.event : null
+  const browserEvent = selection.event
+
+  useEffect(() => {
+    if (selectedEventId || events.length === 0) return
+    const first = events[0]
+    setCursorIndex(first.sampleIndex)
+    onSelect(first.project, first.t, first.id, { scroll: false })
+  }, [events, onSelect, selectedEventId])
 
   if (model.samples.length < 2) return null
 
@@ -136,13 +147,14 @@ export function DrivingDynamicsTimeline({
   )
   const currentGearY = gearY(current.gear)
 
-  const focusEvent = (event: DrivingDynamicsEventMarker) => {
+  const focusEvent = (
+    event: DrivingDynamicsEventMarker,
+    options?: { scroll?: boolean },
+  ) => {
     setCursorIndex(event.sampleIndex)
-    onSelect(event.project, event.t, event.id)
+    onSelect(event.project, event.t, event.id, options)
   }
 
-  const selectedEvent =
-    events.find(event => event.id === selectedEventId) ?? null
 
   return <section className="replay-dynamics" aria-labelledby="replay-dynamics-title">
     <div className="replay-dynamics-head">
@@ -226,7 +238,74 @@ export function DrivingDynamicsTimeline({
       </svg>
     </div>
 
-    {events.length > 0 && <div className="replay-dynamics-events" aria-label="危险交通事件">
+    {events.length > 0 && <>
+      <div
+        className="replay-hazard-browser"
+        aria-label="多事件快速复盘"
+        onKeyDown={keyboardEvent => {
+          if (keyboardEvent.key === 'ArrowLeft' && selection.previous) {
+            keyboardEvent.preventDefault()
+            focusEvent(selection.previous, { scroll: false })
+          }
+          if (keyboardEvent.key === 'ArrowRight' && selection.next) {
+            keyboardEvent.preventDefault()
+            focusEvent(selection.next, { scroll: false })
+          }
+        }}
+      >
+        <div className="replay-hazard-browser-head">
+          <span>
+            <small>多事件快速复盘</small>
+            <strong>
+              当前第 {selection.index + 1}/{selection.total} 个风险事件
+            </strong>
+          </span>
+          <span className="replay-hazard-browser-nav">
+            <button
+              type="button"
+              disabled={!selection.previous}
+              onClick={() => {
+                if (selection.previous) focusEvent(selection.previous, { scroll: false })
+              }}
+              aria-label="上一风险事件"
+            >
+              ← 上一事件
+            </button>
+            <button
+              type="button"
+              disabled={!selection.next}
+              onClick={() => {
+                if (selection.next) focusEvent(selection.next, { scroll: false })
+              }}
+              aria-label="下一风险事件"
+            >
+              下一事件 →
+            </button>
+          </span>
+        </div>
+
+        {browserEvent && <div className="replay-hazard-browser-summary" role="status">
+          <span className={`replay-hazard-kind ${browserEvent.kind}`}>
+            {browserEvent.glyph}
+          </span>
+          <span className="replay-hazard-browser-copy">
+            <b>{browserEvent.label}</b>
+            <small>
+              {(browserEvent.t - model.startTime).toFixed(1)}s · {browserEvent.speedKmh.toFixed(1)} km/h · {projectLabel(browserEvent.project)}
+            </small>
+            <em>{browserEvent.summary}</em>
+          </span>
+          <button
+            type="button"
+            className="replay-focus-evidence-btn"
+            onClick={() => focusEvent(browserEvent, { scroll: true })}
+          >
+            查看当前轨迹
+          </button>
+        </div>}
+      </div>
+
+      <div className="replay-dynamics-events" aria-label="危险交通事件">
       {events.map(event => {
         const selected = selectedEventId === event.id
         return <button
@@ -242,7 +321,8 @@ export function DrivingDynamicsTimeline({
           </small>
         </button>
       })}
-    </div>}
+      </div>
+    </>}
 
     {selectedEvent && <div className="replay-dynamics-current-event" role="status">
       <b>当前事件 · {selectedEvent.label}</b>
@@ -270,7 +350,7 @@ export function DrivingDynamicsTimeline({
       <button
         type="button"
         className="replay-focus-evidence-btn"
-        onClick={() => onSelect(current.project, current.t, undefined)}
+        onClick={() => onSelect(current.project, current.t, undefined, { scroll: true })}
       >
         定位到这段轨迹
       </button>
