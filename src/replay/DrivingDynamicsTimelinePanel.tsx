@@ -23,6 +23,14 @@ import {
   buildDrivingDynamicsSessionOverview,
   type DrivingDynamicsSessionOverview,
 } from './drivingDynamicsSessionOverview'
+import {
+  DEFAULT_DRIVING_DYNAMICS_HAZARD_FILTER,
+  drivingDynamicsHazardFilterActive,
+  filterDrivingDynamicsHazardEvents,
+  type DrivingDynamicsHazardEvidenceFilter,
+  type DrivingDynamicsHazardFilter,
+  type DrivingDynamicsHazardKindFilter,
+} from './drivingDynamicsHazardFilter'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -190,6 +198,27 @@ const OVERVIEW_EVENT_ROWS: {
   { kind: 'pedestrian', label: '行人横穿' },
 ]
 
+const HAZARD_KIND_FILTERS: {
+  value: DrivingDynamicsHazardKindFilter
+  label: string
+}[] = [
+  { value: 'all', label: '全部类型' },
+  { value: 'sudden-brake', label: '急刹' },
+  { value: 'cut-in', label: '加塞' },
+  { value: 'pedestrian', label: '行人' },
+]
+
+const HAZARD_EVIDENCE_FILTERS: {
+  value: DrivingDynamicsHazardEvidenceFilter
+  label: string
+}[] = [
+  { value: 'all', label: '全部证据' },
+  { value: 'brake', label: '记录到制动' },
+  { value: 'stop', label: '记录到停车' },
+  { value: 'steering', label: '记录到明显转向' },
+  { value: 'no-auto-response', label: '暂无后续摘要' },
+]
+
 function sessionTimeLabel(seconds: number) {
   if (seconds < 60) return `${seconds.toFixed(0)}s`
   const minutes = Math.floor(seconds / 60)
@@ -200,13 +229,22 @@ function sessionTimeLabel(seconds: number) {
 function HazardSessionOverview({
   overview,
   selectedEventId,
+  filter,
+  filteredEventIds,
+  filteredCount,
+  onFilterChange,
   onSelect,
 }: {
   overview: DrivingDynamicsSessionOverview
   selectedEventId?: string | null
+  filter: DrivingDynamicsHazardFilter
+  filteredEventIds: ReadonlySet<string>
+  filteredCount: number
+  onFilterChange: (filter: DrivingDynamicsHazardFilter) => void
   onSelect: (eventId: string) => void
 }) {
   const { counts } = overview
+  const filterActive = drivingDynamicsHazardFilterActive(filter)
 
   return <div className="replay-hazard-overview" aria-label="整场风险复盘总览">
     <div className="replay-hazard-overview-head">
@@ -214,7 +252,11 @@ function HazardSessionOverview({
         <small>SESSION HAZARD OVERVIEW</small>
         <b>整场风险复盘总览</b>
       </span>
-      <strong>共 {counts.total} 个风险事件</strong>
+      <strong>
+        {filterActive
+          ? `筛选 ${filteredCount}/${counts.total} 个风险事件`
+          : `共 ${counts.total} 个风险事件`}
+      </strong>
     </div>
 
     <div className="replay-hazard-overview-counts">
@@ -232,6 +274,53 @@ function HazardSessionOverview({
       <em>仅汇总已有复盘证据，不代表事件处理质量或考试得分。</em>
     </p>
 
+    <div className="replay-hazard-filters" aria-label="风险事件筛选">
+      <div className="replay-hazard-filter-row">
+        <span>事件类型</span>
+        <div>
+          {HAZARD_KIND_FILTERS.map(option => <button
+            type="button"
+            key={option.value}
+            className={filter.kind === option.value ? 'selected' : ''}
+            aria-pressed={filter.kind === option.value}
+            onClick={() => onFilterChange({
+              ...filter,
+              kind: option.value,
+            })}
+          >
+            {option.label}
+          </button>)}
+        </div>
+      </div>
+      <div className="replay-hazard-filter-row">
+        <span>证据状态</span>
+        <div>
+          {HAZARD_EVIDENCE_FILTERS.map(option => <button
+            type="button"
+            key={option.value}
+            className={filter.evidence === option.value ? 'selected' : ''}
+            aria-pressed={filter.evidence === option.value}
+            onClick={() => onFilterChange({
+              ...filter,
+              evidence: option.value,
+            })}
+          >
+            {option.label}
+          </button>)}
+          {filterActive && <button
+            type="button"
+            className="reset"
+            onClick={() => onFilterChange(DEFAULT_DRIVING_DYNAMICS_HAZARD_FILTER)}
+          >
+            清除筛选
+          </button>}
+        </div>
+      </div>
+      <p>
+        当前显示 {filteredCount}/{counts.total} 个事件；“暂无后续摘要”仅表示当前 ±3 秒窗口未自动归纳出后续节点，不等于没有采取有效避险动作。
+      </p>
+    </div>
+
     <div className="replay-hazard-overview-timeline">
       <div className="replay-hazard-overview-time-scale">
         <span>0s</span>
@@ -244,16 +333,23 @@ function HazardSessionOverview({
           <span className="replay-hazard-overview-lane-label">{row.label}</span>
           <div className="replay-hazard-overview-track">
             {markers.map(marker => {
-              const selected = marker.id === selectedEventId
+              const included = filteredEventIds.has(marker.id)
+              const selected = included && marker.id === selectedEventId
               return <button
                 type="button"
                 key={marker.id}
-                className={`replay-hazard-overview-marker ${marker.kind}${selected ? ' selected' : ''}`}
+                className={`replay-hazard-overview-marker ${marker.kind}${selected ? ' selected' : ''}${included ? '' : ' filtered-out'}`}
                 style={{ left: `${(marker.ratio * 100).toFixed(2)}%` }}
                 aria-label={`${marker.label}，整场第 ${sessionTimeLabel(Math.max(0, marker.relativeTime))} 触发`}
                 aria-pressed={selected}
-                title={`${marker.label} · ${sessionTimeLabel(Math.max(0, marker.relativeTime))}`}
-                onClick={() => onSelect(marker.id)}
+                aria-disabled={!included}
+                tabIndex={included ? 0 : -1}
+                title={included
+                  ? `${marker.label} · ${sessionTimeLabel(Math.max(0, marker.relativeTime))}`
+                  : `${marker.label} · 不在当前筛选结果中`}
+                onClick={() => {
+                  if (included) onSelect(marker.id)
+                }}
               >
                 {marker.glyph}
               </button>
@@ -264,7 +360,7 @@ function HazardSessionOverview({
     </div>
 
     <p className="replay-hazard-overview-note">
-      点击时间带上的事件可直接切换下方详细复盘；位置按真实触发时刻计算。
+      亮色事件属于当前筛选结果；点击即可切换下方详细复盘。灰色事件保留整场位置参考，不参与当前上一/下一导航。
     </p>
   </div>
 }
@@ -509,9 +605,27 @@ export function DrivingDynamicsTimeline({
     ),
     [events, model.endTime, model.startTime],
   )
+  const [hazardFilter, setHazardFilter] = useState<DrivingDynamicsHazardFilter>(
+    DEFAULT_DRIVING_DYNAMICS_HAZARD_FILTER,
+  )
+  const filterResult = useMemo(
+    () => filterDrivingDynamicsHazardEvents(
+      model.samples,
+      events,
+      hazardFilter,
+    ),
+    [events, hazardFilter, model.samples],
+  )
+  const filteredEvents = filterResult.events
+  const filteredEventIds = useMemo(
+    () => new Set(filteredEvents.map(event => event.id)),
+    [filteredEvents],
+  )
   const [cursorIndex, setCursorIndex] = useState(0)
-  const selection = drivingDynamicsEventSelection(events, selectedEventId)
-  const selectedEvent = selectedEventId ? selection.event : null
+  const selection = drivingDynamicsEventSelection(filteredEvents, selectedEventId)
+  const selectedEvent = selectedEventId
+    ? filteredEvents.find(event => event.id === selectedEventId) ?? null
+    : null
   const browserEvent = selection.event
   const browserContext = useMemo(
     () => browserEvent
@@ -527,11 +641,32 @@ export function DrivingDynamicsTimeline({
   )
 
   useEffect(() => {
-    if (selectedEventId || events.length === 0) return
-    const first = events[0]
-    setCursorIndex(first.sampleIndex)
-    onSelect(first.project, first.t, first.id, { scroll: false })
-  }, [events, onSelect, selectedEventId])
+    const selectedInFilter = selectedEventId
+      ? filteredEvents.some(event => event.id === selectedEventId)
+      : false
+
+    if (filteredEvents.length > 0) {
+      if (selectedInFilter) return
+      const first = filteredEvents[0]
+      setCursorIndex(first.sampleIndex)
+      onSelect(first.project, first.t, first.id, { scroll: false })
+      return
+    }
+
+    if (!selectedEventId || model.samples.length === 0) return
+    const safeIndex = Math.max(
+      0,
+      Math.min(model.samples.length - 1, cursorIndex),
+    )
+    const sample = model.samples[safeIndex]
+    onSelect(sample.project, sample.t, undefined, { scroll: false })
+  }, [
+    cursorIndex,
+    filteredEvents,
+    model.samples,
+    onSelect,
+    selectedEventId,
+  ])
 
   if (model.samples.length < 2) return null
 
@@ -600,21 +735,28 @@ export function DrivingDynamicsTimeline({
           className="replay-dynamics-gear"
           d={gearPath(model.chartSamples, model.startTime, model.durationSeconds)}
         />
-        {events.map(event => {
+        {filteredEvents.map(event => {
           const x = timeX(event.t, model.startTime, model.durationSeconds)
           const curveY = speedY(event.speedKmh, speedScaleMax)
           const markerY = eventY(event.kind, curveY)
-          const selected = selectedEventId === event.id
+          const included = filteredEventIds.has(event.id)
+          const selected = included && selectedEventId === event.id
           return <g
             key={event.id}
-            className={`replay-dynamics-event ${event.kind}${selected ? ' selected' : ''}`}
+            className={`replay-dynamics-event ${event.kind}${selected ? ' selected' : ''}${included ? '' : ' filtered-out'}`}
             transform={`translate(${x.toFixed(2)} ${markerY.toFixed(2)})`}
             role="button"
-            tabIndex={0}
-            aria-label={`${event.label} · 点击查看轨迹证据`}
+            tabIndex={included ? 0 : -1}
+            aria-label={included
+              ? `${event.label} · 点击查看轨迹证据`
+              : `${event.label} · 不在当前筛选结果中`}
             aria-pressed={selected}
-            onClick={() => focusEvent(event)}
+            aria-disabled={!included}
+            onClick={() => {
+              if (included) focusEvent(event)
+            }}
             onKeyDown={keyboardEvent => {
+              if (!included) return
               if (keyboardEvent.key !== 'Enter' && keyboardEvent.key !== ' ') return
               keyboardEvent.preventDefault()
               focusEvent(event)
@@ -650,8 +792,12 @@ export function DrivingDynamicsTimeline({
       <HazardSessionOverview
         overview={sessionOverview}
         selectedEventId={selectedEventId}
+        filter={hazardFilter}
+        filteredEventIds={filteredEventIds}
+        filteredCount={filterResult.filtered}
+        onFilterChange={setHazardFilter}
         onSelect={eventId => {
-          const event = events.find(item => item.id === eventId)
+          const event = filteredEvents.find(item => item.id === eventId)
           if (event) focusEvent(event, { scroll: false })
         }}
       />
@@ -674,7 +820,9 @@ export function DrivingDynamicsTimeline({
           <span>
             <small>多事件快速复盘</small>
             <strong>
-              当前第 {selection.index + 1}/{selection.total} 个风险事件
+              {selection.total > 0
+                ? <>当前第 {selection.index + 1}/{selection.total} 个风险事件</>
+                : <>当前筛选暂无风险事件</>}
             </strong>
           </span>
           <span className="replay-hazard-browser-nav">
