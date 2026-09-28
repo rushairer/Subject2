@@ -312,6 +312,11 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Trigger-near speed must come from the existing event-context nearest recorded sample. Post-trigger minimum speed uses only real same-project samples inside the fixed +3 s context window; if recording coverage is shorter, use only the available interval and label the UI accordingly.
 - Throttle-release, brake and stop timing must reuse structured analyzer evidence even when the analyzer observed a response beyond the visible +3 s curve. Steering comparison may show only existing structured steering-change evidence; never derive a new steering score merely to fill a comparison cell.
 - Missing comparison metrics render as missing evidence, not zero, not failure and not an inferred value. Clicking a comparison column must reuse the shared event selection/focus path without forced scrolling.
+- Factual comparison insights may describe only adjacent chronological events inside the same comparison group. Never summarize unlike hazard kinds together, and never reorder events to create a stronger narrative.
+- Insight text may state earlier/later, higher/lower, more/less, or that evidence is present/missing, but must not translate those facts into better/worse, safer/unsafe, correct/incorrect, improvement/regression, scores or rankings.
+- Evidence-presence changes take precedence over pure numeric deltas for the same adjacent pair. When evidence is complete, show at most one reaction-timing difference and one vehicle-state difference per adjacent pair so prose stays concise; the table remains the source for all raw values.
+- Narrative display-noise thresholds are 0.1 s for reaction timing, 1 km/h for speed and 0.05 steering-wheel turns. These thresholds suppress trivial prose only; they must never become analyzer, scoring or pass/fail thresholds.
+- Missing insight bullets mean no comparison difference crossed the prose-display threshold, not that the events were identical. User-facing copy must direct readers back to the full comparison table for exact values.
 
 ## Replay driving dynamics timeline
 
