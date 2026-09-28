@@ -3,6 +3,7 @@ import { CURVE_CENTERLINE } from '../subject2/CurveDrivingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { SIDE_PARKING_GEOMETRY } from '../subject2/SideParkingCourse'
+import { SLOPE_GEOMETRY, SLOPE_START } from '../subject2/SlopeStartCourse'
 import type { Subject2ProjectId } from '../subject2/courseStartPoses'
 import type { CoachPlan, CoachWaypoint } from './coachController'
 
@@ -621,6 +622,79 @@ function sideParkingWaypoints(): CoachWaypoint[] {
   return points
 }
 
+
+function slopeStartWaypoints(): CoachWaypoint[] {
+  const stopX =
+    SLOPE_GEOMETRY.roadHalf -
+    SLOPE_START.carWidth / 2 -
+    0.2
+  const stopZ =
+    SLOPE_GEOMETRY.stopLineZ +
+    SLOPE_START.carLength / 2
+  const points: CoachWaypoint[] = []
+
+  const push = (waypoint: CoachWaypoint) => points.push(waypoint)
+
+  ;[
+    [0.4, 10.2, 0.75],
+    [0.44, 8.2, 0.72],
+    [0.48, 6.2, 0.62],
+    [stopX, 4.5, 0.5],
+    [stopX, 3.2, 0.4],
+    [stopX, 2.4, 0.28],
+    [stopX, 1.95, 0.2],
+  ].forEach(([x, z, speed]) => push({
+    x,
+    z,
+    targetSpeedMps: speed,
+    gear: 1,
+    arrivalRadiusMeters: z < 3 ? 0.16 : 0.4,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    label: z < 3
+      ? '坡道示范 · 低速对准桩杆线与右侧边距'
+      : '坡道示范 · 保持右侧 20cm 参考间距上坡',
+  }))
+
+  push({
+    x: stopX,
+    z: stopZ,
+    targetSpeedMps: 0,
+    gear: 1,
+    stop: true,
+    holdSeconds: 1.55,
+    arrivalRadiusMeters: 0.1,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    handbrake: true,
+    label: '坡道示范 · 定点停稳并拉紧手刹',
+  })
+
+  ;[
+    [0.8, 0.42],
+    [-0.4, 0.5],
+    [-2.0, 0.62],
+    [-5.0, 0.72],
+    [-9.0, 0.82],
+    [-14.5, 0.85],
+    [SLOPE_GEOMETRY.roadEndZ + 0.75, 0.78],
+  ].forEach(([z, speed]) => push({
+    x: stopX,
+    z,
+    targetSpeedMps: speed,
+    gear: 1,
+    arrivalRadiusMeters: 0.35,
+    pathCurvaturePerMeter: 0,
+    headingHoldRadians: 0,
+    handbrake: false,
+    label: z > 0
+      ? '坡道示范 · 松手刹平稳起步'
+      : '坡道示范 · 保持直线驶过坡顶',
+  }))
+
+  return points
+}
+
 const CURVE_DRIVING_COACH_PLAN: CoachPlan = {
   id: 'curve-driving',
   title: '曲线行驶教练示范',
@@ -656,11 +730,21 @@ const SIDE_PARKING_COACH_PLAN: CoachPlan = {
   curvatureFeedforwardBlend: 1,
 }
 
+const SLOPE_START_COACH_PLAN: CoachPlan = {
+  id: 'slope-start',
+  title: '坡道定点停车与起步教练示范',
+  waypoints: slopeStartWaypoints(),
+  lookAheadWaypoints: 2,
+  steeringGain: 0.45,
+  curvatureFeedforwardBlend: 1,
+}
+
 export function subject2CoachPlan(project: Subject2ProjectId): CoachPlan | null {
   if (project === 'curve-driving') return CURVE_DRIVING_COACH_PLAN
   if (project === 'right-angle') return RIGHT_ANGLE_COACH_PLAN
   if (project === 'reverse-parking') return REVERSE_PARKING_COACH_PLAN
   if (project === 'side-parking') return SIDE_PARKING_COACH_PLAN
+  if (project === 'slope-start') return SLOPE_START_COACH_PLAN
   return null
 }
 
