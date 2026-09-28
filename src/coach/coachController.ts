@@ -22,6 +22,8 @@ export interface CoachWaypoint {
   rightIndicator?: boolean
   /** Signed curvature of the desired travel path, positive turns right. */
   pathCurvaturePerMeter?: number
+  /** Optional body-heading hold used on deterministic straight maneuver segments. */
+  headingHoldRadians?: number
   /** Critical geometry points must be physically captured, never skipped by projection. */
   requireCapture?: boolean
   label?: string
@@ -223,10 +225,16 @@ export function stepCoachController(
   const pursuitCurvature =
     2 * Math.sin(alpha) / steeringDistance * (plan.steeringGain ?? 1)
   const feedforwardBlend = clamp(plan.curvatureFeedforwardBlend ?? 0, 0, 1)
-  const commandedCurvature = target.pathCurvaturePerMeter == null
+  let commandedCurvature = target.pathCurvaturePerMeter == null
     ? pursuitCurvature
     : target.pathCurvaturePerMeter * feedforwardBlend +
       pursuitCurvature * (1 - feedforwardBlend)
+  if (target.headingHoldRadians != null) {
+    const headingError = normalizeHeadingDelta(
+      target.headingHoldRadians - vehicle.heading,
+    )
+    commandedCurvature += clamp(headingError * 0.7, -0.08, 0.08)
+  }
   const roadWheelTarget = clamp(
     Math.atan(DRIVING_RULES.steering.wheelbaseMeters * commandedCurvature) *
       direction,
