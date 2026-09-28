@@ -7,6 +7,7 @@ import {
 } from '../src/replay/drivingDynamicsTimeline'
 import {
   buildDrivingDynamicsEventMarkers,
+  drivingDynamicsEventId,
   type DrivingDynamicsEventSample,
 } from '../src/replay/drivingDynamicsEvents'
 
@@ -256,6 +257,23 @@ test('dynamics event markers reuse the three coaching evidence moments', () => {
         project: 'subject3',
       },
     ],
+  )
+
+  assert.deepEqual(markers.map(marker => marker.id), [
+    drivingDynamicsEventId('sudden-brake', 'lead-a', 0.2),
+    drivingDynamicsEventId('cut-in', 'cut-a', 5.2),
+    drivingDynamicsEventId('pedestrian', 'ped-a', 10.2),
+  ])
+})
+
+test('defensive event identity is stable to millisecond trigger precision', () => {
+  assert.equal(
+    drivingDynamicsEventId('cut-in', 'scooter-a', 12.34549),
+    'cut-in:scooter-a:12.345',
+  )
+  assert.equal(
+    drivingDynamicsEventId('cut-in', 'scooter-a', 12.34551),
+    'cut-in:scooter-a:12.346',
   )
 })
 
