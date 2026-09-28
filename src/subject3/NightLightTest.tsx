@@ -6,6 +6,10 @@ import {
   recordNightLightAction,
   type NightLightAnswer,
 } from './nightLightExam'
+import {
+  applySubject3LightCoachAction,
+  subject3LightCoachSequence,
+} from '../coach/subject3LightCoach'
 
 export interface LightTestVehicle {
   lowBeam: boolean
@@ -60,10 +64,14 @@ export function NightLightTest({
   vehicle,
   onPass,
   onFail,
+  coachActive = false,
+  onCoachStatus,
 }: {
   vehicle: MutableRefObject<LightTestVehicle>
   onPass: () => void
   onFail: (prompt: string) => void
+  coachActive?: boolean
+  onCoachStatus?: (status: string) => void
 }) {
   const prompts = useMemo(() => [...PROMPTS].sort(() => Math.random() - 0.5).slice(0, 3), [])
   const [index, setIndex] = useState(0)
@@ -71,15 +79,35 @@ export function NightLightTest({
   const attempt = useRef(createNightLightAttempt())
   const onPassRef = useRef(onPass)
   const onFailRef = useRef(onFail)
+  const onCoachStatusRef = useRef(onCoachStatus)
   const prompt = prompts[index]
   onPassRef.current = onPass
   onFailRef.current = onFail
+  onCoachStatusRef.current = onCoachStatus
 
   useEffect(() => {
     let resolved = false
+    const coachTimers: number[] = []
     attempt.current = createNightLightAttempt()
     setRemaining(5)
     speak(`模拟夜间灯光考试。${prompt.text}。`)
+
+    if (coachActive) {
+      onCoachStatusRef.current?.(`灯光预检 · ${prompt.text} · 听完整口令`)
+      for (const action of subject3LightCoachSequence(prompt.answer)) {
+        coachTimers.push(window.setTimeout(() => {
+          if (resolved) return
+          applySubject3LightCoachAction(
+            vehicle.current,
+            attempt.current,
+            action,
+          )
+          onCoachStatusRef.current?.(
+            `灯光预检 · ${prompt.text} · ${action.label}`,
+          )
+        }, action.afterMs))
+      }
+    }
 
     const keyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
@@ -106,6 +134,9 @@ export function NightLightTest({
         window.clearTimeout(timeout)
         if (index >= prompts.length - 1) {
           speak('模拟夜间灯光考试完成。请关闭不需要的灯光，准备起步。')
+          if (coachActive) {
+            onCoachStatusRef.current?.('灯光预检 · 全部完成，准备起步')
+          }
           onPassRef.current()
         } else {
           setIndex(value => value + 1)
@@ -124,9 +155,10 @@ export function NightLightTest({
       resolved = true
       window.clearInterval(interval)
       window.clearTimeout(timeout)
+      coachTimers.forEach(timer => window.clearTimeout(timer))
       window.removeEventListener('keydown', keyDown)
     }
-  }, [index, prompt, prompts.length, vehicle])
+  }, [coachActive, index, prompt, prompts.length, vehicle])
 
   return <div className="light-test">
     <div className="eyebrow">科目三 · 模拟夜间灯光考试</div>
@@ -134,5 +166,6 @@ export function NightLightTest({
     <h2>{prompt.text}</h2>
     <p>请听完口令后再操作。当前可用：<b>L 近光灯</b>、<b>K 远光灯切换</b>。</p>
     <div className="light-test-hint">训练提示：{prompt.hint}</div>
+    {coachActive && <div className="light-test-coach">教练接管中 · 按原灯光判定器逐题操作</div>}
   </div>
 }
