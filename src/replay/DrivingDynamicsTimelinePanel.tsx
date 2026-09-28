@@ -167,6 +167,12 @@ function contextSteeringLabel(turns: number | undefined) {
   return `${turns < 0 ? '左' : '右'} ${Math.abs(turns).toFixed(2)} 圈`
 }
 
+function contextRelativeTimeLabel(value: number | undefined) {
+  if (value == null) return '--'
+  if (Math.abs(value) < 0.05) return '0.0s'
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}s`
+}
+
 function HazardEventContextChart({
   context,
 }: {
@@ -265,6 +271,9 @@ function HazardEventContextChart({
       </i>
     </div>
 
+    <div className="replay-hazard-trigger-title">
+      触发附近状态 · 最近采样点 {contextRelativeTimeLabel(trigger?.relativeTime)}
+    </div>
     <div className="replay-hazard-trigger-readout" aria-label="风险事件触发附近操作状态">
       <span><b>{trigger ? trigger.speedKmh.toFixed(1) : '--'}</b><small>km/h</small></span>
       <span><b>{contextPercentLabel(trigger?.throttlePercent)}</b><small>油门</small></span>
