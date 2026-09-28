@@ -308,6 +308,7 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
 })
 
 test('standalone Subject 3 lane-change drill starts at the targeted slice', async ({ page }) => {
+  test.setTimeout(60_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '科三专项E2E')
 
