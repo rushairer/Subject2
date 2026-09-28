@@ -236,7 +236,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      label: '第一次倒库 · 直线后倒到转向点',
+      pathCurvaturePerMeter: 0,
+      label: '第一次倒库 · 方向回正，直线后倒到转向点',
     })
   }
 
@@ -344,7 +345,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.5,
       gear: -1,
       arrivalRadiusMeters: 0.14,
-      label: '第二次倒库 · 直线后倒到转向点',
+      pathCurvaturePerMeter: 0,
+      label: '第二次倒库 · 方向回正，直线后倒到转向点',
     })
   }
 
