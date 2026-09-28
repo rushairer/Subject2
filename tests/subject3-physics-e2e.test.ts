@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createPedalControlsState, stepPedalControls } from '../src/input/pedalControls'
 import { DRIVING_RULES } from '../src/rules/drivingRules'
+import {
+  subject3CoachDesiredLateral,
+  subject3CoachManualGearState,
+  subject3CoachSignalState,
+} from '../src/coach/subject3Coach'
 import { assessSessionResult } from '../src/session/sessionResult'
 import { stepVehiclePhysics, type PhysicsVehicle } from '../src/sim/vehiclePhysics'
 import {
@@ -34,106 +39,12 @@ function normalizeAngle(angle: number) {
   return value
 }
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * clamp(t, 0, 1)
-}
-
-function desiredLateral(progress: number) {
-  if (progress >= 1835 && progress < 1915) {
-    return lerp(0, -2.2, (progress - 1835) / 80)
-  }
-  if (progress >= 1915 && progress < 2040) return -2.2
-  if (progress >= 2040 && progress < 2060) {
-    return lerp(-2.2, 0, (progress - 2040) / 20)
-  }
-
-  if (progress >= 2060 && progress < 2110) {
-    return lerp(0, -2.2, (progress - 2060) / 50)
-  }
-  if (progress >= 2110 && progress < 2160) return -2.2
-  if (progress >= 2160 && progress < 2210) {
-    return lerp(-2.2, -1.0, (progress - 2160) / 50)
-  }
-  if (progress >= 2210 && progress < 2240) return -1.0
-  if (progress >= 2240 && progress < 2270) {
-    return lerp(-1.0, 0, (progress - 2240) / 30)
-  }
-
-  if (progress >= 4100 && progress < 4170) {
-    return lerp(0, 0.6, (progress - 4100) / 70)
-  }
-  if (progress >= 4170) return 0.6
-  return 0
-}
-
-function signalState(progress: number) {
-  const left =
-    progress <= 120 ||
-    (progress >= 625 && progress <= 770) ||
-    (progress >= 1835 && progress < 2135) ||
-    (progress >= 2235 && progress <= 2380) ||
-    (progress >= 2835 && progress <= 3020) ||
-    (progress >= 3435 && progress <= 3820)
-
-  const right =
-    (progress >= 915 && progress <= 1090) ||
-    (progress >= 2135 && progress <= 2240) ||
-    progress >= 4070
-
-  return { left, right }
-}
-
 function targetWorld(progress: number, lateral: number) {
   const pose = poseAtRouteDistance(progress)
   return {
     x: pose.x + pose.rightX * lateral,
     z: pose.z + pose.rightZ * lateral,
   }
-}
-
-function manualGearState(progress: number, elapsed: number) {
-  const gearEvent = SUBJECT3_EVENTS.find(event => event.id === 'gear')
-  assert.ok(gearEvent)
-
-  if (elapsed < 3.3) {
-    return { gear: 1, clutch: 1 }
-  }
-  if (elapsed < 4.3) {
-    return {
-      gear: 1,
-      clutch: DRIVING_RULES.manualTransmission.biteClutchPosition,
-    }
-  }
-  // A brief C press releases the keyboard's half-linkage latch before driving
-  // with the clutch fully engaged; simply releasing Shift keeps it latched.
-  if (elapsed < 4.4) {
-    return { gear: 1, clutch: 1 }
-  }
-  if (progress < gearEvent.start) {
-    return { gear: 1, clutch: 0 }
-  }
-  if (progress < gearEvent.start + 5) {
-    return { gear: 2, clutch: 1 }
-  }
-  if (progress < gearEvent.start + 40) {
-    return { gear: 2, clutch: 0 }
-  }
-  if (progress < gearEvent.start + 45) {
-    return { gear: 3, clutch: 1 }
-  }
-  if (progress < gearEvent.start + 80) {
-    return { gear: 3, clutch: 0 }
-  }
-  if (progress < gearEvent.start + 85) {
-    return { gear: 4, clutch: 1 }
-  }
-  if (progress < gearEvent.end + 10) {
-    return { gear: 4, clutch: 0 }
-  }
-  if (progress < gearEvent.end + 15) {
-    return { gear: 3, clutch: 1 }
-  }
-  return { gear: 3, clutch: 0 }
 }
 
 function runPhysicalSubject3Route(automatic: boolean) {
@@ -196,7 +107,7 @@ function runPhysicalSubject3Route(automatic: boolean) {
     const waitingForStart = elapsed < 3.3
     const stoppingForPullOver = before.progress >= 4180
 
-    const signals = signalState(before.progress)
+    const signals = subject3CoachSignalState(before.progress)
     vehicle.leftIndicator = signals.left
     vehicle.rightIndicator = signals.right
     vehicle.leftSignalAge = signals.left
@@ -222,7 +133,7 @@ function runPhysicalSubject3Route(automatic: boolean) {
         vehicle.gear = 1
       }
     } else {
-      const manual = manualGearState(before.progress, elapsed)
+      const manual = subject3CoachManualGearState(before.progress, elapsed)
       vehicle.gear = manual.gear
       clutch = manual.clutch
       vehicle.handbrake = waitingForStart
@@ -243,7 +154,7 @@ function runPhysicalSubject3Route(automatic: boolean) {
     )
     const target = targetWorld(
       lookAheadProgress,
-      desiredLateral(before.progress),
+      subject3CoachDesiredLateral(before.progress),
     )
     const desiredHeading = Math.atan2(
       target.x - vehicle.x,
@@ -363,7 +274,7 @@ function runPhysicalSubject3Route(automatic: boolean) {
         `lateral=${projection.lateral.toFixed(3)} heading=${vehicle.heading.toFixed(3)} ` +
         `gear=${vehicle.gear} clutch=${vehicle.clutch.toFixed(2)} rpm=${vehicle.engineRpm.toFixed(0)} ` +
         `x=${vehicle.x.toFixed(3)} z=${vehicle.z.toFixed(3)} ` +
-        `targetLateral=${desiredLateral(before.progress).toFixed(3)} ` +
+        `targetLateral=${subject3CoachDesiredLateral(before.progress).toFixed(3)} ` +
         `event=${SUBJECT3_EVENTS[runtime.eventIndex]?.id ?? 'done'}: ` +
         result.infractions.map(item => item.id).join(', '),
     )
