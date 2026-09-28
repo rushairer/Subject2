@@ -266,6 +266,12 @@ test('dynamics event markers reuse the three coaching evidence moments', () => {
     drivingDynamicsEventId('cut-in', 'cut-a', 5.2),
     drivingDynamicsEventId('pedestrian', 'ped-a', 10.2),
   ])
+  assert.deepEqual(markers.map(marker => marker.response.maximumBrake), [0, 0, 0])
+  assert.deepEqual(markers.map(marker => marker.response.brakeReactionSeconds), [
+    undefined,
+    undefined,
+    undefined,
+  ])
 
   assert.match(markers[0].summary, /最小时距 1\.8 秒/)
   assert.match(markers[0].summary, /未记录到明显制动反应/)
@@ -328,6 +334,7 @@ test('hazard context window keeps only same-project samples within three seconds
     project: 'subject3',
     sampleIndex: 4,
     speedKmh: 28.8,
+    response: {},
   }
 
   const context = buildDrivingDynamicsEventContext([
@@ -367,6 +374,7 @@ test('hazard context window reports truncated recording coverage without inventi
     project: 'subject3',
     sampleIndex: 1,
     speedKmh: 18,
+    response: {},
   }
 
   const context = buildDrivingDynamicsEventContext([
@@ -396,6 +404,7 @@ test('hazard context window stays empty when no sample belongs to the event proj
     project: 'subject3',
     sampleIndex: 0,
     speedKmh: 0,
+    response: {},
   }
 
   const context = buildDrivingDynamicsEventContext([

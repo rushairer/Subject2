@@ -15,6 +15,10 @@ import {
   type DrivingDynamicsEventContext,
   type DrivingDynamicsEventContextSample,
 } from './drivingDynamicsEventContext'
+import {
+  buildDrivingDynamicsReactionChain,
+  type DrivingDynamicsReactionChain,
+} from './drivingDynamicsReactionChain'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -175,8 +179,10 @@ function contextRelativeTimeLabel(value: number | undefined) {
 
 function HazardEventContextChart({
   context,
+  reactionChain,
 }: {
   context: DrivingDynamicsEventContext
+  reactionChain: DrivingDynamicsReactionChain
 }) {
   const trigger = context.triggerSample
   const truncated =
@@ -269,6 +275,33 @@ function HazardEventContextChart({
       <i className={truncated ? 'truncated' : ''}>
         覆盖 前 {context.beforeCoverageSeconds.toFixed(1)}s / 后 {context.afterCoverageSeconds.toFixed(1)}s
       </i>
+    </div>
+
+    <div className="replay-hazard-reaction-chain" aria-label="风险事件反应链自动摘要">
+      <div className="replay-hazard-reaction-chain-head">
+        <span>
+          <b>反应链自动摘要</b>
+          <small>只按已记录的分析器证据与轨迹采样排序，不评价反应好坏。</small>
+        </span>
+        <i>{reactionChain.steps.length - 1} 个后续节点</i>
+      </div>
+      <p>{reactionChain.summary}</p>
+      {reactionChain.hasObservedResponse
+        ? <ol>
+            {reactionChain.steps.map(step => <li
+              key={`${step.kind}:${step.timeSeconds.toFixed(3)}:${step.label}`}
+              className={step.kind}
+            >
+              <time>{contextRelativeTimeLabel(step.timeSeconds)}</time>
+              <span>
+                <b>{step.label}</b>
+                {step.detail && <small>{step.detail}</small>}
+              </span>
+            </li>)}
+          </ol>
+        : <em>
+            当前窗口没有足够的后续反应节点可自动归纳；请结合下面的连续曲线查看。
+          </em>}
     </div>
 
     <div className="replay-hazard-trigger-title">
@@ -385,6 +418,12 @@ export function DrivingDynamicsTimeline({
       ? buildDrivingDynamicsEventContext(model.samples, browserEvent)
       : null,
     [browserEvent, model.samples],
+  )
+  const browserReactionChain = useMemo(
+    () => browserEvent && browserContext
+      ? buildDrivingDynamicsReactionChain(browserContext, browserEvent)
+      : null,
+    [browserContext, browserEvent],
   )
 
   useEffect(() => {
@@ -573,7 +612,10 @@ export function DrivingDynamicsTimeline({
           </button>
         </div>}
 
-        {browserContext && <HazardEventContextChart context={browserContext} />}
+        {browserContext && browserReactionChain && <HazardEventContextChart
+          context={browserContext}
+          reactionChain={browserReactionChain}
+        />}
       </div>
 
       <div className="replay-dynamics-events" aria-label="危险交通事件">

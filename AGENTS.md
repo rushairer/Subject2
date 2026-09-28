@@ -292,6 +292,11 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Context samples must come from the existing trajectory stream and the event's exact project only. Never borrow a neighboring project, synthesize missing checkpoints, interpolate across missing control fields, or extend recording boundaries to make the window look complete.
 - Speed, throttle, brake and steering traces are presentation evidence only. Missing optional pedal/steering values create visible gaps rather than inferred values; boundary-shortened windows must disclose their actual before/after coverage.
 - The trigger-state readout uses the nearest recorded sample and must be described as being near the trigger, not as an exact measurement when no sample exists at exactly 0 s.
+- Reaction-chain summaries must reuse structured response timing already emitted by the existing sudden-brake, cut-in and pedestrian coaching analyzers. Do not redetect throttle release, brake onset or pedestrian stop with a second threshold engine in replay.
+- Reaction-chain wording is factual and chronological only. Do not label a response fast/slow, correct/incorrect, safe/unsafe or otherwise convert the replay summary into a scoring verdict.
+- Only nodes inside the actual visible context coverage may appear in the chain. Analyzer evidence beyond the current ±3 s window stays out of the summary even when a wider coaching analyzer observed it.
+- Trajectory-derived speed wording may surface only when the post-trigger recorded minimum is at least 1 km/h below the trigger-near sample. Steering wording is allowed only when the existing analyzer already reported at least 0.05 turns of change and the context samples corroborate it. These are display-noise filters, never scoring thresholds.
+- When the evidence supports no post-trigger node, render the trigger alone and explicitly tell the user to inspect the continuous curves rather than inventing a response.
 
 ## Replay driving dynamics timeline
 

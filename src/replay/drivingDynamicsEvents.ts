@@ -27,6 +27,14 @@ export type DrivingDynamicsEventSample =
 
 export type { DrivingDynamicsEventKind } from './drivingDynamicsEventIdentity'
 
+export interface DrivingDynamicsEventResponseEvidence {
+  throttleReleaseSeconds?: number
+  brakeReactionSeconds?: number
+  stopReactionSeconds?: number
+  maximumBrake?: number
+  maximumSteeringWheelChangeTurns?: number
+}
+
 export interface DrivingDynamicsEventMarker {
   id: string
   kind: DrivingDynamicsEventKind
@@ -38,6 +46,7 @@ export interface DrivingDynamicsEventMarker {
   project: string
   sampleIndex: number
   speedKmh: number
+  response: DrivingDynamicsEventResponseEvidence
 }
 
 export interface DrivingDynamicsEventSelection {
@@ -158,6 +167,7 @@ function marker(
   t: number,
   triggerTime: number,
   summary: string,
+  response: DrivingDynamicsEventResponseEvidence,
 ): DrivingDynamicsEventMarker | undefined {
   if (!Number.isFinite(t) || !Number.isFinite(triggerTime) || samples.length === 0) {
     return undefined
@@ -178,6 +188,7 @@ function marker(
     project: sample.project,
     sampleIndex,
     speedKmh: Math.abs(sample.speed) * 3.6,
+    response,
   }
 }
 
@@ -208,6 +219,11 @@ export function buildDrivingDynamicsEventMarkers(
       event.representativeTime,
       event.triggerTime,
       suddenBrakeSummary(event),
+      {
+        throttleReleaseSeconds: event.throttleReleaseSeconds,
+        brakeReactionSeconds: event.brakeReactionSeconds,
+        maximumBrake: event.maximumBrake,
+      },
     )
     if (item) markers.push(item)
   }
@@ -220,6 +236,15 @@ export function buildDrivingDynamicsEventMarkers(
       event.representativeTime,
       event.triggerTime,
       cutInSummary(event),
+      {
+        throttleReleaseSeconds: event.throttleReleaseSeconds,
+        brakeReactionSeconds: event.brakeReactionSeconds,
+        maximumBrake: event.maximumBrake,
+        maximumSteeringWheelChangeTurns:
+          event.maximumSteeringWheelChangeRadians == null
+            ? undefined
+            : event.maximumSteeringWheelChangeRadians / (Math.PI * 2),
+      },
     )
     if (item) markers.push(item)
   }
@@ -232,6 +257,12 @@ export function buildDrivingDynamicsEventMarkers(
       event.representativeTime,
       event.triggerTime,
       pedestrianSummary(event),
+      {
+        throttleReleaseSeconds: event.throttleReleaseSeconds,
+        brakeReactionSeconds: event.brakeReactionSeconds,
+        stopReactionSeconds: event.stopReactionSeconds,
+        maximumBrake: event.maximumBrake,
+      },
     )
     if (item) markers.push(item)
   }
