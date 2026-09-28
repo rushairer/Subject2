@@ -294,6 +294,9 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Defensive-driving event markers must be derived from the existing sudden-brake, cut-in and pedestrian coaching reports; do not duplicate those trigger heuristics in the timeline UI.
 - Marker time must use each coaching event's existing `representativeTime`, and clicking a marker/chip must update the timeline cursor and route through the existing project/time focus callback.
 - Marker generation belongs in `src/replay/drivingDynamicsEvents.ts`; deterministic marker kind/order/evidence-time coverage stays in `tests/driving-dynamics-timeline.test.ts`.
+- Shared event identity belongs in `src/replay/drivingDynamicsEventIdentity.ts`; coaching panels must import that lightweight module instead of importing the aggregate marker builder just to construct IDs.
+- `ExamReplay` owns the selected defensive-event ID. Timeline markers/chips and their matching coaching card must reflect the same selection; any unrelated replay-focus action must clear that selection so stale highlighting cannot survive a context change.
+- Event markers must remain keyboard operable and expose pressed/selected state through accessible button semantics.
 - Browser coverage must prove the dynamics timeline can drive the existing project replay focus instead of only verifying that the chart renders, and must verify the unified hazard-aware chart surface is present.
 
 ## Subject 3 slow-zone judging

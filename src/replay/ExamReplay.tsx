@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { CURVE_CENTERLINE, CURVE_DRIVING } from '../subject2/CurveDrivingCourse'
 import { REVERSE_PARKING_GEOMETRY } from '../subject2/ReverseParkingCourse'
 import { RIGHT_ANGLE_GEOMETRY } from '../subject2/RightAngleCourse'
@@ -591,6 +591,19 @@ export function ExamReplay({
     t: number
     token: number
   } | null>(null)
+  const [selectedHazardEventId, setSelectedHazardEventId] = useState<string | null>(null)
+  const focusReplay = useCallback((
+    project: string,
+    t: number,
+    hazardEventId?: string,
+  ) => {
+    setSelectedHazardEventId(hazardEventId ?? null)
+    setFocusRequest(previous => ({
+      project,
+      t,
+      token: (previous?.token ?? 0) + 1,
+    }))
+  }, [])
 
   const projects = useMemo(
     () => Array.from(new Set(samples.map(item => item.project))),
@@ -619,11 +632,7 @@ export function ExamReplay({
       onSelect={item => {
         const representative = item.representative
         if (representative.project == null || representative.t == null) return
-        setFocusRequest(previous => ({
-          project: representative.project!,
-          t: representative.t!,
-          token: (previous?.token ?? 0) + 1,
-        }))
+        focusReplay(representative.project!, representative.t!)
       }}
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
@@ -632,66 +641,42 @@ export function ExamReplay({
 
     <GearSpeedCoachingPanel
       samples={samples}
-      onSelect={(project, t) => setFocusRequest(previous => ({
-        project,
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      onSelect={(project, t) => focusReplay(project, t)}
     />
 
     <FollowingDistanceCoachingPanel
       samples={samples}
-      onSelect={t => setFocusRequest(previous => ({
-        project: 'subject3',
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      onSelect={t => focusReplay('subject3', t)}
     />
 
     <SuddenBrakeCoachingPanel
       samples={samples}
-      onSelect={t => setFocusRequest(previous => ({
-        project: 'subject3',
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      selectedEventId={selectedHazardEventId}
+      onSelect={(t, eventId) => focusReplay('subject3', t, eventId)}
     />
 
     <CutInResponseCoachingPanel
       samples={samples}
-      onSelect={t => setFocusRequest(previous => ({
-        project: 'subject3',
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      selectedEventId={selectedHazardEventId}
+      onSelect={(t, eventId) => focusReplay('subject3', t, eventId)}
     />
 
     <PedestrianResponseCoachingPanel
       samples={samples}
-      onSelect={t => setFocusRequest(previous => ({
-        project: 'subject3',
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      selectedEventId={selectedHazardEventId}
+      onSelect={(t, eventId) => focusReplay('subject3', t, eventId)}
     />
 
     <NightLightingCoachingPanel
       samples={samples}
-      onSelect={t => setFocusRequest(previous => ({
-        project: 'subject3',
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      onSelect={t => focusReplay('subject3', t)}
     />
 
     <DrivingDynamicsTimeline
       samples={samples}
+      selectedEventId={selectedHazardEventId}
       projectLabel={projectLabel}
-      onSelect={(project, t) => setFocusRequest(previous => ({
-        project,
-        t,
-        token: (previous?.token ?? 0) + 1,
-      }))}
+      onSelect={(project, t, eventId) => focusReplay(project, t, eventId)}
     />
 
     <div className="replay-projects">
@@ -731,11 +716,7 @@ export function ExamReplay({
                 disabled={!canFocus}
                 onClick={() => {
                   if (!canFocus) return
-                  setFocusRequest(previous => ({
-                    project: item.project!,
-                    t: item.t!,
-                    token: (previous?.token ?? 0) + 1,
-                  }))
+                  focusReplay(item.project!, item.t!)
                 }}
               >
                 <time>{item.t != null ? `${item.t.toFixed(1)}s` : '--'}</time>

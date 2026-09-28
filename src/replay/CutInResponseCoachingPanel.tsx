@@ -5,6 +5,7 @@ import {
   type CutInResponseCoachingEvent,
   type CutInResponseCoachingSample,
 } from '../coaching/cutInResponseCoaching'
+import { drivingDynamicsEventId } from './drivingDynamicsEventIdentity'
 
 function seconds(value: number | undefined) {
   return value == null ? '--' : `${value.toFixed(1)} 秒`
@@ -55,10 +56,12 @@ function riskSummary(event: CutInResponseCoachingEvent) {
 
 export function CutInResponseCoachingPanel({
   samples,
+  selectedEventId,
   onSelect,
 }: {
   samples: readonly CutInResponseCoachingSample[]
-  onSelect: (time: number) => void
+  selectedEventId?: string | null
+  onSelect: (time: number, eventId: string) => void
 }) {
   const report = useMemo(
     () => buildCutInResponseCoachingReport(samples),
@@ -112,15 +115,19 @@ export function CutInResponseCoachingPanel({
         ) : (
           report.events.map((event, index) => {
             const response = responseSummary(event)
+            const eventId = drivingDynamicsEventId('cut-in', event.hazardId, event.triggerTime)
+            const selected = selectedEventId === eventId
             return (
               <article
-                className="replay-focus-card"
-                key={`${event.hazardId}-${event.triggerTime}`}
+                className={`replay-focus-card${selected ? ' selected-evidence' : ''}`}
+                key={eventId}
+                data-replay-event-id={eventId}
                 aria-label={`电动车加塞反应观察 ${index + 1}`}
               >
                 <span className="replay-focus-rank">{index + 1}</span>
                 <span className="replay-focus-copy">
                   <strong>电动车切入本车道 · 反应证据</strong>
+                  {selected && <span className="replay-focus-current">时间轴当前事件</span>}
                   <span>{riskSummary(event)}</span>
                   <span className="replay-focus-practice">
                     <b>操作反应</b>
@@ -135,7 +142,8 @@ export function CutInResponseCoachingPanel({
                     <button
                       type="button"
                       className="replay-focus-evidence-btn"
-                      onClick={() => onSelect(event.representativeTime)}
+                      aria-pressed={selected}
+                      onClick={() => onSelect(event.representativeTime, eventId)}
                     >
                       查看这段轨迹证据
                     </button>

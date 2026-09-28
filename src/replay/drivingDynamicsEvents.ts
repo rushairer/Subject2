@@ -10,6 +10,10 @@ import {
   buildSuddenBrakeCoachingReport,
   type SuddenBrakeCoachingSample,
 } from '../coaching/suddenBrakeCoaching'
+import {
+  drivingDynamicsEventId,
+  type DrivingDynamicsEventKind,
+} from './drivingDynamicsEventIdentity'
 import type { DrivingDynamicsSample } from './drivingDynamicsTimeline'
 
 export type DrivingDynamicsEventSample =
@@ -18,10 +22,7 @@ export type DrivingDynamicsEventSample =
   CutInResponseCoachingSample &
   PedestrianResponseCoachingSample
 
-export type DrivingDynamicsEventKind =
-  | 'sudden-brake'
-  | 'cut-in'
-  | 'pedestrian'
+export type { DrivingDynamicsEventKind } from './drivingDynamicsEventIdentity'
 
 export interface DrivingDynamicsEventMarker {
   id: string
@@ -78,7 +79,7 @@ function marker(
   const meta = EVENT_META[kind]
 
   return {
-    id: `${kind}:${id}:${triggerTime.toFixed(3)}`,
+    id: drivingDynamicsEventId(kind, id, triggerTime),
     kind,
     label: meta.label,
     glyph: meta.glyph,
