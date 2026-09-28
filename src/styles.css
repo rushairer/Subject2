@@ -360,6 +360,36 @@
 .replay-hazard-overview-marker.filtered-out{opacity:.18;filter:saturate(.25);cursor:not-allowed;box-shadow:none}
 .replay-hazard-overview-marker.filtered-out:hover{transform:translate(-50%,-50%)}
 .replay-hazard-overview-note{margin:0;color:#678497;font-size:8px;line-height:1.45}
+.replay-hazard-comparison{display:grid;gap:10px;margin:12px 0;padding:12px;border:1px solid #345970;border-radius:14px;background:linear-gradient(145deg,#0d2231,#081722)}
+.replay-hazard-comparison-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.replay-hazard-comparison-head>span{display:grid;gap:2px}
+.replay-hazard-comparison-head small{color:#6e90a4;font-size:8px;font-weight:900;letter-spacing:.1em}
+.replay-hazard-comparison-head b{color:#edf9ff;font-size:12px}
+.replay-hazard-comparison-head>em{max-width:520px;color:#708a9c;font-size:8px;font-style:normal;line-height:1.5;text-align:right}
+.replay-hazard-comparison-group{display:grid;gap:8px;padding:10px;border:1px solid #28495d;border-radius:11px;background:#071720}
+.replay-hazard-comparison-group.sudden-brake{border-color:#604f39}
+.replay-hazard-comparison-group.cut-in{border-color:#2d5a72}
+.replay-hazard-comparison-group.pedestrian{border-color:#345b45}
+.replay-hazard-comparison-group-head{display:flex;align-items:center;gap:8px}
+.replay-hazard-comparison-group-head>.replay-hazard-kind{width:28px;height:28px;font-size:10px}
+.replay-hazard-comparison-group-head>span:last-child{display:grid;gap:2px}
+.replay-hazard-comparison-group-head b{color:#e9f7ff;font-size:10px}
+.replay-hazard-comparison-group-head small{color:#708d9e;font-size:8px}
+.replay-hazard-comparison-table-wrap{overflow-x:auto;border:1px solid #213e51;border-radius:9px;background:#06131c}
+.replay-hazard-comparison-table{width:100%;min-width:620px;border-collapse:collapse;table-layout:fixed}
+.replay-hazard-comparison-table th,.replay-hazard-comparison-table td{padding:8px 9px;border-right:1px solid #ffffff0d;border-bottom:1px solid #ffffff0d;color:#b8ceda;font-size:8px;text-align:center;vertical-align:middle}
+.replay-hazard-comparison-table tr:last-child th,.replay-hazard-comparison-table tr:last-child td{border-bottom:0}
+.replay-hazard-comparison-table th:last-child,.replay-hazard-comparison-table td:last-child{border-right:0}
+.replay-hazard-comparison-table thead th:first-child,.replay-hazard-comparison-table tbody th{width:150px;color:#7f9baa;text-align:left;font-weight:850}
+.replay-hazard-comparison-table thead th{padding:0;background:#0a1d29}
+.replay-hazard-comparison-table thead th:first-child{padding:8px 9px}
+.replay-hazard-comparison-table thead th.selected{background:#102b3e}
+.replay-hazard-comparison-table thead button{display:grid;gap:2px;width:100%;padding:8px 9px;border:0;background:transparent;color:#dff4ff;cursor:pointer;text-align:center}
+.replay-hazard-comparison-table thead button:hover,.replay-hazard-comparison-table thead button:focus-visible{background:#123047;outline:none}
+.replay-hazard-comparison-table thead button b{font-size:9px}
+.replay-hazard-comparison-table thead button small{color:#7190a4;font-size:7px}
+.replay-hazard-comparison-table tbody tr:nth-child(even){background:#ffffff03}
+.replay-hazard-comparison-group>p{margin:0;color:#667f90;font-size:7px;line-height:1.5}
 .replay-hazard-browser{display:grid;gap:10px;margin:12px 0 10px;padding:12px;border:1px solid #3a627c;border-radius:14px;background:linear-gradient(145deg,#10283a,#0b1d2b)}
 .replay-hazard-browser-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .replay-hazard-browser-head>span:first-child{display:grid;gap:2px}
@@ -460,6 +490,9 @@
   .replay-hazard-overview-time-scale{padding-left:0}
   .replay-hazard-overview-lane{grid-template-columns:1fr;gap:3px}
   .replay-hazard-overview-lane-label{text-align:left}
+  .replay-hazard-comparison-head{align-items:stretch;flex-direction:column}
+  .replay-hazard-comparison-head>em{text-align:left}
+  .replay-hazard-comparison-table thead th:first-child,.replay-hazard-comparison-table tbody th{width:130px}
   .replay-hazard-browser-head{align-items:stretch;flex-direction:column}
   .replay-hazard-browser-nav{display:grid;grid-template-columns:1fr 1fr}
   .replay-hazard-browser-nav button{width:100%}

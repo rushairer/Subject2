@@ -307,6 +307,11 @@ Standalone course geometry and judging remain defined in each course's **local f
 - When the active filter excludes the selected event, select the first filtered event without forced scrolling. When no event matches, clear the shared hazard selection and show an explicit empty state instead of silently falling back to an unfiltered event.
 - Keep excluded events visible only as dimmed session-position context in the overview/timeline. They must not be clickable or keyboard-focusable while excluded.
 - User-facing copy must say that “no follow-up summary” means no later node was automatically summarized inside the current evidence window; it must not imply that the driver took no valid evasive action.
+- Same-kind comparison is a factual replay aid only. It must compare events within the current filtered event set and group only identical hazard kinds; never compare unlike hazard kinds in a ranked table.
+- Comparison columns stay in chronological trigger order. Do not sort by reaction time, speed, distance or any other metric, and do not add best/worst labels, color grades, scores or winner semantics.
+- Trigger-near speed must come from the existing event-context nearest recorded sample. Post-trigger minimum speed uses only real same-project samples inside the fixed +3 s context window; if recording coverage is shorter, use only the available interval and label the UI accordingly.
+- Throttle-release, brake and stop timing must reuse structured analyzer evidence even when the analyzer observed a response beyond the visible +3 s curve. Steering comparison may show only existing structured steering-change evidence; never derive a new steering score merely to fill a comparison cell.
+- Missing comparison metrics render as missing evidence, not zero, not failure and not an inferred value. Clicking a comparison column must reuse the shared event selection/focus path without forced scrolling.
 
 ## Replay driving dynamics timeline
 
