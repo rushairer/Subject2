@@ -112,11 +112,14 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const g = REVERSE_PARKING_GEOMETRY
   const bayCenterX = (g.bayMouthX + g.bayBackX) / 2
   const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
-  const rearTurnRadius = 5.0
   const reverseStagingX = -0.15
-  const outboundTurnX = 3.55
-  const outboundLaneX = outboundTurnX + rearAxle - rearTurnRadius
-  const turnStartZ = rearTurnRadius + rearAxle
+  const reverseTurnStartZ = 5.0 + rearAxle
+  const exitTurnRadius = 4.31
+  // Drive far enough out of the bay that the 4.4 m body is substantially
+  // inside the 6.7 m lane before beginning the 90-degree forward turn.
+  const outboundTurnX = 1.7
+  const outboundLaneX = outboundTurnX + rearAxle - exitTurnRadius
+  const turnStartZ = reverseTurnStartZ
   const northStopZ = g.startControlZ + 0.65
   const southStopZ = g.oppositeControlZ - 0.65
   const points: CoachWaypoint[] = []
@@ -182,25 +185,14 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     { steering: 0, distance: 2.9 },
   ] as const
 
-  const reverseNorthArcPoint = (theta: number, south: boolean) => {
-    const cos = Math.cos(theta)
-    const sin = Math.sin(theta)
-    return {
-      x: reverseStagingX + rearTurnRadius * (1 - cos) - rearAxle * sin,
-      z: south
-        ? -(rearTurnRadius * (1 - sin) + rearAxle * cos)
-        : rearTurnRadius * (1 - sin) + rearAxle * cos,
-    }
-  }
-
   const forwardExitArcPoint = (theta: number, north: boolean) => {
     const cos = Math.cos(theta)
     const sin = Math.sin(theta)
     return {
-      x: outboundTurnX + rearAxle * (1 - cos) - rearTurnRadius * sin,
+      x: outboundTurnX + rearAxle * (1 - cos) - exitTurnRadius * sin,
       z: north
-        ? rearTurnRadius * (1 - cos) + rearAxle * sin
-        : -(rearTurnRadius * (1 - cos) + rearAxle * sin),
+        ? exitTurnRadius * (1 - cos) + rearAxle * sin
+        : -(exitTurnRadius * (1 - cos) + rearAxle * sin),
     }
   }
 
@@ -301,7 +293,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.46,
       gear: 1,
       arrivalRadiusMeters: 0.28,
-      pathCurvaturePerMeter: 1 / rearTurnRadius,
+      pathCurvaturePerMeter: 1 / exitTurnRadius,
       label: '驶向另一端 · 到达出库转向点',
     })
   }
@@ -313,7 +305,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.56,
       gear: 1,
       arrivalRadiusMeters: 0.36,
-      pathCurvaturePerMeter: 1 / rearTurnRadius,
+      pathCurvaturePerMeter: 1 / exitTurnRadius,
       label: '驶向另一端 · 按后轴转弯半径进入纵向车道',
     })
   }
@@ -411,7 +403,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.46,
       gear: 1,
       arrivalRadiusMeters: 0.28,
-      pathCurvaturePerMeter: -1 / rearTurnRadius,
+      pathCurvaturePerMeter: -1 / exitTurnRadius,
       label: '返回起始端 · 到达出库转向点',
     })
   }
@@ -423,7 +415,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
       targetSpeedMps: 0.56,
       gear: 1,
       arrivalRadiusMeters: 0.36,
-      pathCurvaturePerMeter: -1 / rearTurnRadius,
+      pathCurvaturePerMeter: -1 / exitTurnRadius,
       label: '返回起始端 · 按后轴转弯半径进入纵向车道',
     })
   }
