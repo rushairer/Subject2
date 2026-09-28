@@ -128,3 +128,14 @@ test('session overview treats tiny steering evidence as display noise rather tha
 
   assert.equal(overview.counts.withSteeringChange, 1)
 })
+
+
+test('session overview stays empty and safe when there are no replay hazard events', () => {
+  const overview = buildDrivingDynamicsSessionOverview([], Number.NaN, Number.NaN)
+
+  assert.equal(overview.startTime, 0)
+  assert.equal(overview.endTime, 0)
+  assert.equal(overview.durationSeconds, 0)
+  assert.equal(overview.counts.total, 0)
+  assert.deepEqual(overview.markers, [])
+})
