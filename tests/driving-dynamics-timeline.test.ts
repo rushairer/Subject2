@@ -7,9 +7,9 @@ import {
 } from '../src/replay/drivingDynamicsTimeline'
 import {
   buildDrivingDynamicsEventMarkers,
-  drivingDynamicsEventId,
   type DrivingDynamicsEventSample,
 } from '../src/replay/drivingDynamicsEvents'
+import { drivingDynamicsEventId } from '../src/replay/drivingDynamicsEventIdentity'
 
 function sample(
   t: number,
