@@ -185,9 +185,14 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     { steering: 0, distance: 2.9 },
   ] as const
   const secondReverseParkingSegments = reverseParkingSegments.map(
-    segment => ({
+    (segment, index) => ({
       steering: -segment.steering,
-      distance: segment.distance,
+      // Keep a little extra rear clearance from the 5.1 m bay back line on
+      // the mirrored second entry. The real body judge includes all corners.
+      distance:
+        index === reverseParkingSegments.length - 1
+          ? segment.distance - 0.15
+          : segment.distance,
     }),
   )
 
