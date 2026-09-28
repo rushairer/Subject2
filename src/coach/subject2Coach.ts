@@ -405,15 +405,16 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   )
 
   push({
-    x: secondParkPose.x,
-    z: secondParkPose.z,
+    x: bayCenterX,
+    z: 0,
     targetSpeedMps: 0,
     gear: -1,
     stop: true,
     holdSeconds: 0.72,
     arrivalRadiusMeters: 0.18,
     pathCurvaturePerMeter: 0,
-    label: '第二次倒库 · 完全入库并停稳',
+    headingHoldRadians: Math.PI * 1.5,
+    label: '第二次倒库 · 对准库位中心后停稳',
   })
 
 
