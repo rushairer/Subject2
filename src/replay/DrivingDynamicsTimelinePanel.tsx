@@ -10,6 +10,11 @@ import {
   buildDrivingDynamicsTimeline,
   dynamicsGearLabel,
 } from './drivingDynamicsTimeline'
+import {
+  buildDrivingDynamicsEventContext,
+  type DrivingDynamicsEventContext,
+  type DrivingDynamicsEventContextSample,
+} from './drivingDynamicsEventContext'
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 230
@@ -17,6 +22,17 @@ const SPEED_TOP = 24
 const SPEED_BOTTOM = 132
 const GEAR_TOP = 158
 const GEAR_BOTTOM = 214
+
+const CONTEXT_VIEW_WIDTH = 1000
+const CONTEXT_VIEW_HEIGHT = 292
+const CONTEXT_PLOT_LEFT = 105
+const CONTEXT_PLOT_RIGHT = 982
+const CONTEXT_TRACKS = {
+  speed: { top: 20, bottom: 72 },
+  throttle: { top: 86, bottom: 138 },
+  brake: { top: 152, bottom: 204 },
+  steering: { top: 218, bottom: 270 },
+} as const
 
 const EVENT_OFFSETS: Record<DrivingDynamicsEventKind, number> = {
   'sudden-brake': 16,
@@ -94,6 +110,253 @@ function durationLabel(seconds: number) {
   return `${minutes} 分 ${remainder} 秒`
 }
 
+function contextTimeX(relativeTime: number, windowSeconds: number) {
+  const duration = Math.max(0.2, windowSeconds * 2)
+  const ratio = clamp01((relativeTime + windowSeconds) / duration)
+  return CONTEXT_PLOT_LEFT +
+    ratio * (CONTEXT_PLOT_RIGHT - CONTEXT_PLOT_LEFT)
+}
+
+function contextValueY(
+  value: number,
+  minimum: number,
+  maximum: number,
+  top: number,
+  bottom: number,
+) {
+  const range = Math.max(0.0001, maximum - minimum)
+  const ratio = clamp01((value - minimum) / range)
+  return bottom - ratio * (bottom - top)
+}
+
+function contextSeriesPath(
+  samples: readonly DrivingDynamicsEventContextSample[],
+  windowSeconds: number,
+  pick: (sample: DrivingDynamicsEventContextSample) => number | undefined,
+  minimum: number,
+  maximum: number,
+  top: number,
+  bottom: number,
+) {
+  let path = ''
+  let drawing = false
+
+  for (const sample of samples) {
+    const value = pick(sample)
+    if (value == null || !Number.isFinite(value)) {
+      drawing = false
+      continue
+    }
+
+    const x = contextTimeX(sample.relativeTime, windowSeconds)
+    const y = contextValueY(value, minimum, maximum, top, bottom)
+    path += `${drawing ? ' L' : ' M'} ${x.toFixed(2)} ${y.toFixed(2)}`
+    drawing = true
+  }
+
+  return path
+}
+
+function contextPercentLabel(value: number | undefined) {
+  return value == null ? '--' : `${Math.round(value)}%`
+}
+
+function contextSteeringLabel(turns: number | undefined) {
+  if (turns == null) return '--'
+  if (Math.abs(turns) < 0.01) return '回正'
+  return `${turns < 0 ? '左' : '右'} ${Math.abs(turns).toFixed(2)} 圈`
+}
+
+function contextRelativeTimeLabel(value: number | undefined) {
+  if (value == null) return '--'
+  if (Math.abs(value) < 0.05) return '0.0s'
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}s`
+}
+
+function HazardEventContextChart({
+  context,
+}: {
+  context: DrivingDynamicsEventContext
+}) {
+  const trigger = context.triggerSample
+  const truncated =
+    context.beforeCoverageSeconds < context.windowSeconds - 0.05 ||
+    context.afterCoverageSeconds < context.windowSeconds - 0.05
+  const triggerX = contextTimeX(0, context.windowSeconds)
+  const steeringScale = context.steeringScaleTurns
+
+  if (context.samples.length === 0) {
+    return <div className="replay-hazard-context empty">
+      当前事件附近没有可用的同项目轨迹样本。
+    </div>
+  }
+
+  const tracks = [
+    {
+      key: 'speed',
+      label: '速度',
+      detail: `0–${context.speedScaleMaxKmh} km/h`,
+      path: contextSeriesPath(
+        context.samples,
+        context.windowSeconds,
+        sample => sample.speedKmh,
+        0,
+        context.speedScaleMaxKmh,
+        CONTEXT_TRACKS.speed.top,
+        CONTEXT_TRACKS.speed.bottom,
+      ),
+      top: CONTEXT_TRACKS.speed.top,
+      bottom: CONTEXT_TRACKS.speed.bottom,
+    },
+    {
+      key: 'throttle',
+      label: '油门',
+      detail: '0–100%',
+      path: contextSeriesPath(
+        context.samples,
+        context.windowSeconds,
+        sample => sample.throttlePercent,
+        0,
+        100,
+        CONTEXT_TRACKS.throttle.top,
+        CONTEXT_TRACKS.throttle.bottom,
+      ),
+      top: CONTEXT_TRACKS.throttle.top,
+      bottom: CONTEXT_TRACKS.throttle.bottom,
+    },
+    {
+      key: 'brake',
+      label: '制动',
+      detail: '0–100%',
+      path: contextSeriesPath(
+        context.samples,
+        context.windowSeconds,
+        sample => sample.brakePercent,
+        0,
+        100,
+        CONTEXT_TRACKS.brake.top,
+        CONTEXT_TRACKS.brake.bottom,
+      ),
+      top: CONTEXT_TRACKS.brake.top,
+      bottom: CONTEXT_TRACKS.brake.bottom,
+    },
+    {
+      key: 'steering',
+      label: '方向盘',
+      detail: `±${steeringScale.toFixed(2)} 圈`,
+      path: contextSeriesPath(
+        context.samples,
+        context.windowSeconds,
+        sample => sample.steeringTurns,
+        -steeringScale,
+        steeringScale,
+        CONTEXT_TRACKS.steering.top,
+        CONTEXT_TRACKS.steering.bottom,
+      ),
+      top: CONTEXT_TRACKS.steering.top,
+      bottom: CONTEXT_TRACKS.steering.bottom,
+    },
+  ]
+
+  return <div className="replay-hazard-context">
+    <div className="replay-hazard-context-head">
+      <span>
+        <b>事件前后操作链</b>
+        <small>
+          以真实触发时刻为 0 秒，查看前 {context.windowSeconds.toFixed(0)} 秒到后 {context.windowSeconds.toFixed(0)} 秒连续采样。
+        </small>
+      </span>
+      <i className={truncated ? 'truncated' : ''}>
+        覆盖 前 {context.beforeCoverageSeconds.toFixed(1)}s / 后 {context.afterCoverageSeconds.toFixed(1)}s
+      </i>
+    </div>
+
+    <div className="replay-hazard-trigger-title">
+      触发附近状态 · 最近采样点 {contextRelativeTimeLabel(trigger?.relativeTime)}
+    </div>
+    <div className="replay-hazard-trigger-readout" aria-label="风险事件触发附近操作状态">
+      <span><b>{trigger ? trigger.speedKmh.toFixed(1) : '--'}</b><small>km/h</small></span>
+      <span><b>{contextPercentLabel(trigger?.throttlePercent)}</b><small>油门</small></span>
+      <span><b>{contextPercentLabel(trigger?.brakePercent)}</b><small>制动</small></span>
+      <span><b>{contextSteeringLabel(trigger?.steeringTurns)}</b><small>方向盘</small></span>
+    </div>
+
+    <div className="replay-hazard-context-chart">
+      <svg
+        viewBox={`0 0 ${CONTEXT_VIEW_WIDTH} ${CONTEXT_VIEW_HEIGHT}`}
+        role="img"
+        aria-label="风险事件前后三秒的速度、油门、制动和方向盘连续变化"
+      >
+        <rect
+          className="replay-hazard-context-before"
+          x={CONTEXT_PLOT_LEFT}
+          y="8"
+          width={triggerX - CONTEXT_PLOT_LEFT}
+          height="270"
+        />
+        <rect
+          className="replay-hazard-context-after"
+          x={triggerX}
+          y="8"
+          width={CONTEXT_PLOT_RIGHT - triggerX}
+          height="270"
+        />
+
+        {tracks.map(track => <g key={track.key}>
+          <line
+            className="replay-hazard-context-grid"
+            x1={CONTEXT_PLOT_LEFT}
+            x2={CONTEXT_PLOT_RIGHT}
+            y1={track.bottom}
+            y2={track.bottom}
+          />
+          {track.key === 'steering' && <line
+            className="replay-hazard-context-zero"
+            x1={CONTEXT_PLOT_LEFT}
+            x2={CONTEXT_PLOT_RIGHT}
+            y1={(track.top + track.bottom) / 2}
+            y2={(track.top + track.bottom) / 2}
+          />}
+          <text className="replay-hazard-context-label" x="8" y={track.top + 17}>
+            {track.label}
+          </text>
+          <text className="replay-hazard-context-scale" x="8" y={track.top + 35}>
+            {track.detail}
+          </text>
+          <path
+            className={`replay-hazard-context-line ${track.key}`}
+            d={track.path}
+          />
+        </g>)}
+
+        <line
+          className="replay-hazard-context-trigger"
+          x1={triggerX}
+          x2={triggerX}
+          y1="8"
+          y2="278"
+        />
+        <text className="replay-hazard-context-trigger-label" x={triggerX + 8} y="18">
+          触发
+        </text>
+        <text className="replay-hazard-context-time" x={CONTEXT_PLOT_LEFT} y="289">
+          -{context.windowSeconds.toFixed(0)}s
+        </text>
+        <text className="replay-hazard-context-time" x={triggerX} y="289" textAnchor="middle">
+          0s
+        </text>
+        <text className="replay-hazard-context-time" x={CONTEXT_PLOT_RIGHT} y="289" textAnchor="end">
+          +{context.windowSeconds.toFixed(0)}s
+        </text>
+      </svg>
+    </div>
+
+    {truncated && <p className="replay-hazard-context-note">
+      本段录像靠近训练开始或结束，仅展示实际存在的采样；缺失部分不会补值或推测。
+    </p>}
+  </div>
+}
+
 export function DrivingDynamicsTimeline({
   samples,
   selectedEventId,
@@ -117,6 +380,12 @@ export function DrivingDynamicsTimeline({
   const selection = drivingDynamicsEventSelection(events, selectedEventId)
   const selectedEvent = selectedEventId ? selection.event : null
   const browserEvent = selection.event
+  const browserContext = useMemo(
+    () => browserEvent
+      ? buildDrivingDynamicsEventContext(model.samples, browserEvent)
+      : null,
+    [browserEvent, model.samples],
+  )
 
   useEffect(() => {
     if (selectedEventId || events.length === 0) return
@@ -291,7 +560,7 @@ export function DrivingDynamicsTimeline({
           <span className="replay-hazard-browser-copy">
             <b>{browserEvent.label}</b>
             <small>
-              {(browserEvent.t - model.startTime).toFixed(1)}s · {browserEvent.speedKmh.toFixed(1)} km/h · {projectLabel(browserEvent.project)}
+              触发 {(browserEvent.triggerTime - model.startTime).toFixed(1)}s · 证据位置 {(browserEvent.t - model.startTime).toFixed(1)}s · {projectLabel(browserEvent.project)}
             </small>
             <em>{browserEvent.summary}</em>
           </span>
@@ -303,6 +572,8 @@ export function DrivingDynamicsTimeline({
             查看当前轨迹
           </button>
         </div>}
+
+        {browserContext && <HazardEventContextChart context={browserContext} />}
       </div>
 
       <div className="replay-dynamics-events" aria-label="危险交通事件">

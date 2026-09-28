@@ -288,6 +288,10 @@ Standalone course geometry and judging remain defined in each course's **local f
 - The browser may summarize existing evidence such as gap, closest distance and reaction time, but it must not add penalty points, mutate infractions or claim an unobserved reaction.
 - A stale or missing selected-event ID falls back safely to the first current event. Empty sessions render no browser.
 - Keyboard left/right navigation is allowed only within the hazard browser and must preserve normal button accessibility.
+- Event context uses the analyzer's real `triggerTime` as 0 s and shows a fixed ±3 s window. The representative evidence time may differ and must remain labeled separately.
+- Context samples must come from the existing trajectory stream and the event's exact project only. Never borrow a neighboring project, synthesize missing checkpoints, interpolate across missing control fields, or extend recording boundaries to make the window look complete.
+- Speed, throttle, brake and steering traces are presentation evidence only. Missing optional pedal/steering values create visible gaps rather than inferred values; boundary-shortened windows must disclose their actual before/after coverage.
+- The trigger-state readout uses the nearest recorded sample and must be described as being near the trigger, not as an exact measurement when no sample exists at exactly 0 s.
 
 ## Replay driving dynamics timeline
 
