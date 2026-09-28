@@ -587,7 +587,9 @@ function sideParkingWaypoints(): CoachWaypoint[] {
     gear: -1,
     stop: true,
     holdSeconds: 0.72,
-    arrivalRadiusMeters: 0.18,
+    // The bay has ample longitudinal clearance; capture the stop early enough
+    // to brake before automatic creep can step past a tiny point target.
+    arrivalRadiusMeters: 0.5,
     pathCurvaturePerMeter: 0,
     headingHoldRadians: 0,
     label: '侧方停车示范 · 车身完全入库并停稳',
