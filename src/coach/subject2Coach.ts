@@ -112,7 +112,7 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const g = REVERSE_PARKING_GEOMETRY
   const bayCenterX = (g.bayMouthX + g.bayBackX) / 2
   const rearAxle = DRIVING_RULES.steering.rearAxleFromCenterMeters
-  const reverseStagingX = -0.30
+  const reverseStagingX = 0
   const reverseTurnStartZ = 5.0 + rearAxle
   const exitTurnRadius = 4.31
   // Drive far enough out of the bay that the 4.4 m body is substantially
