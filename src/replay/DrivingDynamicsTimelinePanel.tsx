@@ -736,7 +736,7 @@ export function DrivingDynamicsTimeline({
           className="replay-dynamics-gear"
           d={gearPath(model.chartSamples, model.startTime, model.durationSeconds)}
         />
-        {filteredEvents.map(event => {
+        {events.map(event => {
           const x = timeX(event.t, model.startTime, model.durationSeconds)
           const curveY = speedY(event.speedKmh, speedScaleMax)
           const markerY = eventY(event.kind, curveY)
@@ -880,8 +880,8 @@ export function DrivingDynamicsTimeline({
         />}
       </div>
 
-      <div className="replay-dynamics-events" aria-label="危险交通事件">
-      {events.map(event => {
+      <div className="replay-dynamics-events" aria-label="当前筛选风险事件">
+      {filteredEvents.map(event => {
         const selected = selectedEventId === event.id
         return <button
           type="button"
