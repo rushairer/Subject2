@@ -10,6 +10,10 @@ import {
   buildSuddenBrakeCoachingReport,
   type SuddenBrakeCoachingSample,
 } from '../coaching/suddenBrakeCoaching'
+import {
+  drivingDynamicsEventId,
+  type DrivingDynamicsEventKind,
+} from './drivingDynamicsEventIdentity'
 import type { DrivingDynamicsSample } from './drivingDynamicsTimeline'
 
 export type DrivingDynamicsEventSample =
@@ -18,10 +22,7 @@ export type DrivingDynamicsEventSample =
   CutInResponseCoachingSample &
   PedestrianResponseCoachingSample
 
-export type DrivingDynamicsEventKind =
-  | 'sudden-brake'
-  | 'cut-in'
-  | 'pedestrian'
+export type { DrivingDynamicsEventKind } from './drivingDynamicsEventIdentity'
 
 export interface DrivingDynamicsEventMarker {
   id: string
@@ -42,14 +43,6 @@ const EVENT_META: Record<
   'sudden-brake': { label: '前车急刹', glyph: '急' },
   'cut-in': { label: '电动车加塞', glyph: '切' },
   pedestrian: { label: '行人横穿', glyph: '人' },
-}
-
-export function drivingDynamicsEventId(
-  kind: DrivingDynamicsEventKind,
-  actorId: string,
-  triggerTime: number,
-) {
-  return `${kind}:${actorId}:${triggerTime.toFixed(3)}`
 }
 
 function nearestSampleIndex(
