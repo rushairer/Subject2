@@ -16,6 +16,8 @@ import {
   type CoursePose,
 } from './courseTransform'
 
+export const SUBJECT2_EXAM_ENTRY_CAPTURE_METERS = 1.25
+
 export function subject2ProjectJudgingEnabled(
   continuousExam: boolean,
   entryReached: boolean,
