@@ -1439,6 +1439,7 @@ function Result({
       onStartTraining={onStartTraining}
       onStartTrainingPack={onStartTrainingPack}
       onStartSubject3Practice={onStartSubject3Practice}
+      subject3Practice={session.subject3Practice}
     />
 
     {trainingPack && nextPackState
