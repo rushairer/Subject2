@@ -21,6 +21,11 @@ import { SuddenBrakeCoachingPanel } from './SuddenBrakeCoachingPanel'
 import { CutInResponseCoachingPanel } from './CutInResponseCoachingPanel'
 import { PedestrianResponseCoachingPanel } from './PedestrianResponseCoachingPanel'
 import { DrivingDynamicsTimeline } from './DrivingDynamicsTimelinePanel'
+import {
+  coachDeviationStats,
+  coachReferencePathForReplay,
+  type CoachReferencePoint,
+} from './coachTrajectoryComparison'
 
 export interface TrajectorySample {
   t: number
@@ -209,11 +214,13 @@ function PathMap({
   samples,
   infractions,
   cursorIndex,
+  coachReference,
 }: {
   project: string
   samples: TrajectorySample[]
   infractions: ReplayInfraction[]
   cursorIndex: number
+  coachReference: CoachReferencePoint[]
 }) {
   const width = 640
   const height = 310
@@ -229,10 +236,14 @@ function PathMap({
     ...line,
     points: line.points.map(point => toReplayLocal(point, frame)),
   }))
+  const localCoachReference = coachReference.map(point =>
+    toReplayLocal(point, frame),
+  )
 
   const allPoints = [
     ...localSamples.map(({ x, z }) => ({ x, z })),
     ...localReferences.flatMap(line => line.points),
+    ...localCoachReference,
   ]
   const xs = allPoints.map(item => item.x)
   const zs = allPoints.map(item => item.z)
@@ -262,6 +273,9 @@ function PathMap({
     first.heading,
   ) * 180 / Math.PI
   const points = localSamples.map(item => mapPoint(item.x, item.z).join(',')).join(' ')
+  const coachPoints = localCoachReference
+    .map(item => mapPoint(item.x, item.z).join(','))
+    .join(' ')
   const progressPoints = localSamples
     .slice(0, safeCursorIndex + 1)
     .map(item => mapPoint(item.x, item.z).join(','))
@@ -269,7 +283,7 @@ function PathMap({
   const start = mapPoint(localSamples[0].x, localSamples[0].z)
   const end = mapPoint(localSamples[localSamples.length - 1].x, localSamples[localSamples.length - 1].z)
 
-  return <svg className="replay-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="本次驾驶轨迹俯视图；屏幕上方为车辆初始前进方向">
+  return <svg className="replay-map" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="本次驾驶轨迹与教练标准轨迹对照俯视图；屏幕上方为车辆初始前进方向">
     <rect x="0" y="0" width={width} height={height} rx="18" className="replay-map-bg" />
 
     {localReferences.map((line, index) => (
@@ -280,6 +294,7 @@ function PathMap({
       />
     ))}
 
+    {coachPoints && <polyline points={coachPoints} className="replay-coach-path" />}
     <polyline points={points} className="replay-path-shadow" />
     <polyline points={points} className="replay-path" />
     {safeCursorIndex > 0 && <polyline points={progressPoints} className="replay-path-progress" />}
@@ -319,6 +334,7 @@ function PathMap({
 
 function ReplayLegend() {
   return <div className="replay-legend" aria-label="轨迹图例">
+    <span><i className="replay-legend-line coach" />教练标准</span>
     <span><i className="replay-legend-dot start" />起点</span>
     <span><i className="replay-legend-dot end" />终点</span>
     <span><i className="replay-legend-dot error" />扣分位置</span>
@@ -508,6 +524,16 @@ function ProjectReplay({
   const safeCursorIndex = Math.max(0, Math.min(cursorIndex, samples.length - 1))
   const current = samples[safeCursorIndex]
   const stats = pathStats(samples)
+  const automatic = samples.find(sample => sample.automatic != null)?.automatic ?? true
+  const coachReference = useMemo(
+    () => coachReferencePathForReplay(project, automatic),
+    [project, automatic],
+  )
+  const coachDeviation = useMemo(
+    () => coachDeviationStats(samples, coachReference),
+    [samples, coachReference],
+  )
+  const currentCoachDeviation = coachDeviation?.distances[safeCursorIndex]
   const projectElapsed = current.t - samples[0].t
 
   return <article className="replay-project" ref={articleRef}>
@@ -517,6 +543,8 @@ function ProjectReplay({
         <span>{stats.distance >= 1000 ? `${(stats.distance / 1000).toFixed(2)} km` : `${Math.round(stats.distance)} m`}</span>
         <span>最高 {Math.round(stats.maxSpeed)} km/h</span>
         <span>{Math.round(stats.duration)} s</span>
+        {coachDeviation && <span className="replay-coach-stat">平均偏差 {coachDeviation.averageMeters.toFixed(2)} m</span>}
+        {coachDeviation && <span className="replay-coach-stat">最大偏差 {coachDeviation.maxMeters.toFixed(2)} m</span>}
       </div>
     </div>
 
@@ -525,6 +553,7 @@ function ProjectReplay({
       samples={samples}
       infractions={infractions}
       cursorIndex={safeCursorIndex}
+      coachReference={coachReference}
     />
 
     <div className="replay-scrubber">
@@ -550,6 +579,11 @@ function ProjectReplay({
         <span><b>{headlampLabel(current)}</b><small>前照灯</small></span>
         <span><b>{pedalLabel(current.throttle)}</b><small>油门</small></span>
         <span><b>{pedalLabel(current.brake)}</b><small>制动</small></span>
+        {currentCoachDeviation != null &&
+          <span className="replay-coach-deviation">
+            <b>{currentCoachDeviation.toFixed(2)} m</b>
+            <small>距教练标准轨迹</small>
+          </span>}
         {current.leadTimeGapSeconds != null && current.leadGapMeters != null &&
           <span>
             <b>{current.leadTimeGapSeconds.toFixed(1)} 秒</b>

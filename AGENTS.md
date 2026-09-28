@@ -567,3 +567,6 @@ The “本次优先改进” block must remain readable inside the result-card c
 - New supported projects require deterministic physics-integrated regression coverage that runs the real coach controller, real vehicle physics and real project judge and proves completion without infractions.
 - Keep coach/golden-driver behavior deterministic so it can later serve as CI regression coverage for physics, geometry and judging changes.
 - Continuous Subject 2 coach routing must use `subject2ExamLayout.ts` transforms when added; do not reuse standalone-local waypoints directly in world space.
+- `src/replay/coachTrajectoryComparison.ts` owns replay-only coach reference paths and geometric deviation measurements. These values are advisory evidence only: never emit infractions, subtract points, alter pass/fail, or feed training-priority scoring.
+- Standalone and in-project continuous Subject 2 replay samples use local course coordinates and must compare against the canonical local coach plan. `transition:*` replay samples use world coordinates and must compare against the continuous world-space connector plan.
+- Coach-reference replay changes require deterministic coverage for local paths, continuous connectors, legacy history without `automatic` metadata, and point-to-polyline deviation math.
