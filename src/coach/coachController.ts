@@ -1,0 +1,208 @@
+import { DRIVING_RULES } from '../rules/drivingRules'
+import { normalizeHeadingDelta } from '../sim/vehicleFrame'
+
+export interface CoachVehicleState {
+  x: number
+  z: number
+  heading: number
+  speed: number
+  gear: number
+}
+
+export interface CoachWaypoint {
+  x: number
+  z: number
+  /** Positive magnitude. Direction comes from gear. */
+  targetSpeedMps: number
+  gear: -1 | 1
+  arrivalRadiusMeters?: number
+  stop?: boolean
+  holdSeconds?: number
+  label?: string
+}
+
+export interface CoachPlan {
+  id: string
+  title: string
+  waypoints: readonly CoachWaypoint[]
+  lookAheadWaypoints?: number
+}
+
+export interface CoachRuntime {
+  waypointIndex: number
+  holdSeconds: number
+  completed: boolean
+}
+
+export interface CoachCommand {
+  throttle: number
+  brake: number
+  clutch: number
+  steeringWheelTarget: number
+  gear: -1 | 1
+  engineOn: true
+  handbrake: boolean
+  seatbelt: true
+  waypointIndex: number
+  completed: boolean
+  status: string
+}
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value))
+
+function bearingTo(
+  from: Pick<CoachVehicleState, 'x' | 'z'>,
+  to: Pick<CoachWaypoint, 'x' | 'z'>,
+) {
+  return Math.atan2(to.x - from.x, -(to.z - from.z))
+}
+
+function distanceTo(
+  from: Pick<CoachVehicleState, 'x' | 'z'>,
+  to: Pick<CoachWaypoint, 'x' | 'z'>,
+) {
+  return Math.hypot(to.x - from.x, to.z - from.z)
+}
+
+export function createCoachRuntime(): CoachRuntime {
+  return {
+    waypointIndex: 0,
+    holdSeconds: 0,
+    completed: false,
+  }
+}
+
+/**
+ * Deterministic low-level path follower for coach/golden-driver sessions.
+ *
+ * This controller deliberately emits the same steering-wheel/pedal inputs a
+ * human driver would. It never moves the vehicle pose directly, so the real
+ * vehicle physics, collision system and course judges remain authoritative.
+ */
+export function stepCoachController(
+  plan: CoachPlan,
+  vehicle: CoachVehicleState,
+  previous: CoachRuntime,
+  dt: number,
+  automatic: boolean,
+): { runtime: CoachRuntime; command: CoachCommand } {
+  if (plan.waypoints.length === 0) {
+    throw new Error('Coach plan requires at least one waypoint')
+  }
+
+  const runtime = { ...previous }
+  if (runtime.completed) {
+    return {
+      runtime,
+      command: {
+        throttle: 0,
+        brake: 1,
+        clutch: automatic ? 0 : 1,
+        steeringWheelTarget: 0,
+        gear: plan.waypoints[plan.waypoints.length - 1].gear,
+        engineOn: true,
+        handbrake: true,
+        seatbelt: true,
+        waypointIndex: runtime.waypointIndex,
+        completed: true,
+        status: '教练示范完成',
+      },
+    }
+  }
+
+  const lastIndex = plan.waypoints.length - 1
+  let index = clamp(runtime.waypointIndex, 0, lastIndex)
+  let target = plan.waypoints[index]
+  let distance = distanceTo(vehicle, target)
+  const arrivalRadius = target.arrivalRadiusMeters ?? 0.75
+
+  while (!target.stop && index < lastIndex && distance <= arrivalRadius) {
+    index += 1
+    target = plan.waypoints[index]
+    distance = distanceTo(vehicle, target)
+  }
+  runtime.waypointIndex = index
+
+  const nearStop = !!target.stop && distance <= arrivalRadius
+  if (nearStop && Math.abs(vehicle.speed) <= 0.06) {
+    runtime.holdSeconds += dt
+    if (runtime.holdSeconds >= (target.holdSeconds ?? 0.35)) {
+      if (index >= lastIndex) {
+        runtime.completed = true
+      } else {
+        runtime.waypointIndex = index + 1
+        runtime.holdSeconds = 0
+        target = plan.waypoints[runtime.waypointIndex]
+        distance = distanceTo(vehicle, target)
+      }
+    }
+  } else if (!nearStop) {
+    runtime.holdSeconds = 0
+  }
+
+  if (!target.stop && index >= lastIndex && distance <= arrivalRadius) {
+    runtime.completed = true
+  }
+
+  const direction = target.gear
+  const steeringIndex = Math.min(
+    lastIndex,
+    runtime.waypointIndex + (plan.lookAheadWaypoints ?? 3),
+  )
+  const steeringTarget = plan.waypoints[steeringIndex]
+  const steeringDistance = Math.max(0.5, distanceTo(vehicle, steeringTarget))
+  const travelBearing = bearingTo(vehicle, steeringTarget)
+  const travelHeading = normalizeHeadingDelta(
+    vehicle.heading + (direction < 0 ? Math.PI : 0),
+  )
+  const alpha = normalizeHeadingDelta(travelBearing - travelHeading)
+  const curvature = 2 * Math.sin(alpha) / steeringDistance
+  const roadWheelTarget = clamp(
+    Math.atan(DRIVING_RULES.steering.wheelbaseMeters * curvature) * direction,
+    -DRIVING_RULES.steering.roadWheelMaxAngleRadians,
+    DRIVING_RULES.steering.roadWheelMaxAngleRadians,
+  )
+  const maxSteeringWheelAngle =
+    DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
+  const steeringWheelTarget =
+    roadWheelTarget /
+    DRIVING_RULES.steering.roadWheelMaxAngleRadians *
+    maxSteeringWheelAngle
+
+  const requestedSpeed = nearStop ? 0 : Math.max(0, target.targetSpeedMps)
+  const alongSpeed = vehicle.speed * direction
+  let throttle = 0
+  let brake = 0
+
+  if (alongSpeed < -0.04) {
+    brake = 0.85
+  } else if (alongSpeed > requestedSpeed + 0.12) {
+    brake = clamp((alongSpeed - requestedSpeed) * 0.75, 0.12, 0.7)
+  } else if (requestedSpeed > 0 && alongSpeed < requestedSpeed - 0.05) {
+    throttle = clamp(0.18 + (requestedSpeed - Math.max(0, alongSpeed)) * 0.2, 0.18, 0.42)
+  }
+
+  const clutch = automatic
+    ? 0
+    : Math.abs(vehicle.speed) < 0.75
+      ? 0.46
+      : 0.06
+
+  return {
+    runtime,
+    command: {
+      throttle,
+      brake,
+      clutch,
+      steeringWheelTarget: runtime.completed ? 0 : steeringWheelTarget,
+      gear: target.gear,
+      engineOn: true,
+      handbrake: runtime.completed,
+      seatbelt: true,
+      waypointIndex: runtime.waypointIndex,
+      completed: runtime.completed,
+      status: target.label ?? `教练驾驶 · 路径点 ${runtime.waypointIndex + 1}/${plan.waypoints.length}`,
+    },
+  }
+}
