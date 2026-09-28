@@ -1,0 +1,341 @@
+import { DRIVING_RULES } from '../rules/drivingRules'
+import { normalizeHeadingDelta } from '../sim/vehicleFrame'
+import {
+  SUBJECT3_EVENTS,
+  SUBJECT3_ROUTE_LENGTH,
+  poseAtRouteDistance,
+  projectToSubject3Route,
+} from '../subject3/subject3Route'
+import {
+  observeSubject3LeadVehicle,
+} from '../subject3/subject3LeadVehicle'
+import {
+  observeSubject3CutInHazard,
+  observeSubject3PedestrianHazard,
+} from '../subject3/subject3HazardObservation'
+import type { Subject3TrafficState } from '../subject3/subject3Traffic'
+
+export interface Subject3CoachVehicle {
+  x: number
+  z: number
+  heading: number
+  speed: number
+  gear: number
+}
+
+export interface Subject3CoachRuntime {
+  elapsedSeconds: number
+}
+
+export interface Subject3CoachCommand {
+  throttle: number
+  brake: number
+  clutch: number
+  steeringWheelTarget: number
+  gear: number
+  engineOn: true
+  handbrake: boolean
+  seatbelt: true
+  leftIndicator: boolean
+  rightIndicator: boolean
+  lowBeam: boolean
+  highBeam: false
+  horn: false
+  lookLeft: boolean
+  lookRight: boolean
+  lookBack: boolean
+  status: string
+}
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value))
+
+const lerp = (a: number, b: number, t: number) =>
+  a + (b - a) * clamp(t, 0, 1)
+
+export function createSubject3CoachRuntime(): Subject3CoachRuntime {
+  return { elapsedSeconds: 0 }
+}
+
+/**
+ * Canonical lane position used by the production coach and CI Golden Driver.
+ * Negative lateral values are the left/overtaking lane; +0.6 m is the
+ * pull-over offset that leaves the training car about 30 cm from the edge.
+ */
+export function subject3CoachDesiredLateral(progress: number) {
+  if (progress >= 1835 && progress < 1915) {
+    return lerp(0, -2.2, (progress - 1835) / 80)
+  }
+  if (progress >= 1915 && progress < 2040) return -2.2
+  if (progress >= 2040 && progress < 2060) {
+    return lerp(-2.2, 0, (progress - 2040) / 20)
+  }
+
+  if (progress >= 2060 && progress < 2110) {
+    return lerp(0, -2.2, (progress - 2060) / 50)
+  }
+  if (progress >= 2110 && progress < 2160) return -2.2
+  if (progress >= 2160 && progress < 2210) {
+    return lerp(-2.2, -1.0, (progress - 2160) / 50)
+  }
+  if (progress >= 2210 && progress < 2240) return -1.0
+  if (progress >= 2240 && progress < 2270) {
+    return lerp(-1.0, 0, (progress - 2240) / 30)
+  }
+
+  if (progress >= 4100 && progress < 4170) {
+    return lerp(0, 0.6, (progress - 4100) / 70)
+  }
+  if (progress >= 4170) return 0.6
+  return 0
+}
+
+export function subject3CoachSignalState(progress: number) {
+  const left =
+    progress <= 120 ||
+    (progress >= 625 && progress <= 770) ||
+    (progress >= 1835 && progress < 2135) ||
+    (progress >= 2235 && progress <= 2380) ||
+    (progress >= 2835 && progress <= 3020) ||
+    (progress >= 3435 && progress <= 3820)
+
+  const right =
+    (progress >= 915 && progress <= 1090) ||
+    (progress >= 2135 && progress <= 2240) ||
+    progress >= 4070
+
+  return { left, right }
+}
+
+export function subject3CoachManualGearState(
+  progress: number,
+  elapsedSeconds: number,
+) {
+  const gearEvent = SUBJECT3_EVENTS.find(event => event.id === 'gear')
+  if (!gearEvent) throw new Error('Subject 3 gear event is missing')
+
+  if (progress < 5 && elapsedSeconds < 3.3) {
+    return { gear: 1, clutch: 1 }
+  }
+  if (progress < 5 && elapsedSeconds < 4.3) {
+    return {
+      gear: 1,
+      clutch: DRIVING_RULES.manualTransmission.biteClutchPosition,
+    }
+  }
+  if (progress < 5 && elapsedSeconds < 4.4) {
+    return { gear: 1, clutch: 1 }
+  }
+  if (progress < gearEvent.start) return { gear: 1, clutch: 0 }
+  if (progress < gearEvent.start + 5) return { gear: 2, clutch: 1 }
+  if (progress < gearEvent.start + 40) return { gear: 2, clutch: 0 }
+  if (progress < gearEvent.start + 45) return { gear: 3, clutch: 1 }
+  if (progress < gearEvent.start + 80) return { gear: 3, clutch: 0 }
+  if (progress < gearEvent.start + 85) return { gear: 4, clutch: 1 }
+  if (progress < gearEvent.end + 10) return { gear: 4, clutch: 0 }
+  if (progress < gearEvent.end + 15) return { gear: 3, clutch: 1 }
+  return { gear: 3, clutch: 0 }
+}
+
+function routeTarget(progress: number, lateral: number) {
+  const pose = poseAtRouteDistance(progress)
+  return {
+    x: pose.x + pose.rightX * lateral,
+    z: pose.z + pose.rightZ * lateral,
+  }
+}
+
+function eventTitle(progress: number) {
+  const event =
+    SUBJECT3_EVENTS.find(item => progress >= item.start && progress <= item.end) ??
+    SUBJECT3_EVENTS.find(item => progress < item.start)
+  return event?.title ?? '靠边停车'
+}
+
+function defensiveTargetSpeedKmh(
+  vehicle: Subject3CoachVehicle,
+  traffic: Readonly<Subject3TrafficState>,
+  progress: number,
+) {
+  let target = 22
+  let reason = ''
+
+  const lead = observeSubject3LeadVehicle(vehicle, traffic)
+  if (lead) {
+    const shortGap =
+      lead.bumperGapMeters < 14 ||
+      (lead.timeGapSeconds > 0 && lead.timeGapSeconds < 2.2) ||
+      (lead.timeToCollisionSeconds != null &&
+        lead.timeToCollisionSeconds < 3.2)
+    if (shortGap) {
+      target = Math.min(target, Math.max(0, lead.leadSpeedMps * 3.6))
+      reason = lead.scenario === 'sudden-brake'
+        ? '前车急刹，正在制动避让'
+        : '前车距离较近，正在控制车距'
+    }
+  }
+
+  const cutIn = observeSubject3CutInHazard(vehicle, traffic)
+  if (
+    cutIn?.conflict &&
+    cutIn.progressDeltaMeters >= -1 &&
+    cutIn.progressDeltaMeters <= 18
+  ) {
+    target = 0
+    reason = '电动车加塞冲突，正在制动避让'
+  }
+
+  const pedestrian = observeSubject3PedestrianHazard(vehicle, traffic)
+  if (
+    pedestrian?.conflict &&
+    pedestrian.progressDeltaMeters >= -2 &&
+    pedestrian.progressDeltaMeters <= 24
+  ) {
+    target = 0
+    reason = '行人横穿冲突，停车让行'
+  }
+
+  if (
+    traffic.crosswalkPedestrianConflict &&
+    progress >= 2420 &&
+    progress <= 2605
+  ) {
+    target = 0
+    reason = '人行横道有行人，停车让行'
+  }
+
+  return { target, reason }
+}
+
+/**
+ * Deterministic Subject 3 Golden Driver.
+ *
+ * It emits only ordinary driver controls. Rendering, traffic collisions,
+ * vehicle physics and the existing Subject 3 judge remain authoritative.
+ */
+export function stepSubject3Coach(
+  vehicle: Subject3CoachVehicle,
+  previous: Subject3CoachRuntime,
+  dt: number,
+  automatic: boolean,
+  night: boolean,
+  traffic: Readonly<Subject3TrafficState>,
+): { runtime: Subject3CoachRuntime; command: Subject3CoachCommand } {
+  const runtime = {
+    elapsedSeconds: previous.elapsedSeconds + Math.max(0, dt),
+  }
+  const projection = projectToSubject3Route(vehicle.x, vehicle.z)
+  const progress = projection.progress
+  const waitingForStart = progress < 5 && runtime.elapsedSeconds < 3.3
+  const stoppingForPullOver = progress >= 4180
+  const securedPullOver =
+    stoppingForPullOver && Math.abs(vehicle.speed) < 0.05
+
+  const signals = subject3CoachSignalState(progress)
+  const manual = automatic
+    ? { gear: 1, clutch: 0 }
+    : subject3CoachManualGearState(progress, runtime.elapsedSeconds)
+
+  let gear = manual.gear
+  let clutch = manual.clutch
+  let handbrake = waitingForStart
+
+  if (stoppingForPullOver) {
+    if (!automatic) clutch = 1
+    handbrake = securedPullOver
+    if (securedPullOver) gear = 0
+  }
+
+  const lookAheadProgress = Math.min(
+    SUBJECT3_ROUTE_LENGTH,
+    progress + 6,
+  )
+  const target = routeTarget(
+    lookAheadProgress,
+    subject3CoachDesiredLateral(progress),
+  )
+  const desiredHeading = Math.atan2(
+    target.x - vehicle.x,
+    -(target.z - vehicle.z),
+  )
+  const headingError = normalizeHeadingDelta(
+    desiredHeading - vehicle.heading,
+  )
+  const roadWheelTarget = clamp(
+    headingError * 1.5,
+    -DRIVING_RULES.steering.roadWheelMaxAngleRadians,
+    DRIVING_RULES.steering.roadWheelMaxAngleRadians,
+  )
+  const maxSteeringWheelAngle =
+    DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
+  const steeringWheelTarget =
+    roadWheelTarget /
+    DRIVING_RULES.steering.roadWheelMaxAngleRadians *
+    maxSteeringWheelAngle
+
+  const defensive = defensiveTargetSpeedKmh(
+    vehicle,
+    traffic,
+    progress,
+  )
+  const targetSpeedKmh =
+    waitingForStart || stoppingForPullOver
+      ? 0
+      : defensive.target
+  const speedKmh = Math.abs(vehicle.speed) * 3.6
+  let throttle = 0
+  let brake = 0
+
+  if (targetSpeedKmh <= 0.1) {
+    if (speedKmh > 0.15) brake = stoppingForPullOver ? 0.72 : 0.64
+  } else if (!automatic && clutch === 1) {
+    throttle = 0
+  } else if (
+    !automatic &&
+    clutch === DRIVING_RULES.manualTransmission.biteClutchPosition &&
+    progress < 5
+  ) {
+    throttle = 0.32
+  } else if (speedKmh < targetSpeedKmh - 0.6) {
+    throttle = 0.34
+  } else if (speedKmh > targetSpeedKmh + 0.8) {
+    brake = 0.16
+  } else {
+    throttle = 0.08
+  }
+
+  const status = defensive.reason
+    ? `科目三示范 · ${defensive.reason}`
+    : waitingForStart
+      ? '科目三示范 · 左灯开启并观察后方，等待 3 秒后起步'
+      : stoppingForPullOver
+        ? securedPullOver
+          ? '科目三示范 · 靠边停车完成，空挡并拉紧手刹'
+          : '科目三示范 · 靠边减速停车'
+        : `科目三示范 · ${eventTitle(progress)}`
+
+  return {
+    runtime,
+    command: {
+      throttle,
+      brake,
+      clutch,
+      steeringWheelTarget,
+      gear,
+      engineOn: true,
+      handbrake,
+      seatbelt: true,
+      leftIndicator: signals.left,
+      rightIndicator: signals.right,
+      lowBeam: night,
+      highBeam: false,
+      horn: false,
+      // The coach continuously scans mirrors and both sides. These booleans
+      // feed the same observation state used by manual look controls.
+      lookLeft: true,
+      lookRight: true,
+      lookBack: true,
+      status,
+    },
+  }
+}
