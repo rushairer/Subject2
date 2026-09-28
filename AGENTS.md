@@ -301,6 +301,12 @@ Standalone course geometry and judging remain defined in each course's **local f
 - Session overview timeline positions use each event's real `triggerTime` against the recorded replay start/end range. The overview may sort by trigger time even when a detail marker uses a later representative evidence time.
 - Overview response counts must be worded as “recorded” evidence (for example recorded brake response or recorded stop), never as proof that uncounted events lacked a valid evasive response.
 - Clicking an overview marker must reuse the shared event selection/focus path and keep the overview in place for rapid browsing.
+- Hazard focus filters are replay-navigation state only. They must never alter event detection, event counts stored in history, scoring, pass/fail, training-priority penalties or analyzer thresholds.
+- Type and evidence filters may compose, and previous/next plus N/M must operate on the filtered chronological event list rather than the full list.
+- “Recorded brake/stop/steering” filters must use the existing structured event response evidence. “No follow-up summary” must reuse the same context/reaction-chain builder as the detail card; do not implement a second notion of whether a response exists.
+- When the active filter excludes the selected event, select the first filtered event without forced scrolling. When no event matches, clear the shared hazard selection and show an explicit empty state instead of silently falling back to an unfiltered event.
+- Keep excluded events visible only as dimmed session-position context in the overview/timeline. They must not be clickable or keyboard-focusable while excluded.
+- User-facing copy must say that “no follow-up summary” means no later node was automatically summarized inside the current evidence window; it must not imply that the driver took no valid evasive action.
 
 ## Replay driving dynamics timeline
 
