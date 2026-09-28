@@ -414,3 +414,32 @@ test('coach curved waypoint advances only after passing inside its tight corrido
   }, { waypointIndex: 1, holdSeconds: 0, completed: false }, 0.02, true)
   assert.equal(farPassed.runtime.waypointIndex, 1)
 })
+
+
+test('coach heading hold corrects lateral error on a reverse straight', () => {
+  const plan = {
+    id: 'reverse-line-hold',
+    title: 'reverse line hold',
+    curvatureFeedforwardBlend: 1,
+    waypoints: [
+      {
+        x: -0.3,
+        z: 6,
+        targetSpeedMps: 0.5,
+        gear: -1 as const,
+        pathCurvaturePerMeter: 0,
+        headingHoldRadians: Math.PI,
+      },
+    ],
+  }
+
+  const eastOfLine = stepCoachController(plan, {
+    x: -0.05,
+    z: 7,
+    heading: Math.PI,
+    speed: -0.4,
+    gear: -1,
+  }, createCoachRuntime(), 0.02, true)
+
+  assert.ok(eastOfLine.command.steeringWheelTarget > 0)
+})
