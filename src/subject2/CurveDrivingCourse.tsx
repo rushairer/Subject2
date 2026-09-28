@@ -5,7 +5,8 @@ import { SUBJECT2_NATIONAL_RULE_PROFILE, type Subject2RuleProfile } from '../rul
 import { SUBJECT2_BOUNDARY_LINE_WIDTH_METERS } from './courseMarkings'
 import { SUBJECT2_RULE_LIMITS, subject2Infraction } from '../rules/subject2Rules'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'\nimport { SignPost } from './SignPost'
+import { wheelContactFootprints, wheelContactSamplePoints } from '../sim/wheelContact'
+import { SignPost } from './SignPost'
 
 export const CURVE_DRIVING = {
   radius: 7.5,
