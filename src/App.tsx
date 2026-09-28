@@ -31,6 +31,8 @@ import {
 } from './subject3/subject3HazardObservation'
 import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
+import { createCoachRuntime, stepCoachController } from './coach/coachController'
+import { subject2CoachPlan, subject2CoachSupported } from './coach/subject2Coach'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
@@ -393,8 +395,8 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onIncident, onTick, onProjectStatus, onProjectComplete }: {
-  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean,
+function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, coachActive, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onIncident, onTick, onProjectStatus, onCoachStatus, onProjectComplete }: {
+  vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean, coachActive: boolean,
   cameraMode: CameraMode,
   onCycleCameraMode: () => void,
   onToggleHelp: () => void,
@@ -403,6 +405,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   onIncident: (incident: DrivingIncidentDraft) => void,
   onTick: (traffic?: Readonly<Subject3TrafficState>) => void,
   onProjectStatus: (status: string) => void,
+  onCoachStatus: (status: string) => void,
   onProjectComplete: () => void
 }) {
   const keys = useRef<DrivingKeys>({})
@@ -433,6 +436,9 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const audioContext = useRef<AudioContext | null>(null)
   const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
   const stallCount = useRef(0)
+  const coachRuntime = useRef(createCoachRuntime())
+  const coachWasActive = useRef(false)
+  const lastCoachStatus = useRef('')
 
   const startHorn = () => {
     if (hornNodes.current) return
@@ -569,6 +575,9 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       )
       lastProjectStatus.current = ''
       completionLatched.current = false
+      coachRuntime.current = createCoachRuntime()
+      coachWasActive.current = false
+      lastCoachStatus.current = ''
     }
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
@@ -596,14 +605,43 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       dt,
     })
 
-    const throttle = controlsLocked ? 0 : wheel.deviceId ? wheel.throttle : keyboardThrottle
-    const brake = controlsLocked ? 0 : wheel.deviceId ? wheel.brake : keyboardBrake
-    const clutch = controlsLocked || automatic
-      ? 0
-      : wheel.deviceId && wheel.clutch != null
-        ? wheel.clutch
-        : keyboardClutch
-    const steer = controlsLocked || wheel.deviceId ? 0 : keyboardSteer
+    const coachPlan = !continuousExam && session.examId !== 'subject3'
+      ? subject2CoachPlan(session.examId as Subject2ProjectId)
+      : null
+    if (coachActive && !coachWasActive.current) {
+      coachRuntime.current = createCoachRuntime()
+      lastCoachStatus.current = ''
+    }
+    coachWasActive.current = coachActive
+    const coachStep = coachActive && coachPlan && !controlsLocked
+      ? stepCoachController(coachPlan, v, coachRuntime.current, dt, automatic)
+      : null
+    if (coachStep) {
+      coachRuntime.current = coachStep.runtime
+      v.engineOn = coachStep.command.engineOn
+      v.handbrake = coachStep.command.handbrake
+      v.seatbelt = coachStep.command.seatbelt
+      v.gear = coachStep.command.gear
+      if (coachStep.command.status !== lastCoachStatus.current) {
+        lastCoachStatus.current = coachStep.command.status
+        onCoachStatus(coachStep.command.status)
+      }
+    }
+
+    const throttle = coachStep
+      ? coachStep.command.throttle
+      : controlsLocked ? 0 : wheel.deviceId ? wheel.throttle : keyboardThrottle
+    const brake = coachStep
+      ? coachStep.command.brake
+      : controlsLocked ? 0 : wheel.deviceId ? wheel.brake : keyboardBrake
+    const clutch = coachStep
+      ? coachStep.command.clutch
+      : controlsLocked || automatic
+        ? 0
+        : wheel.deviceId && wheel.clutch != null
+          ? wheel.clutch
+          : keyboardClutch
+    const steer = coachStep ? 0 : controlsLocked || wheel.deviceId ? 0 : keyboardSteer
     const slopeVehicleBefore = continuousExam && session.examId === 'slope-start'
       ? subject2ExamLocalVehicle('slope-start', v)
       : v
@@ -616,9 +654,11 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       brake,
       clutch,
       steer,
-      steeringWheelTarget: controlsLocked || !wheel.deviceId
-        ? undefined
-        : wheel.steering * DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI,
+      steeringWheelTarget: coachStep
+        ? coachStep.command.steeringWheelTarget
+        : controlsLocked || !wheel.deviceId
+          ? undefined
+          : wheel.steering * DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI,
     }, dt, {
       automatic,
       grade: slopeBeforeStep.grade,
@@ -905,6 +945,8 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
   )
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
+  const [coachActive, setCoachActive] = useState(false)
+  const [coachStatus, setCoachStatus] = useState('')
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
     mode === 'first' ? 'second'
       : mode === 'second' ? 'third'
@@ -1055,10 +1097,16 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
+  const coachSupported = !combinedExam && activeExamId !== 'subject3' && subject2CoachSupported(activeExamId as Subject2ProjectId)
   const navigatingToProject = combinedExam && !activeEntryReached
   const hudProjectStatus = navigatingToProject
     ? `连接道路 · 前往${examTitle(activeExamId)} · 距入口约 ${Math.max(1, Math.ceil(activeEntryDistance))} m`
     : projectStatus
+
+  useEffect(() => {
+    setCoachActive(false)
+    setCoachStatus('')
+  }, [activeExamId])
 
   useEffect(() => {
     if (!combinedExam || activeEntryReached) return
@@ -1134,7 +1182,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     }}
   >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onIncident={addIncident} onTick={tick} onProjectStatus={setProjectStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} coachActive={coachActive} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onIncident={addIncident} onTick={tick} onProjectStatus={setProjectStatus} onCoachStatus={setCoachStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
@@ -1147,6 +1195,15 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
               ? sessionTitle(session)
               : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
+          {coachSupported && <button
+            className={coachActive ? 'view-btn coach-active' : 'view-btn'}
+            onClick={() => {
+              setCoachActive(active => !active)
+              setCoachStatus('')
+            }}
+          >
+            {coachActive ? '我来接管' : '教练接管'}
+          </button>}
           <button className="view-btn" onClick={cycleCameraMode}>
             M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
           </button>
@@ -1165,7 +1222,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           setLightTestDone(true)
         }}
       />}
-      {hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
+      {coachActive && coachStatus
+        ? <div className="project-status coach-status">教练驾驶中 · {coachStatus}</div>
+        : hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
       <DrivingHelp automatic={automatic} expanded={helpExpanded} onToggle={toggleHelp} />
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
