@@ -33,6 +33,10 @@ import { NightLightTest } from './subject3/NightLightTest'
 import { DRIVING_RULES } from './rules/drivingRules'
 import { createCoachRuntime, stepCoachController } from './coach/coachController'
 import { subject2CoachPlan, subject2CoachSupported, subject2ContinuousCoachPlan } from './coach/subject2Coach'
+import {
+  createSubject3CoachRuntime,
+  stepSubject3Coach,
+} from './coach/subject3Coach'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
@@ -437,6 +441,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const hornNodes = useRef<{ oscillators: OscillatorNode[]; gain: GainNode } | null>(null)
   const stallCount = useRef(0)
   const coachRuntime = useRef(createCoachRuntime())
+  const subject3CoachRuntime = useRef(createSubject3CoachRuntime())
   const coachWasActive = useRef(false)
   const lastCoachStatus = useRef('')
   const activeCoachPlanId = useRef('')
@@ -577,6 +582,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       lastProjectStatus.current = ''
       completionLatched.current = false
       coachRuntime.current = createCoachRuntime()
+      subject3CoachRuntime.current = createSubject3CoachRuntime()
       coachWasActive.current = false
       lastCoachStatus.current = ''
       activeCoachPlanId.current = ''
@@ -623,20 +629,49 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     }
     if (coachActive && !coachWasActive.current) {
       coachRuntime.current = createCoachRuntime()
+      subject3CoachRuntime.current = createSubject3CoachRuntime()
       lastCoachStatus.current = ''
     }
     coachWasActive.current = coachActive
-    const coachStep = coachActive && coachPlan && !controlsLocked
+
+    const subject2CoachStep = coachActive && coachPlan && !controlsLocked
       ? stepCoachController(coachPlan, v, coachRuntime.current, dt, automatic)
       : null
+    if (subject2CoachStep) {
+      coachRuntime.current = subject2CoachStep.runtime
+    }
+
+    const subject3CoachStep =
+      coachActive && session.examId === 'subject3' && !controlsLocked
+        ? stepSubject3Coach(
+            v,
+            subject3CoachRuntime.current,
+            dt,
+            automatic,
+            session.time === 'night',
+            subject3Traffic.current,
+          )
+        : null
+    if (subject3CoachStep) {
+      subject3CoachRuntime.current = subject3CoachStep.runtime
+    }
+
+    const coachStep = subject3CoachStep ?? subject2CoachStep
     if (coachStep) {
-      coachRuntime.current = coachStep.runtime
       v.engineOn = coachStep.command.engineOn
       v.handbrake = coachStep.command.handbrake
       v.seatbelt = coachStep.command.seatbelt
       v.gear = coachStep.command.gear
       v.leftIndicator = coachStep.command.leftIndicator
       v.rightIndicator = coachStep.command.rightIndicator
+      if (subject3CoachStep) {
+        v.lowBeam = subject3CoachStep.command.lowBeam
+        v.highBeam = subject3CoachStep.command.highBeam
+        v.horn = subject3CoachStep.command.horn
+        v.lookLeft = subject3CoachStep.command.lookLeft
+        v.lookRight = subject3CoachStep.command.lookRight
+        v.lookBack = subject3CoachStep.command.lookBack
+      }
       if (coachStep.command.status !== lastCoachStatus.current) {
         lastCoachStatus.current = coachStep.command.status
         onCoachStatus(coachStep.command.status)
@@ -1112,7 +1147,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
-  const coachSupported = activeExamId !== 'subject3' && (combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId))
+  const coachSupported = activeExamId === 'subject3'
+    ? lightTestDone && session.subject3Practice == null
+    : combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId)
   const navigatingToProject = combinedExam && !activeEntryReached
   const hudProjectStatus = navigatingToProject
     ? `连接道路 · 前往${examTitle(activeExamId)} · 距入口约 ${Math.max(1, Math.ceil(activeEntryDistance))} m`
