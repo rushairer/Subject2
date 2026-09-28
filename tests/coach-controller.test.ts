@@ -231,7 +231,8 @@ test('coach reverse-parking plan completes both parking passes through real phys
       coach.waypointIndex !== lastWaypoint &&
       (
         (coach.waypointIndex >= 7 && coach.waypointIndex <= 16) ||
-        (coach.waypointIndex >= 110 && coach.waypointIndex <= 124)
+        (coach.waypointIndex >= 110 && coach.waypointIndex <= 124) ||
+        (coach.waypointIndex >= 160 && coach.waypointIndex <= 180)
       )
     ) {
       checkpoints.push({
@@ -289,6 +290,8 @@ test('coach reverse-parking plan completes both parking passes through real phys
         gear: vehicle.gear,
       },
       coach,
+      currentTarget: plan.waypoints[coach.waypointIndex],
+      planLength: plan.waypoints.length,
       course,
       firstInfraction,
       checkpoints,
