@@ -230,8 +230,28 @@ export function stepCoachController(
     : target.pathCurvaturePerMeter * feedforwardBlend +
       pursuitCurvature * (1 - feedforwardBlend)
   if (target.headingHoldRadians != null) {
+    const reverseOffset = direction < 0 ? Math.PI : 0
+    const baseTravelHeading = normalizeHeadingDelta(
+      target.headingHoldRadians + reverseOffset,
+    )
+    const pathRightX = Math.cos(baseTravelHeading)
+    const pathRightZ = Math.sin(baseTravelHeading)
+    const crossTrackMeters =
+      (vehicle.x - target.x) * pathRightX +
+      (vehicle.z - target.z) * pathRightZ
+    const crossTrackHeading = clamp(
+      -Math.atan(crossTrackMeters * 0.75),
+      -0.18,
+      0.18,
+    )
+    const desiredTravelHeading = normalizeHeadingDelta(
+      baseTravelHeading + crossTrackHeading,
+    )
+    const desiredBodyHeading = normalizeHeadingDelta(
+      desiredTravelHeading - reverseOffset,
+    )
     const headingError = normalizeHeadingDelta(
-      target.headingHoldRadians - vehicle.heading,
+      desiredBodyHeading - vehicle.heading,
     )
     commandedCurvature += clamp(headingError * 0.7, -0.08, 0.08)
   }
