@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   buildDrivingDynamicsEventMarkers,
   drivingDynamicsEventSelection,
@@ -148,6 +148,13 @@ export function DrivingDynamicsTimeline({
   const selection = drivingDynamicsEventSelection(events, selectedEventId)
   const selectedEvent = selectedEventId ? selection.event : null
   const browserEvent = selection.event
+
+  useEffect(() => {
+    if (selectedEventId || events.length === 0) return
+    const first = events[0]
+    setCursorIndex(first.sampleIndex)
+    onSelect(first.project, first.t, first.id, { scroll: false })
+  }, [events, onSelect, selectedEventId])
 
   return <section className="replay-dynamics" aria-labelledby="replay-dynamics-title">
     <div className="replay-dynamics-head">
