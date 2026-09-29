@@ -54,4 +54,8 @@ test('training center demo sessions auto-take over and personal sessions keep no
   assert.match(app, /教练示范 ·/)
   assert.match(app, /结束示范并查看复盘/)
   assert.match(app, /coachDemo[\s\S]*科目二[\s\S]*activeIndex \+ 1/)
+  assert.match(app, /白天模式从模拟灯光预检开始/)
+  assert.match(app, /夜间模式直接进入夜间道路驾驶/)
+  assert.match(app, /科目二完整示范/)
+  assert.match(app, /科目三完整示范/)
 })

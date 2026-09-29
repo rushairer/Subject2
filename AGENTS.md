@@ -587,3 +587,4 @@ The “本次优先改进” block must remain readable inside the result-card c
 - One-click demo UI changes require browser coverage proving automatic takeover and proving the demo does not create a personal history entry.
 - Coach-demo identity must win over candidate/exam identity in the driving HUD. A demo HUD must say `教练示范` and show the active project/progress without presenting the candidate name or `模拟考试` as the primary session label. Demo-specific exit wording should say `结束示范并查看复盘`.
 - Browser coverage for demo identity must use a neutral candidate name; never make the candidate name itself contain `教练示范`, or the assertion can become a false positive.
+- Coach-demo copy must reflect the selected time of day: daytime full Subject 3 demonstration starts with the simulated light preflight, while nighttime demonstration enters night road driving directly. Result metadata for full demos must say `科目二完整示范` / `科目三完整示范`, never `模拟考试`.

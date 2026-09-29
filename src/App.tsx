@@ -333,7 +333,9 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
         >
           <span className="task-index">COACH 3</span>
           <strong>科目三完整示范</strong>
-          <p>从模拟灯光预检开始，连续示范道路项目、动态交通防御和靠边停车。</p>
+          <p>{time === 'day'
+            ? '白天模式从模拟灯光预检开始，连续示范道路项目、动态交通防御和靠边停车。'
+            : '夜间模式直接进入夜间道路驾驶，连续示范灯光使用、道路项目、动态交通防御和靠边停车。'}</p>
           <span className="enter">教练开一遍 →</span>
         </button>
       </div>
@@ -1438,7 +1440,13 @@ function Result({
     <div className="eyebrow">{coachDemo ? '教练示范复盘' : trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
     {session.coachDemo && <p className="disclaimer coach-demo-disclaimer">这是电脑教练的标准示范，不计入你的个人成绩、训练趋势或训练计划。</p>}
-    <h1>{coachDemo ? '教练标准示范' : candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>{coachDemo ? '仅供学习 · 不计入成绩' : `合格线 ${passLine}`}</span></div>
+    <h1>{coachDemo ? '教练标准示范' : candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{coachDemo
+      ? session.examId === 'subject2-exam'
+        ? '科目二完整示范'
+        : session.examId === 'subject3'
+          ? '科目三完整示范'
+          : sessionTitle(session)
+      : sessionTitle(session)}</span><span>{coachDemo ? '仅供学习 · 不计入成绩' : `合格线 ${passLine}`}</span></div>
     {!coachDemo && <section className={'result-comment ' + status} aria-label="今日车评">
       <div className="result-comment-topline"><span>今日车评</span><b>{resultComment.badge}</b></div>
       <blockquote>{resultComment.headline}</blockquote>
