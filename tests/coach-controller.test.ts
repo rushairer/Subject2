@@ -669,3 +669,114 @@ test('coach heading hold corrects lateral error on a reverse straight', () => {
 
   assert.ok(eastOfLine.command.steeringWheelTarget > 0)
 })
+
+
+test('coach runtime can observe learner progress and resume from the tracked waypoint', () => {
+  const plan = {
+    id: 'observe-resume',
+    title: 'observe resume',
+    waypoints: [
+      { x: 0, z: -1, targetSpeedMps: 0.6, gear: 1 as const, arrivalRadiusMeters: 0.35 },
+      { x: 0, z: -2, targetSpeedMps: 0.6, gear: 1 as const, arrivalRadiusMeters: 0.35 },
+      { x: 0, z: -3, targetSpeedMps: 0.6, gear: 1 as const, arrivalRadiusMeters: 0.35 },
+      { x: 0, z: -4, targetSpeedMps: 0.6, gear: 1 as const, arrivalRadiusMeters: 0.35 },
+    ],
+  }
+
+  let observed = createCoachRuntime()
+  for (const z of [-0.9, -1.9, -2.9]) {
+    observed = stepCoachController(plan, {
+      x: 0,
+      z,
+      heading: 0,
+      speed: 0.45,
+      gear: 1,
+      handbrake: false,
+    }, observed, 0.02, true).runtime
+  }
+
+  assert.ok(
+    observed.waypointIndex >= 3,
+    `learner progress should be tracked, got waypoint ${observed.waypointIndex}`,
+  )
+
+  const resumed = stepCoachController(plan, {
+    x: 0,
+    z: -3.1,
+    heading: 0,
+    speed: 0.4,
+    gear: 1,
+    handbrake: false,
+  }, observed, 0.02, true)
+
+  const resetAtSamePose = stepCoachController(plan, {
+    x: 0,
+    z: -3.1,
+    heading: 0,
+    speed: 0.4,
+    gear: 1,
+    handbrake: false,
+  }, createCoachRuntime(), 0.02, true)
+
+  assert.ok(resumed.command.waypointIndex >= 3)
+  assert.equal(resetAtSamePose.command.waypointIndex, 0)
+})
+
+test('coach parking-brake stop cannot advance until the physical handbrake is applied', () => {
+  const plan = {
+    id: 'parking-brake-stop',
+    title: 'parking brake stop',
+    waypoints: [
+      {
+        x: 0,
+        z: 0,
+        targetSpeedMps: 0,
+        gear: 1 as const,
+        stop: true,
+        holdSeconds: 0.2,
+        handbrake: true,
+        arrivalRadiusMeters: 0.2,
+      },
+      {
+        x: 0,
+        z: -1,
+        targetSpeedMps: 0.4,
+        gear: 1 as const,
+      },
+    ],
+  }
+
+  let runtime = createCoachRuntime()
+  for (let index = 0; index < 5; index++) {
+    runtime = stepCoachController(plan, {
+      x: 0,
+      z: 0,
+      heading: 0,
+      speed: 0,
+      gear: 1,
+      handbrake: false,
+    }, runtime, 0.1, true).runtime
+  }
+  assert.equal(runtime.waypointIndex, 0)
+  assert.equal(runtime.holdSeconds, 0)
+
+  runtime = stepCoachController(plan, {
+    x: 0,
+    z: 0,
+    heading: 0,
+    speed: 0,
+    gear: 1,
+    handbrake: true,
+  }, runtime, 0.1, true).runtime
+  assert.equal(runtime.waypointIndex, 0)
+
+  runtime = stepCoachController(plan, {
+    x: 0,
+    z: 0,
+    heading: 0,
+    speed: 0,
+    gear: 1,
+    handbrake: true,
+  }, runtime, 0.1, true).runtime
+  assert.equal(runtime.waypointIndex, 1)
+})
