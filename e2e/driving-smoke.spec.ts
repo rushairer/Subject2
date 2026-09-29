@@ -237,7 +237,7 @@ test('Subject 3 night scene records lighting state and exposes replay coaching',
     await page.keyboard.up('w')
   }
 
-  await page.getByRole('button', { name: '结束示范并查看复盘' }).click()
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
 
   const lighting = page.getByRole('region', { name: '夜间灯光训练观察' })
   await expect(lighting).toBeVisible()
@@ -676,7 +676,7 @@ test('training center coach demo auto-takes over without polluting personal hist
     page.getByRole('complementary', { name: '教练实时讲解' }),
   ).toBeVisible({ timeout: 10_000 })
 
-  await page.getByRole('button', { name: '结束并查看结果' }).click()
+  await page.getByRole('button', { name: '结束示范并查看复盘' }).click()
 
   await expect(page.getByText('教练示范复盘')).toBeVisible()
   await expect(page.getByRole('heading', { name: '教练标准示范' })).toBeVisible()
