@@ -563,6 +563,8 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Coach mode must drive through `stepVehiclePhysics`, the normal collision pipeline and the existing Subject 2/3 judges. Never teleport the car, bypass collision response, suppress infractions or synthesize completion.
 - Coach mode may set ordinary driver controls and safety state (steering, pedals, gear, parking brake, indicators, belt, lights) exactly as a human could. Course state machines remain authoritative for success/failure.
 - A user takeover must stop coach commands immediately and restore the normal keyboard/wheel input path without remounting the driving world or resetting the vehicle pose.
+- While a learner has taken control, Subject 2 coach runtime must continue observing canonical waypoint progress without issuing controls. Re-enabling coach mode must resume from the observed runtime; toggling coach off/on must never reset to waypoint 0. Only an actual coach-plan ID change may reset Subject 2 runtime.
+- Coach stop waypoints that require `handbrake: true` may advance only after the physical vehicle state reports the parking brake applied. This is required both for active coach driving and passive learner-progress observation.
 - `src/coach/subject2Coach.ts` owns Subject 2 demonstration plans. Plans should reuse canonical course geometry rather than hand-copying unrelated coordinates.
 - New supported projects require deterministic physics-integrated regression coverage that runs the real coach controller, real vehicle physics and real project judge and proves completion without infractions.
 - Keep coach/golden-driver behavior deterministic so it can later serve as CI regression coverage for physics, geometry and judging changes.
