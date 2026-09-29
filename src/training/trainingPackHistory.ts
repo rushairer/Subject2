@@ -62,6 +62,12 @@ function isFiniteNonNegative(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
+export function trainingPackStagesArePersonalEvidence(
+  stages: readonly TrainingPackStageResult[],
+) {
+  return stages.length > 0 && stages.every(stage => !stage.coachAssisted)
+}
+
 export function trainingPackHistoryMatchesCurrentDefinition(
   entry: Pick<TrainingPackRoundHistoryEntry, 'packId' | 'totalStages'>,
 ) {
@@ -104,6 +110,9 @@ export function buildTrainingPackHistoryEntry({
   packId: TrainingPackId
   stages: readonly TrainingPackStageResult[]
 }): TrainingPackRoundHistoryEntry {
+  if (!trainingPackStagesArePersonalEvidence(stages)) {
+    throw new Error('Coach-assisted training stages cannot be persisted as personal history')
+  }
   const report = buildTrainingPackReport(packId, stages)
 
   return {
