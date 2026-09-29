@@ -661,18 +661,25 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       lastCoachStatus.current = ''
     }
     if (coachActive && !coachWasActive.current) {
-      coachRuntime.current = createCoachRuntime()
-      subject3CoachRuntime.current = createSubject3CoachRuntime()
+      // Re-engaging coach mode must preserve the progress observed while the
+      // learner was driving. Plan changes are the only reason to reset the
+      // Subject 2 runtime; Subject 3 keeps its elapsed launch state as well.
       lastCoachStatus.current = ''
     }
     coachWasActive.current = coachActive
 
-    const subject2CoachStep = coachActive && coachPlan && !controlsLocked
+    const subject2CoachObservation = coachPlan && !controlsLocked
       ? stepCoachController(coachPlan, v, coachRuntime.current, dt, automatic)
       : null
-    if (subject2CoachStep) {
-      coachRuntime.current = subject2CoachStep.runtime
+    if (subject2CoachObservation) {
+      // Even while the learner has control, keep following their physical
+      // progress through the canonical plan. Commands are ignored unless
+      // coachActive is true.
+      coachRuntime.current = subject2CoachObservation.runtime
     }
+    const subject2CoachStep = coachActive
+      ? subject2CoachObservation
+      : null
 
     const subject3CoachStep =
       coachActive && session.examId === 'subject3' && !controlsLocked
