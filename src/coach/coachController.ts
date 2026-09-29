@@ -7,6 +7,7 @@ export interface CoachVehicleState {
   heading: number
   speed: number
   gear: number
+  handbrake?: boolean
 }
 
 export interface CoachWaypoint {
@@ -182,7 +183,13 @@ export function stepCoachController(
   runtime.waypointIndex = index
 
   const nearStop = !!target.stop && distance <= arrivalRadius
-  if (nearStop && Math.abs(vehicle.speed) <= 0.06) {
+  const requiredParkingBrakeSatisfied =
+    target.handbrake !== true || vehicle.handbrake === true
+  if (
+    nearStop &&
+    Math.abs(vehicle.speed) <= 0.06 &&
+    requiredParkingBrakeSatisfied
+  ) {
     runtime.holdSeconds += dt
     if (runtime.holdSeconds >= (target.holdSeconds ?? 0.35)) {
       if (index >= lastIndex) {
