@@ -404,11 +404,12 @@ test('Subject 3 coach stops for a live pedestrian conflict', () => {
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 
-test('full and targeted Subject 3 sessions expose the same production coach after preflight', () => {
+test('full and targeted Subject 3 sessions expose one coach across preflight and road driving', () => {
   assert.match(app, /stepSubject3Coach\(/)
   assert.match(app, /session\.subject3Practice/)
   assert.match(app, /activeExamId === 'subject3'/)
-  assert.match(app, /\? lightTestDone/)
-  assert.doesNotMatch(app, /lightTestDone && session\.subject3Practice == null/)
+  assert.match(app, /\? true/)
+  assert.match(app, /coachActive=\{coachActive\}/)
+  assert.match(app, /onCoachStatus=\{setCoachStatus\}/)
   assert.match(app, /subject3Traffic\.current/)
 })

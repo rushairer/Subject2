@@ -619,3 +619,32 @@ test('coach takeover shows structured live teaching and returns control cleanly'
   await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
   expect(runtimeErrors).toEqual([])
 })
+
+
+test('Subject 3 coach completes the daytime light preflight through the real judge before road takeover', async ({ page }) => {
+  test.setTimeout(90_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '灯光教练 E2E')
+
+  await page.getByRole('button', { name: /综合道路驾驶/ }).click()
+  await expectHealthyDrivingScene(page)
+
+  const lightTest = page.locator('.light-test')
+  await expect(lightTest).toBeVisible()
+  await expect(lightTest).toContainText('模拟夜间灯光考试')
+
+  const takeover = page.getByRole('button', { name: '教练接管' })
+  await expect(takeover).toBeVisible()
+  await takeover.click()
+
+  await expect(lightTest).toHaveCount(0, { timeout: 15_000 })
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await expect(page.locator('.penalty-toast')).toHaveCount(0)
+
+  const teaching = page.getByRole('complementary', { name: '教练实时讲解' })
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: '我来接管' }).click()
+  await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})

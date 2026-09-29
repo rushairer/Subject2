@@ -1150,7 +1150,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
     : 0
   const coachSupported = activeExamId === 'subject3'
-    ? lightTestDone
+    ? true
     : combinedExam || subject2CoachSupported(activeExamId as Subject2ProjectId)
   const coachTeaching = useMemo(
     () => coachActive
@@ -1275,8 +1275,10 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           <button className="finish-btn" onClick={finishSession}>结束并查看结果</button>
         </div>
       </div>
-      {activeExamId === 'subject3' && !lightTestDone && <NightLightTest
+      {drivingReady && activeExamId === 'subject3' && !lightTestDone && <NightLightTest
         vehicle={vehicle}
+        coachActive={coachActive}
+        onCoachStatus={setCoachStatus}
         onPass={() => setLightTestDone(true)}
         onFail={(prompt) => {
           addInfraction(subject3Infraction(
