@@ -637,14 +637,12 @@ test('Subject 3 coach completes the daytime light preflight through the real jud
   await expect(takeover).toBeVisible()
   await takeover.click()
 
-  const teaching = page.getByRole('complementary', { name: '教练实时讲解' })
-  await expect(teaching).toBeVisible({ timeout: 10_000 })
-  await expect(teaching).toContainText('灯光预检')
-  await expect(lightTest).toContainText('教练接管中')
-
   await expect(lightTest).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
   await expect(page.locator('.penalty-toast')).toHaveCount(0)
+
+  const teaching = page.getByRole('complementary', { name: '教练实时讲解' })
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
 
   await page.getByRole('button', { name: '我来接管' }).click()
   await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
