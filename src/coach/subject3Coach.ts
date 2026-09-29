@@ -26,6 +26,7 @@ export interface Subject3CoachVehicle {
 
 export interface Subject3CoachRuntime {
   elapsedSeconds: number
+  defensiveRecovery: boolean
 }
 
 export interface Subject3CoachCommand {
@@ -57,7 +58,10 @@ const lerp = (a: number, b: number, t: number) =>
 export const SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS = 4180
 
 export function createSubject3CoachRuntime(): Subject3CoachRuntime {
-  return { elapsedSeconds: 0 }
+  return {
+    elapsedSeconds: 0,
+    defensiveRecovery: false,
+  }
 }
 
 /**
@@ -158,6 +162,18 @@ function subject3CoachPracticeManualGearState(
   return { gear: desiredGear, clutch: 0 }
 }
 
+function subject3CoachDefensiveManualGearState(
+  vehicle: Subject3CoachVehicle,
+  stopping: boolean,
+) {
+  const adaptive = subject3CoachPracticeManualGearState(vehicle)
+  if (!stopping) return adaptive
+  return {
+    gear: adaptive.gear,
+    clutch: 1,
+  }
+}
+
 function routeTarget(progress: number, lateral: number) {
   const pose = poseAtRouteDistance(progress)
   return {
@@ -243,22 +259,49 @@ export function stepSubject3Coach(
   traffic: Readonly<Subject3TrafficState>,
   practiceSlice?: Subject3PracticeSliceId,
 ): { runtime: Subject3CoachRuntime; command: Subject3CoachCommand } {
-  const runtime = {
-    elapsedSeconds: previous.elapsedSeconds + Math.max(0, dt),
-  }
+  const elapsedSeconds =
+    previous.elapsedSeconds + Math.max(0, dt)
   const projection = projectToSubject3Route(vehicle.x, vehicle.z)
   const progress = projection.progress
-  const waitingForStart = progress < 5 && runtime.elapsedSeconds < 3.3
+  const waitingForStart = progress < 5 && elapsedSeconds < 3.3
   const stoppingForPullOver = progress >= SUBJECT3_COACH_PULL_OVER_STOP_PROGRESS
   const securedPullOver =
     stoppingForPullOver && Math.abs(vehicle.speed) < 0.05
+  const defensive = defensiveTargetSpeedKmh(
+    vehicle,
+    traffic,
+    progress,
+  )
+  const defensiveStopping =
+    !waitingForStart &&
+    !stoppingForPullOver &&
+    defensive.reason.length > 0 &&
+    defensive.target <= 0.1
+  const defensiveLowSpeed =
+    !waitingForStart &&
+    !stoppingForPullOver &&
+    defensive.reason.length > 0 &&
+    defensive.target <= 12
+  const defensiveRecovery =
+    defensiveLowSpeed ||
+    (previous.defensiveRecovery &&
+      (defensive.reason.length > 0 || Math.abs(vehicle.speed) < 5.8))
+  const runtime = {
+    elapsedSeconds,
+    defensiveRecovery,
+  }
 
   const signals = subject3CoachSignalState(progress)
   const manual = automatic
     ? { gear: 1, clutch: 0 }
     : practiceSlice
       ? subject3CoachPracticeManualGearState(vehicle)
-      : subject3CoachManualGearState(progress, runtime.elapsedSeconds)
+      : defensiveRecovery
+        ? subject3CoachDefensiveManualGearState(
+            vehicle,
+            defensiveStopping,
+          )
+        : subject3CoachManualGearState(progress, elapsedSeconds)
 
   let gear = manual.gear
   let clutch = manual.clutch
@@ -297,11 +340,6 @@ export function stepSubject3Coach(
     DRIVING_RULES.steering.roadWheelMaxAngleRadians *
     maxSteeringWheelAngle
 
-  const defensive = defensiveTargetSpeedKmh(
-    vehicle,
-    traffic,
-    progress,
-  )
   const targetSpeedKmh =
     waitingForStart || stoppingForPullOver
       ? 0
@@ -317,7 +355,7 @@ export function stepSubject3Coach(
   } else if (
     !automatic &&
     clutch === DRIVING_RULES.manualTransmission.biteClutchPosition &&
-    (progress < 5 || practiceSlice != null)
+    (progress < 5 || practiceSlice != null || runtime.defensiveRecovery)
   ) {
     throttle = 0.32
   } else if (speedKmh < targetSpeedKmh - 0.6) {
@@ -330,7 +368,9 @@ export function stepSubject3Coach(
 
   const status = defensive.reason
     ? `科目三示范 · ${defensive.reason}`
-    : waitingForStart
+    : runtime.defensiveRecovery
+      ? '科目三示范 · 危险解除，一挡重新起步并顺序升挡'
+      : waitingForStart
       ? '科目三示范 · 左灯开启并观察后方，等待 3 秒后起步'
       : stoppingForPullOver
         ? securedPullOver
