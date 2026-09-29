@@ -135,6 +135,10 @@ test('light preflight coach goes through NightLightTest instead of bypassing it'
   assert.match(lightTestSource, /coachActive/)
   assert.match(appSource, /coachActive=\{coachActive\}/)
   assert.match(appSource, /onCoachStatus=\{setCoachStatus\}/)
+  assert.match(
+    appSource,
+    /drivingReady && activeExamId === 'subject3' && !lightTestDone/,
+  )
   assert.doesNotMatch(appSource, /coachActive.*setLightTestDone\(true\)/)
 })
 
