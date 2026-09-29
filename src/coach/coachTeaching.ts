@@ -90,6 +90,12 @@ function subject3Teaching(action: string): Pick<CoachTeachingHint, 'reason' | 'w
       watch: '先听完整口令再操作；近光题确认远光关闭，交替题确认出现过远光且最终回到近光。',
     }
   }
+  if (/危险解除/.test(action)) {
+    return {
+      reason: '危险目标离开后不能立刻猛加速。先确认冲突真正解除，再平稳恢复动力；手动挡需要从与当前低速匹配的挡位重新起步，避免高挡憋熄火。',
+      watch: '继续看原危险目标和前方净空，同时观察本车速度、挡位和发动机状态，确认恢复过程平顺。',
+    }
+  }
   if (/急刹/.test(action)) {
     return {
       reason: '前车速度骤降时先释放动力并建立制动，优先恢复安全纵向间距，而不是临时急打方向。',
