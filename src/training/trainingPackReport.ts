@@ -19,6 +19,7 @@ export interface TrainingPackStageResult {
   score: number
   completed: boolean
   passed: boolean
+  coachAssisted?: boolean
   infractions: readonly TrainingPackStageInfraction[]
 }
 
@@ -39,6 +40,7 @@ export interface TrainingPackReport {
   recordedStages: number
   completedStages: number
   passedStages: number
+  assistedStages: number
   totalInfractions: number
   totalFatalInfractions: number
   habitInfractions: number
@@ -106,22 +108,24 @@ export function buildTrainingPackReport(
     .map(stage => summarizeStage(pack.habits, stage))
     .sort((a, b) => a.index - b.index)
 
-  const retryCandidate = stages.length > 0
-    ? [...stages].sort(compareRetryPriority)[0]
+  const evidenceStages = stages.filter(stage => !stage.coachAssisted)
+  const retryCandidate = evidenceStages.length > 0
+    ? [...evidenceStages].sort(compareRetryPriority)[0]
     : null
 
   return {
     packId,
     totalStages: pack.stages.length,
     recordedStages: stages.length,
-    completedStages: stages.filter(stage => stage.completed).length,
-    passedStages: stages.filter(stage => stage.passed).length,
-    totalInfractions: stages.reduce((sum, stage) => sum + stage.infractions.length, 0),
-    totalFatalInfractions: stages.reduce((sum, stage) => sum + stage.fatalCount, 0),
-    habitInfractions: stages.reduce((sum, stage) => sum + stage.habitInfractionCount, 0),
-    trend: stageTrend(stages),
-    firstHabitInfractionCount: stages.length > 0 ? stages[0].habitInfractionCount : null,
-    lastHabitInfractionCount: stages.length > 0 ? stages[stages.length - 1].habitInfractionCount : null,
+    completedStages: evidenceStages.filter(stage => stage.completed).length,
+    passedStages: evidenceStages.filter(stage => stage.passed).length,
+    assistedStages: stages.filter(stage => stage.coachAssisted).length,
+    totalInfractions: evidenceStages.reduce((sum, stage) => sum + stage.infractions.length, 0),
+    totalFatalInfractions: evidenceStages.reduce((sum, stage) => sum + stage.fatalCount, 0),
+    habitInfractions: evidenceStages.reduce((sum, stage) => sum + stage.habitInfractionCount, 0),
+    trend: stageTrend(evidenceStages),
+    firstHabitInfractionCount: evidenceStages.length > 0 ? evidenceStages[0].habitInfractionCount : null,
+    lastHabitInfractionCount: evidenceStages.length > 0 ? evidenceStages[evidenceStages.length - 1].habitInfractionCount : null,
     stages,
     recommendedRetryProject: retryCandidate?.project ?? null,
     recommendedRetryStageIndex: retryCandidate?.index ?? null,
