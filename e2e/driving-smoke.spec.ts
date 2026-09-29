@@ -36,7 +36,9 @@ function captureRuntimeErrors(page: Page) {
 
 test.afterEach(async ({ page }) => {
   if (page.isClosed()) return
-  const finish = page.getByRole('button', { name: '结束并查看结果' })
+  const finish = page.getByRole('button', {
+    name: /结束(?:并查看结果|示范并查看复盘)/,
+  })
   if (await finish.count() === 0) return
   try {
     await finish.first().click({ timeout: 3_000 })
@@ -54,7 +56,9 @@ async function expectHealthyDrivingScene(
   await expect(page.locator('.driving-shell')).toHaveAttribute('aria-busy', 'false', { timeout: 20_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: '结束并查看结果' })).toBeVisible()
+  await expect(page.getByRole('button', {
+    name: /结束(?:并查看结果|示范并查看复盘)/,
+  })).toBeVisible()
   if (options.requireProjectStatus !== false) {
     await expect(page.locator('.project-status')).toBeVisible()
   }
