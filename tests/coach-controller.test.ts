@@ -419,7 +419,7 @@ test('coach side-parking plan parks and exits through real physics without penal
 
 
 
-test('coach slope plan performs an accurate handbrake stop and zero-rollback start', () => {
+function runSlopeCoach(automatic: boolean) {
   const plan = subject2CoachPlan('slope-start')
   assert.ok(plan)
 
@@ -434,7 +434,7 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
     steeringWheelAngle: 0,
     throttle: 0,
     brake: 0,
-    clutch: 0,
+    clutch: automatic ? 0 : 1,
     gear: 1,
     engineOn: true,
     engineRpm: 820,
@@ -447,11 +447,14 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
   const phases = new Set<string>()
   const infractions: string[] = []
   let handbrakeObserved = false
+  let stallCount = 0
+  let minimumStartingSpeed = Number.POSITIVE_INFINITY
   let firstInfraction: {
     frame: number
     x: number
     z: number
     speed: number
+    clutch: number
     handbrake: boolean
     waypoint: number
     phase: string
@@ -460,7 +463,13 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
   const dt = 0.02
 
   for (let frame = 0; frame < 12000 && !course.completed; frame++) {
-    const next = stepCoachController(plan, vehicle, coach, dt, true)
+    const next = stepCoachController(
+      plan,
+      vehicle,
+      coach,
+      dt,
+      automatic,
+    )
     coach = next.runtime
     vehicle.gear = next.command.gear
     vehicle.engineOn = next.command.engineOn
@@ -468,27 +477,35 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
     handbrakeObserved ||= vehicle.handbrake
 
     const slope = getSlopePose(vehicle.z)
-    stepVehiclePhysics(vehicle, {
+    const physics = stepVehiclePhysics(vehicle, {
       throttle: next.command.throttle,
       brake: next.command.brake,
       clutch: next.command.clutch,
       steer: 0,
       steeringWheelTarget: next.command.steeringWheelTarget,
     }, dt, {
-      automatic: true,
+      automatic,
       grade: slope.grade,
       gradeHeading: 0,
     })
+    if (physics.stalled) stallCount += 1
 
     const judged = updateSlopeStart(vehicle, course, dt)
     course = judged.runtime
     phases.add(course.phase)
+    if (course.phase === 'starting') {
+      minimumStartingSpeed = Math.min(
+        minimumStartingSpeed,
+        vehicle.speed,
+      )
+    }
     if (!firstInfraction && judged.infractions.length > 0) {
       firstInfraction = {
         frame,
         x: vehicle.x,
         z: vehicle.z,
         speed: vehicle.speed,
+        clutch: vehicle.clutch,
         handbrake: vehicle.handbrake,
         waypoint: coach.waypointIndex,
         phase: course.phase,
@@ -502,16 +519,21 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
     course.completed,
     true,
     JSON.stringify({
+      automatic,
       vehicle: {
         x: vehicle.x,
         z: vehicle.z,
         speed: vehicle.speed,
+        clutch: vehicle.clutch,
         handbrake: vehicle.handbrake,
+        engineOn: vehicle.engineOn,
       },
       coach,
       currentTarget: plan.waypoints[coach.waypointIndex],
       course,
       phases: [...phases],
+      stallCount,
+      minimumStartingSpeed,
       firstInfraction,
       infractions: [...new Set(infractions)],
     }),
@@ -519,8 +541,17 @@ test('coach slope plan performs an accurate handbrake stop and zero-rollback sta
   assert.equal(handbrakeObserved, true)
   assert.equal(phases.has('stopped'), true)
   assert.equal(phases.has('starting'), true)
+  assert.equal(stallCount, 0)
+  assert.equal(vehicle.engineOn, true)
+  assert.ok(minimumStartingSpeed > -0.02)
   assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
-})
+}
+
+for (const automatic of [false, true]) {
+  test(`${automatic ? 'automatic controller' : 'C1 manual'} slope coach performs an accurate handbrake stop and zero-rollback start`, () => {
+    runSlopeCoach(automatic)
+  })
+}
 
 test('coach controller only completes after reaching the final waypoint', () => {
   const plan = {
