@@ -604,8 +604,8 @@ test('C1 sequential keys shift once per press, pedals show clutch, and help pres
 })
 
 
-test('coach takeover shows structured live teaching and returns control cleanly', async ({ page }) => {
-  test.setTimeout(60_000)
+test('coach takeover shows structured live teaching and resumes from observed progress', async ({ page }) => {
+  test.setTimeout(90_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page, '教练讲解 E2E')
 
@@ -622,10 +622,21 @@ test('coach takeover shows structured live teaching and returns control cleanly'
   await expect(teaching).toContainText('为什么这样做')
   await expect(teaching).toContainText('观察重点')
   await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await expect(teaching).toContainText('第一次倒库', { timeout: 35_000 })
 
   await page.getByRole('button', { name: '我来接管' }).click()
   await expect(teaching).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
+  const resumeCoach = page.getByRole('button', { name: '教练接管' })
+  await expect(resumeCoach).toBeVisible()
+
+  // Let the learner own the same physical car briefly. The coach runtime must
+  // keep observing progress instead of being reset to the first waypoint.
+  await page.waitForTimeout(350)
+  await resumeCoach.click()
+
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
+  await expect(teaching).toContainText('第一次倒库', { timeout: 8_000 })
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
   expect(runtimeErrors).toEqual([])
 })
 
