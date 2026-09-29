@@ -66,6 +66,7 @@ import {
   appendTrainingPackHistory,
   buildTrainingPackHistoryEntry,
   loadTrainingPackHistory,
+  trainingPackStagesArePersonalEvidence,
 } from './training/trainingPackHistory'
 import { buildTrainingPlan } from './training/trainingPlan'
 import { TrainingPlanPanel } from './training/TrainingPlanPanel'
@@ -336,8 +337,8 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
         {recentHistory.map(item => <div className="recent-result" key={item.id}>
-          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
-          <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
+          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}{item.coachAssisted ? ' · 教练辅助' : ''}</span></div>
+          <b className={item.coachAssisted ? 'history-coach' : item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
         </div>)}
       </div>
     </section>}
@@ -962,7 +963,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   </>
 }
 
-function Driving({ session, candidate, onIncident, onDone, onExit }: { session: Session, candidate: Candidate, onIncident: (incident: DrivingIncident) => void, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean) => void, onExit: () => void }) {
+function Driving({ session, candidate, onIncident, onDone, onExit }: { session: Session, candidate: Candidate, onIncident: (incident: DrivingIncident) => void, onDone: (score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean, coachAssisted: boolean) => void, onExit: () => void }) {
   const [drivingReady, setDrivingReady] = useState(false)
   const markDrivingReady = useCallback(() => setDrivingReady(true), [])
   const [helpExpanded, setHelpExpanded] = useState(false)
@@ -999,6 +1000,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
   const [coachActive, setCoachActive] = useState(false)
   const [coachStatus, setCoachStatus] = useState('')
+  const coachAssisted = useRef(false)
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
     mode === 'first' ? 'second'
       : mode === 'second' ? 'third'
@@ -1144,7 +1146,13 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const finishSession = useCallback(() => {
     if (finishLatched.current) return
     finishLatched.current = true
-    onDone(score, infractions, trajectory.current, sessionComplete)
+    onDone(
+      score,
+      infractions,
+      trajectory.current,
+      sessionComplete,
+      coachAssisted.current,
+    )
   }, [infractions, onDone, score, sessionComplete])
   const activeEntryDistance = combinedExam
     ? subject2ExamDistanceToStart(activeExamId as Subject2ProjectId, display)
@@ -1263,7 +1271,11 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           {coachSupported && <button
             className={coachActive ? 'view-btn coach-active' : 'view-btn'}
             onClick={() => {
-              setCoachActive(active => !active)
+              setCoachActive(active => {
+                const next = !active
+                if (next) coachAssisted.current = true
+                return next
+              })
               setCoachStatus('')
             }}
           >
@@ -1334,6 +1346,7 @@ function Result({
   incidents,
   trajectory,
   completed,
+  coachAssisted,
   onBack,
   onStartTraining,
   onStartTrainingPack,
@@ -1349,6 +1362,7 @@ function Result({
   incidents: DrivingIncident[]
   trajectory: TrajectorySample[]
   completed: boolean
+  coachAssisted: boolean
   onBack: () => void
   onStartTraining: (examId: ReplayTrainingProjectId) => void
   onStartTrainingPack: (packId: TrainingPackId) => void
@@ -1376,10 +1390,13 @@ function Result({
     fatalCount: infractions.filter(item => item.fatal).length,
   })
   const [shareState, setShareState] = useState<'idle' | 'shared' | 'copied'>('idle')
+  const shareText = coachAssisted
+    ? `教练辅助示范 · ${resultComment.shareText}`
+    : resultComment.shareText
   const shareResult = useCallback(async () => {
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: '驾考模拟成绩', text: resultComment.shareText })
+        await navigator.share({ title: '驾考模拟成绩', text: shareText })
         setShareState('shared')
         return
       } catch (error) {
@@ -1387,14 +1404,17 @@ function Result({
       }
     }
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(resultComment.shareText)
+      await navigator.clipboard.writeText(shareText)
       setShareState('copied')
     }
-  }, [resultComment.shareText])
+  }, [shareText])
 
   return <main className="shell centered"><section className="result-card">
     <div className="eyebrow">{trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
+    {coachAssisted && <p className="coach-assisted-result" role="note">
+      教练辅助示范 · 本次成绩和复盘可查看，但不计入个人训练画像、最近个人成绩或长期训练趋势。
+    </p>}
     <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>合格线 {passLine}</span></div>
     <section className={'result-comment ' + status} aria-label="今日车评">
       <div className="result-comment-topline"><span>今日车评</span><b>{resultComment.badge}</b></div>
@@ -1462,7 +1482,7 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('profile')
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean } | null>(null)
+  const [result, setResult] = useState<{ score: number, infractions: Infraction[], trajectory: TrajectorySample[], completed: boolean, coachAssisted: boolean } | null>(null)
   const [sessionIncidents, setSessionIncidents] = useState<DrivingIncident[]>([])
   const [trainingPackStages, setTrainingPackStages] = useState<TrainingPackStageResult[]>([])
   const startSession = useCallback((nextSession: Session) => {
@@ -1495,7 +1515,7 @@ export default function App() {
     onIncident={incident => setSessionIncidents(prev =>
       prev.some(item => item.id === incident.id) ? prev : [...prev, incident]
     )}
-    onDone={(score, infractions, trajectory, completed) => {
+    onDone={(score, infractions, trajectory, completed, coachAssisted) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
     appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
@@ -1509,6 +1529,7 @@ export default function App() {
       passed: outcome.passed,
       status: outcome.status,
       completed,
+      coachAssisted,
       infractionCount: infractions.length,
     })
     if (session.trainingPack) {
@@ -1519,6 +1540,7 @@ export default function App() {
         score,
         completed,
         passed: outcome.passed,
+        coachAssisted,
         infractions: infractions.map(item => ({
           id: item.id,
           title: item.title,
@@ -1538,7 +1560,11 @@ export default function App() {
       const pack = trainingPackById(session.trainingPack.id)
       const reachedLastStage = session.trainingPack.index === pack.stages.length - 1
       const hasEveryStage = nextStages.length === pack.stages.length
-      if (reachedLastStage && hasEveryStage) {
+      if (
+        reachedLastStage &&
+        hasEveryStage &&
+        trainingPackStagesArePersonalEvidence(nextStages)
+      ) {
         appendTrainingPackHistory(buildTrainingPackHistoryEntry({
           id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
             ? crypto.randomUUID()
@@ -1551,7 +1577,13 @@ export default function App() {
         }))
       }
     }
-    setResult({ score, infractions, trajectory: [...trajectory], completed })
+    setResult({
+      score,
+      infractions,
+      trajectory: [...trajectory],
+      completed,
+      coachAssisted,
+    })
     setPhase('result')
   }}
   />
@@ -1563,6 +1595,7 @@ export default function App() {
     incidents={sessionIncidents}
     trajectory={result.trajectory}
     completed={result.completed}
+    coachAssisted={result.coachAssisted}
     onBack={() => {
       setTrainingPackStages([])
       setPhase('menu')
