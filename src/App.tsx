@@ -1275,7 +1275,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           <button className="finish-btn" onClick={finishSession}>结束并查看结果</button>
         </div>
       </div>
-      {activeExamId === 'subject3' && !lightTestDone && <NightLightTest
+      {drivingReady && activeExamId === 'subject3' && !lightTestDone && <NightLightTest
         vehicle={vehicle}
         coachActive={coachActive}
         onCoachStatus={setCoachStatus}
