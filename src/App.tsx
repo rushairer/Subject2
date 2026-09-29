@@ -38,6 +38,11 @@ import {
   stepSubject3Coach,
 } from './coach/subject3Coach'
 import { buildCoachTeachingHint } from './coach/coachTeaching'
+import {
+  createCoachDemoSession,
+  isCoachDemoSession,
+  shouldPersistPersonalResult,
+} from './coach/coachDemoSession'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
@@ -140,6 +145,7 @@ interface Session {
   time: TimeOfDay
   trainingPack?: TrainingPackSessionState
   subject3Practice?: Subject3PracticeSliceId
+  coachDemo?: boolean
 }
 
 function createTrainingPackSession(
@@ -306,6 +312,32 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
     </section>
     <RacingWheelSetup />
+    <section className="coach-demo-section" aria-label="教练示范">
+      <div className="section-heading">
+        <div><span className="chapter">教练模式</span><h2>先看一遍标准答案</h2></div>
+        <p>电脑按真实车辆物理和原考试判定完整示范；可随时点击“我来接管”。示范成绩不会写入个人训练记录。</p>
+      </div>
+      <div className="coach-demo-grid">
+        <button
+          className="coach-demo-card"
+          onClick={() => onStart(createCoachDemoSession('subject2-exam', time))}
+        >
+          <span className="task-index">COACH 2</span>
+          <strong>科目二完整示范</strong>
+          <p>{candidate.licenseType} 适用项目连续完成，包含项目间连接道路和实时操作讲解。</p>
+          <span className="enter">教练开一遍 →</span>
+        </button>
+        <button
+          className="coach-demo-card"
+          onClick={() => onStart(createCoachDemoSession('subject3', time))}
+        >
+          <span className="task-index">COACH 3</span>
+          <strong>科目三完整示范</strong>
+          <p>从模拟灯光预检开始，连续示范道路项目、动态交通防御和靠边停车。</p>
+          <span className="enter">教练开一遍 →</span>
+        </button>
+      </div>
+    </section>
     <TodayTrainingPlanPanel
       plan={dailyTrainingPlan}
       onStartPack={packId => onStartTrainingPack(packId, time)}
@@ -997,7 +1029,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
   )
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
-  const [coachActive, setCoachActive] = useState(false)
+  const [coachActive, setCoachActive] = useState(() => isCoachDemoSession(session))
   const [coachStatus, setCoachStatus] = useState('')
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
     mode === 'first' ? 'second'
@@ -1169,9 +1201,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     : projectStatus
 
   useEffect(() => {
-    if (!combinedExam) setCoachActive(false)
+    if (!combinedExam && !isCoachDemoSession(session)) setCoachActive(false)
     setCoachStatus('')
-  }, [activeExamId, combinedExam])
+  }, [activeExamId, combinedExam, session.coachDemo])
 
   useEffect(() => {
     if (!combinedExam || activeEntryReached) return
@@ -1258,7 +1290,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
             ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
             : session.subject3Practice
               ? sessionTitle(session)
-              : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
+              : session.coachDemo
+                ? '教练示范'
+                : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
           {coachSupported && <button
             className={coachActive ? 'view-btn coach-active' : 'view-btn'}
@@ -1360,11 +1394,14 @@ function Result({
   const { passLine, passed, status } = assessSessionResult({ examId: session.examId, score, completed, infractions })
   const trainingPack = session.trainingPack ? trainingPackById(session.trainingPack.id) : null
   const nextPackState = session.trainingPack ? nextTrainingPackState(session.trainingPack) : null
-  const resultLabel = status === 'incomplete'
-    ? '未完成'
-    : passed
-      ? trainingPack ? '达标' : '合格'
-      : trainingPack ? '需继续练习' : '未合格'
+  const coachDemo = isCoachDemoSession(session)
+  const resultLabel = coachDemo
+    ? completed ? '示范完成' : '示范中断'
+    : status === 'incomplete'
+      ? '未完成'
+      : passed
+        ? trainingPack ? '达标' : '合格'
+        : trainingPack ? '需继续练习' : '未合格'
   const resultComment = buildResultComment({
     examTitle: sessionTitle(session),
     score,
@@ -1393,17 +1430,18 @@ function Result({
   }, [resultComment.shareText])
 
   return <main className="shell centered"><section className="result-card">
-    <div className="eyebrow">{trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
+    <div className="eyebrow">{coachDemo ? '教练示范复盘' : trainingPack ? '专项训练阶段结果' : '模拟考试成绩单'}</div><div className={'result-mark ' + (passed ? 'passed' : 'failed')}><strong>{score}</strong><span>{resultLabel}</span></div>
     {status === 'incomplete' && <p className="disclaimer">本次提前结束，尚未完成全部要求。分数仅代表已记录的操作，不作为合格成绩。</p>}
-    <h1>{candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>合格线 {passLine}</span></div>
-    <section className={'result-comment ' + status} aria-label="今日车评">
+    {session.coachDemo && <p className="disclaimer coach-demo-disclaimer">这是电脑教练的标准示范，不计入你的个人成绩、训练趋势或训练计划。</p>}
+    <h1>{coachDemo ? '教练标准示范' : candidate.name}</h1><div className="result-meta"><span>{candidate.licenseType}</span><span>{sessionTitle(session)}</span><span>{coachDemo ? '仅供学习 · 不计入成绩' : `合格线 ${passLine}`}</span></div>
+    {!coachDemo && <section className={'result-comment ' + status} aria-label="今日车评">
       <div className="result-comment-topline"><span>今日车评</span><b>{resultComment.badge}</b></div>
       <blockquote>{resultComment.headline}</blockquote>
       <p>{resultComment.detail}</p>
       <button className="result-share-btn" type="button" onClick={shareResult}>
         {shareState === 'copied' ? '已复制 · 去分享' : shareState === 'shared' ? '已分享' : '分享这次成绩'}
       </button>
-    </section>
+    </section>}
     {incidents.length > 0 && <div className="result-incidents" aria-label="现场记录">
       <strong>现场记录 · 不计分</strong>
       <span>{incidents.map(item => item.title).join(' · ')}</span>
@@ -1497,7 +1535,8 @@ export default function App() {
     )}
     onDone={(score, infractions, trajectory, completed) => {
     const outcome = assessSessionResult({ examId: session.examId, score, completed, infractions })
-    appendExamHistory({
+    if (shouldPersistPersonalResult(session)) {
+      appendExamHistory({
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
       createdAt: Date.now(),
       candidateName: candidate.name,
@@ -1550,6 +1589,7 @@ export default function App() {
           stages: nextStages,
         }))
       }
+    }
     }
     setResult({ score, infractions, trajectory: [...trajectory], completed })
     setPhase('result')

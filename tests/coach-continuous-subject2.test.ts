@@ -134,10 +134,13 @@ for (const automatic of [false, true]) {
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 
-test('continuous Subject 2 exposes coach takeover and keeps it active across project changes', () => {
+test('continuous Subject 2 keeps takeover across projects and preserves explicit demo auto-takeover', () => {
   assert.match(app, /subject2ContinuousCoachPlan\(/)
   assert.match(app, /combinedExam \|\| subject2CoachSupported/)
-  assert.match(app, /if \(!combinedExam\) setCoachActive\(false\)/)
+  assert.match(
+    app,
+    /if \(!combinedExam && !isCoachDemoSession\(session\)\) setCoachActive\(false\)/,
+  )
   assert.match(app, /activeCoachPlanId/)
   assert.match(app, /SUBJECT2_EXAM_ENTRY_CAPTURE_METERS/)
   assert.doesNotMatch(app, /activeEntryDistance <= 6/)

@@ -46,13 +46,18 @@ test.afterEach(async ({ page }) => {
   }
 })
 
-async function expectHealthyDrivingScene(page: Page) {
+async function expectHealthyDrivingScene(
+  page: Page,
+  options: { requireProjectStatus?: boolean } = {},
+) {
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('.driving-shell')).toHaveAttribute('aria-busy', 'false', { timeout: 20_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
   await expect(page.getByRole('button', { name: '结束并查看结果' })).toBeVisible()
-  await expect(page.locator('.project-status')).toBeVisible()
+  if (options.requireProjectStatus !== false) {
+    await expect(page.locator('.project-status')).toBeVisible()
+  }
 }
 
 async function expectProgressiveKeyboardPedals(page: Page) {
@@ -646,5 +651,45 @@ test('Subject 3 coach completes the daytime light preflight through the real jud
 
   await page.getByRole('button', { name: '我来接管' }).click()
   await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
+  expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
+})
+
+
+test('training center coach demo auto-takes over without polluting personal history', async ({ page }) => {
+  test.setTimeout(90_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '教练示范 E2E')
+
+  const demo = page.getByRole('region', { name: '教练示范' })
+  await expect(demo).toBeVisible()
+  await expect(demo).toContainText('示范成绩不会写入个人训练记录')
+  await demo.getByRole('button', { name: /科目二完整示范/ }).click()
+
+  await expectHealthyDrivingScene(page, { requireProjectStatus: false })
+  await expect(page.locator('.status-chip')).toContainText('教练示范')
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await expect(
+    page.getByRole('complementary', { name: '教练实时讲解' }),
+  ).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: '结束并查看结果' }).click()
+
+  await expect(page.getByText('教练示范复盘')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '教练标准示范' })).toBeVisible()
+  await expect(page.getByText(/不计入你的个人成绩、训练趋势或训练计划/)).toBeVisible()
+  await expect(page.getByRole('region', { name: '今日车评' })).toHaveCount(0)
+
+  const personalHistoryCount = await page.evaluate(() => {
+    const raw = window.localStorage.getItem('subject2.examHistory.v1')
+    if (!raw) return 0
+    try {
+      const value = JSON.parse(raw)
+      return Array.isArray(value) ? value.length : -1
+    } catch {
+      return -1
+    }
+  })
+  expect(personalHistoryCount).toBe(0)
+
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
