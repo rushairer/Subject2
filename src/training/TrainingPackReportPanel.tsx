@@ -67,6 +67,7 @@ function roundDate(createdAt: number) {
 }
 
 function stageResultLabel(stage: TrainingPackStageResult) {
+  if (stage.coachAssisted) return '教练示范'
   if (!stage.completed) return '未完成'
   return stage.passed ? '达标' : '需练习'
 }
@@ -119,21 +120,29 @@ export function TrainingPackReport({
       <span><b>{report.recordedStages}/{report.totalStages}</b><small>已记录阶段</small></span>
       <span><b>{report.completedStages}</b><small>完整完成</small></span>
       <span><b>{report.passedStages}</b><small>阶段达标</small></span>
+      <span><b>{report.assistedStages}</b><small>教练辅助</small></span>
       <span><b>{report.habitInfractions}</b><small>目标习惯错误</small></span>
       <span><b>{report.totalFatalInfractions}</b><small>不合格项</small></span>
     </div>
 
     <div className="training-pack-report-stages">
-      {report.stages.map(stage => <article key={stage.packId + '-' + stage.index}>
+      {report.stages.map(stage => <article
+        key={stage.packId + '-' + stage.index}
+        className={stage.coachAssisted ? 'coach-assisted' : ''}
+      >
         <span className="training-pack-stage-index">{stage.index + 1}</span>
         <div>
           <strong>{trainingPackStageLabel({ id: packId, index: stage.index })}</strong>
-          <span>{stageResultLabel(stage)} · {stage.score} 分</span>
+          <span>{stageResultLabel(stage)} · {stage.score} 分{stage.coachAssisted ? ' · 不计入训练画像' : ''}</span>
         </div>
         <div className="training-pack-stage-evidence">
-          <i>相关错误 {stage.habitInfractionCount}</i>
-          <i>全部记录 {stage.infractions.length}</i>
-          {stage.fatalCount > 0 && <i className="fatal">不合格 {stage.fatalCount}</i>}
+          {stage.coachAssisted
+            ? <i className="coach">教练辅助 · 不计入趋势</i>
+            : <>
+                <i>相关错误 {stage.habitInfractionCount}</i>
+                <i>全部记录 {stage.infractions.length}</i>
+                {stage.fatalCount > 0 && <i className="fatal">不合格 {stage.fatalCount}</i>}
+              </>}
         </div>
       </article>)}
     </div>
@@ -141,6 +150,9 @@ export function TrainingPackReport({
     <div className="training-pack-report-guidance">
       <b>如何理解这份报告</b>
       <p>不同项目的规则、机会次数和难度并不相同，因此这里比较的是训练包内“目标习惯相关错误记录”的变化，不新增考试分数，也不把跨项目结果当作同一张正式成绩单。</p>
+      {report.assistedStages > 0 && <p className="coach-assisted-note">
+        本轮有 <strong>{report.assistedStages}</strong> 个阶段使用了教练接管；这些阶段只作为示范记录展示，已从趋势、重点回练和长期训练画像中排除。完整用户驾驶后再记录为个人证据。
+      </p>}
       {report.recommendedRetryStageIndex != null && <p>
         本轮证据最集中的阶段是 <strong>{trainingPackStageLabel({
           id: packId,
