@@ -21,6 +21,9 @@ export interface ExamHistoryEntry {
   // Optional for records written before explicit completion tracking existed.
   status?: SessionResultStatus
   completed?: boolean
+  // Attempts that used coach takeover are retained for audit/replay but must
+  // not be interpreted as unaided candidate performance.
+  coachAssisted?: boolean
   infractionCount: number
 }
 
