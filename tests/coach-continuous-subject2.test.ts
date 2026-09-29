@@ -143,6 +143,22 @@ test('continuous Subject 2 keeps takeover across projects and preserves explicit
     /if \(!combinedExam && !coachDemo\) setCoachActive\(false\)/,
   )
   assert.match(app, /activeCoachPlanId/)
+  assert.match(
+    app,
+    /const subject2CoachObservation = coachPlan && !controlsLocked/,
+  )
+  assert.match(
+    app,
+    /const subject2CoachStep = coachActive\s*\? subject2CoachObservation\s*: null/,
+  )
+  assert.doesNotMatch(
+    app,
+    /coachActive && !coachWasActive\.current[\s\S]{0,240}coachRuntime\.current = createCoachRuntime\(\)/,
+  )
+  assert.doesNotMatch(
+    app,
+    /coachActive && !coachWasActive\.current[\s\S]{0,240}subject3CoachRuntime\.current = createSubject3CoachRuntime\(\)/,
+  )
   assert.match(app, /SUBJECT2_EXAM_ENTRY_CAPTURE_METERS/)
   assert.doesNotMatch(app, /activeEntryDistance <= 6/)
 })
