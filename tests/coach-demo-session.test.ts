@@ -50,4 +50,7 @@ test('training center demo sessions auto-take over and personal sessions keep no
   assert.match(app, /if \(shouldPersistPersonalResult\(session\)\)/)
   assert.match(app, /示范成绩不会写入个人训练记录/)
   assert.match(app, /不计入你的个人成绩、训练趋势或训练计划/)
+  assert.match(app, /教练示范 ·/)
+  assert.match(app, /结束示范并查看复盘/)
+  assert.match(app, /coachDemo[\s\S]*科目二[\s\S]*activeIndex \+ 1/)
 })
