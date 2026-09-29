@@ -237,7 +237,7 @@ test('Subject 3 night scene records lighting state and exposes replay coaching',
     await page.keyboard.up('w')
   }
 
-  await page.getByRole('button', { name: '结束并查看结果' }).click()
+  await page.getByRole('button', { name: '结束示范并查看复盘' }).click()
 
   const lighting = page.getByRole('region', { name: '夜间灯光训练观察' })
   await expect(lighting).toBeVisible()
@@ -658,7 +658,7 @@ test('Subject 3 coach completes the daytime light preflight through the real jud
 test('training center coach demo auto-takes over without polluting personal history', async ({ page }) => {
   test.setTimeout(90_000)
   const runtimeErrors = captureRuntimeErrors(page)
-  await createC2Candidate(page, '教练示范 E2E')
+  await createC2Candidate(page, '演示入口 E2E')
 
   const demo = page.getByRole('region', { name: '教练示范' })
   await expect(demo).toBeVisible()
@@ -666,8 +666,12 @@ test('training center coach demo auto-takes over without polluting personal hist
   await demo.getByRole('button', { name: /科目二完整示范/ }).click()
 
   await expectHealthyDrivingScene(page, { requireProjectStatus: false })
-  await expect(page.locator('.status-chip')).toContainText('教练示范')
+  const demoStatus = page.locator('.status-chip')
+  await expect(demoStatus).toContainText(/教练示范 · 科目二 \d+\/\d+ ·/)
+  await expect(demoStatus).not.toContainText('演示入口 E2E')
+  await expect(demoStatus).not.toContainText('科目二模拟考试')
   await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '结束示范并查看复盘' })).toBeVisible()
   await expect(
     page.getByRole('complementary', { name: '教练实时讲解' }),
   ).toBeVisible({ timeout: 10_000 })
