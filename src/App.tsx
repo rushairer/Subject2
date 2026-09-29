@@ -1000,6 +1000,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
   const [helpExpanded, setHelpExpanded] = useState(false)
   const toggleHelp = useCallback(() => setHelpExpanded(value => !value), [])
   const combinedExam = session.examId === 'subject2-exam'
+  const coachDemo = isCoachDemoSession(session)
   const trainingPack = session.trainingPack ? trainingPackById(session.trainingPack.id) : null
   const automatic = candidate.licenseType === 'C2'
   const [webglAvailable, setWebglAvailable] = useState(() => supportsWebGL2())
@@ -1029,7 +1030,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
   )
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
-  const [coachActive, setCoachActive] = useState(() => isCoachDemoSession(session))
+  const [coachActive, setCoachActive] = useState(() => coachDemo)
   const [coachStatus, setCoachStatus] = useState('')
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
     mode === 'first' ? 'second'
@@ -1201,9 +1202,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     : projectStatus
 
   useEffect(() => {
-    if (!combinedExam && !isCoachDemoSession(session)) setCoachActive(false)
+    if (!combinedExam && !coachDemo) setCoachActive(false)
     setCoachStatus('')
-  }, [activeExamId, combinedExam, session.coachDemo])
+  }, [activeExamId, coachDemo, combinedExam])
 
   useEffect(() => {
     if (!combinedExam || activeEntryReached) return
@@ -1284,15 +1285,17 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
       <div className="hud-top">
-        <div className="status-chip">{candidate.name} · {combinedExam
-          ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}`
-          : trainingPack && session.trainingPack
-            ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
-            : session.subject3Practice
-              ? sessionTitle(session)
-              : session.coachDemo
-                ? '教练示范'
-                : session.mode === 'exam' ? '模拟考试' : '训练'} · {session.time === 'night' ? '夜间' : '白天'}</div>
+        <div className="status-chip">{coachDemo
+          ? `教练示范 · ${combinedExam
+              ? `科目二 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}`
+              : sessionTitle(session)}`
+          : `${candidate.name} · ${combinedExam
+              ? `科目二模拟考试 ${activeIndex + 1}/${examSequence.length} · ${examTitle(activeExamId)}`
+              : trainingPack && session.trainingPack
+                ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
+                : session.subject3Practice
+                  ? sessionTitle(session)
+                  : session.mode === 'exam' ? '模拟考试' : '训练'}`} · {session.time === 'night' ? '夜间' : '白天'}</div>
         <div className="hud-actions">
           {coachSupported && <button
             className={coachActive ? 'view-btn coach-active' : 'view-btn'}
@@ -1306,7 +1309,9 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           <button className="view-btn" onClick={cycleCameraMode}>
             M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
           </button>
-          <button className="finish-btn" onClick={finishSession}>结束并查看结果</button>
+          <button className="finish-btn" onClick={finishSession}>
+            {coachDemo ? '结束示范并查看复盘' : '结束并查看结果'}
+          </button>
         </div>
       </div>
       {drivingReady && activeExamId === 'subject3' && !lightTestDone && <NightLightTest
