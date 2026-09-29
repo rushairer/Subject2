@@ -369,7 +369,9 @@ export function stepSubject3Coach(
   const status = defensive.reason
     ? `科目三示范 · ${defensive.reason}`
     : runtime.defensiveRecovery
-      ? '科目三示范 · 危险解除，一挡重新起步并顺序升挡'
+      ? automatic
+        ? '科目三示范 · 危险解除，平稳恢复行驶'
+        : '科目三示范 · 危险解除，一挡重新起步并顺序升挡'
       : waitingForStart
       ? '科目三示范 · 左灯开启并观察后方，等待 3 秒后起步'
       : stoppingForPullOver
