@@ -40,6 +40,24 @@ test('Subject 2 reverse-parking explanation stays tied to the actual coach actio
   assert.match(hint.operation, /左打 0\.25 圈/)
 })
 
+test('Subject 3 light preflight explanation teaches the real lamp sequence', () => {
+  const hint = buildCoachTeachingHint({
+    examId: 'subject3',
+    status: '灯光预检 · 夜间通过没有交通信号灯控制的路口 · 切换远光灯',
+    automatic: true,
+    vehicle: vehicle({
+      lowBeam: true,
+      highBeam: true,
+    }),
+  })
+
+  assert.ok(hint)
+  assert.match(hint.action, /灯光预检/)
+  assert.match(hint.reason, /远光再切回近光/)
+  assert.match(hint.watch, /最终回到近光/)
+  assert.match(hint.operation, /远光灯/)
+})
+
 test('Subject 3 hazard explanations identify braking as a defensive response', () => {
   const hint = buildCoachTeachingHint({
     examId: 'subject3',
