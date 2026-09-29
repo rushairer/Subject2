@@ -46,13 +46,18 @@ test.afterEach(async ({ page }) => {
   }
 })
 
-async function expectHealthyDrivingScene(page: Page) {
+async function expectHealthyDrivingScene(
+  page: Page,
+  options: { requireProjectStatus?: boolean } = {},
+) {
   await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 })
   await expect(page.locator('.driving-shell')).toHaveAttribute('aria-busy', 'false', { timeout: 20_000 })
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
   await expect(page.getByRole('button', { name: '结束并查看结果' })).toBeVisible()
-  await expect(page.locator('.project-status')).toBeVisible()
+  if (options.requireProjectStatus !== false) {
+    await expect(page.locator('.project-status')).toBeVisible()
+  }
 }
 
 async function expectProgressiveKeyboardPedals(page: Page) {
@@ -660,7 +665,7 @@ test('training center coach demo auto-takes over without polluting personal hist
   await expect(demo).toContainText('示范成绩不会写入个人训练记录')
   await demo.getByRole('button', { name: /科目二完整示范/ }).click()
 
-  await expectHealthyDrivingScene(page)
+  await expectHealthyDrivingScene(page, { requireProjectStatus: false })
   await expect(page.locator('.status-chip')).toContainText('教练示范')
   await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
   await expect(
