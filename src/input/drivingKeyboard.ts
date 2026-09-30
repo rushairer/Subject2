@@ -3,7 +3,7 @@ import { DRIVING_RULES } from '../rules/drivingRules'
 export type DrivingKey =
   | 'w' | 's' | 'a' | 'd' | 'arrowup' | 'arrowdown' | 'arrowleft' | 'arrowright'
   | 'c' | 'shift' | 'space' | 'i' | 'q' | 'e' | 'v' | 'l' | 'k'
-  | 'n' | 'r' | 'g' | '1' | '2' | '3' | '4' | '5' | 'b' | 't'
+  | 'n' | 'r' | 'g' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'b' | 't'
   | 'z' | 'x' | 'f' | 'm' | 'h' | 'j' | '[' | ']'
 
 export type DrivingKeys = Partial<Record<DrivingKey, boolean>>
@@ -11,14 +11,16 @@ export type DrivingKeys = Partial<Record<DrivingKey, boolean>>
 const recognizedKeys = new Set<string>([
   'w', 's', 'a', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright',
   'c', 'shift', 'space', 'i', 'q', 'e', 'v', 'l', 'k', 'n', 'r', 'g',
-  '1', '2', '3', '4', '5', 'b', 't', 'z', 'x', 'f', 'm', 'h', 'j', '[', ']',
+  '1', '2', '3', '4', '5', '6', '7', '8', '9', 'b', 't', 'z', 'x', 'f', 'm', 'h', 'j', '[', ']',
 ])
 
 /** Physical key codes keep Shift+digit and key-up after modifier changes consistent. */
 export function drivingKey(event: { code?: string; key: string }): DrivingKey | null {
   const code = event.code ?? ''
-  const physical = /^(Key[A-Z]|Digit[1-5])$/.test(code)
+  const physical = /^(Key[A-Z]|Digit[1-9])$/.test(code)
     ? code.replace(/^(Key|Digit)/, '').toLowerCase()
+    : /^Numpad[1-9]$/.test(code)
+      ? code.replace('Numpad', '')
     : code === 'BracketLeft' ? '[' : code === 'BracketRight' ? ']'
     : code === 'ShiftLeft' || code === 'ShiftRight'
       ? 'shift'
@@ -41,6 +43,13 @@ export function releaseDrivingKey(keys: DrivingKeys, key: DrivingKey) {
 
 export function clearDrivingKeys(keys: DrivingKeys) {
   for (const key of Object.keys(keys) as DrivingKey[]) delete keys[key]
+}
+
+export function fixedThrottleFromDrivingKeys(keys: DrivingKeys): number | null {
+  for (let digit = 9; digit >= 1; digit -= 1) {
+    if (keys[String(digit) as DrivingKey]) return digit / 10
+  }
+  return null
 }
 
 export function drivingLook(keys: DrivingKeys) {

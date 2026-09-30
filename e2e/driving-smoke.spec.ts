@@ -85,6 +85,14 @@ async function expectProgressiveKeyboardPedals(page: Page) {
   // Exact release timing is covered in simulation tests; allow software-WebGL frames here.
   await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
 
+  await page.keyboard.down('4')
+  try {
+    await expect(throttle).toHaveAttribute('value', '40', { timeout: 5_000 })
+  } finally {
+    await page.keyboard.up('4')
+  }
+  await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
+
   await page.keyboard.down('w')
   try {
     await expect.poll(throttleOpening).toBeGreaterThan(0)
@@ -265,7 +273,7 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
   await page.keyboard.press('t')
   await page.keyboard.press('i')
   await page.keyboard.down('c')
-  await page.keyboard.press('1')
+  await page.keyboard.press(']')
   await page.keyboard.press('Space')
   // New keyboard model: make every clutch phase observable. Holding Shift
   // while C is still down is not enough on a slow renderer because no frame may

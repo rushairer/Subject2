@@ -117,7 +117,8 @@ test('braking overrides held W and stops in both directions without reversing sp
 test('higher manual gears extend the usable speed range instead of lowering top speed', () => {
   const speeds = [1, 2, 3].map(gear => {
     const sim = driving(false, gear, 20)
-    for (let i = 0; i < 1800; i++) sim.step({ throttleKey: true })
+    // Number 9 is the real keyboard path for a sustained 90% analogue opening.
+    for (let i = 0; i < 1800; i++) sim.step({ fixedThrottle: 0.9 })
     assert.equal(sim.stalls, 0)
     return sim.vehicle.speed * 3.6
   })
@@ -131,7 +132,8 @@ test('C1 can add power from the bite point on a rotated uphill without losing th
     const sim = driving(false)
     sim.vehicle.heading = heading
     for (let i = 0; i < 180; i++) {
-      sim.step({ throttleKey: true, clutchBiteKey: true }, 0.1, heading)
+      // Number 9 supplies a deterministic 90% opening while Shift holds the bite point.
+      sim.step({ fixedThrottle: 0.9, clutchBiteKey: true }, 0.1, heading)
     }
     assert.ok(sim.vehicle.speed > 0.5)
     assert.equal(sim.stalls, 0)

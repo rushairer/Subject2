@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  clearDrivingKeys, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey,
+  clearDrivingKeys, drivingKey, drivingLook, fixedThrottleFromDrivingKeys, pressDrivingKey, releaseDrivingKey,
   type DrivingKeys,
 } from '../src/input/drivingKeyboard.ts'
 
 test('physical keys survive Shift and different key labels', () => {
   assert.equal(drivingKey({ code: 'KeyW', key: 'W' }), 'w')
   assert.equal(drivingKey({ code: 'Digit1', key: '!' }), '1')
+  assert.equal(drivingKey({ code: 'Digit9', key: '(' }), '9')
+  assert.equal(drivingKey({ code: 'Numpad7', key: '7' }), '7')
   assert.equal(drivingKey({ code: 'ShiftRight', key: 'Shift' }), 'shift')
   assert.equal(drivingKey({ code: 'Space', key: ' ' }), 'space')
   assert.equal(drivingKey({ code: 'ArrowLeft', key: 'ArrowLeft' }), 'arrowleft')
@@ -73,4 +75,20 @@ test('help, center and sequential shifts normalize physical keys and ignore repe
     assert.equal(pressDrivingKey(held, normalized), true)
     assert.equal(pressDrivingKey(held, normalized, true), false)
   }
+})
+
+
+test('number keys expose exact fixed throttle levels and highest held level wins', () => {
+  const keys: DrivingKeys = {}
+  assert.equal(fixedThrottleFromDrivingKeys(keys), null)
+  pressDrivingKey(keys, '1')
+  assert.equal(fixedThrottleFromDrivingKeys(keys), 0.1)
+  pressDrivingKey(keys, '5')
+  assert.equal(fixedThrottleFromDrivingKeys(keys), 0.5)
+  pressDrivingKey(keys, '9')
+  assert.equal(fixedThrottleFromDrivingKeys(keys), 0.9)
+  releaseDrivingKey(keys, '9')
+  assert.equal(fixedThrottleFromDrivingKeys(keys), 0.5)
+  clearDrivingKeys(keys)
+  assert.equal(fixedThrottleFromDrivingKeys(keys), null)
 })

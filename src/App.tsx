@@ -51,7 +51,7 @@ import type { ReplayTrainingProjectId } from './replay/replayTrainingFocus'
 import { appendExamHistory, loadCandidate, loadExamHistory, saveCandidate } from './storage/profileStorage'
 import { RacingWheelSetup } from './input/RacingWheelSetup'
 import { readRacingWheelControls } from './input/racingWheel'
-import { clearDrivingKeys, sequentialDrivingGear, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
+import { clearDrivingKeys, fixedThrottleFromDrivingKeys, sequentialDrivingGear, drivingKey, drivingLook, pressDrivingKey, releaseDrivingKey, type DrivingKeys } from './input/drivingKeyboard'
 import { createKeyboardSteeringState, resetKeyboardSteering, stepKeyboardSteer } from './input/keyboardSteering'
 import { createPedalControlsState, resetPedalControls, stepPedalControls } from './input/pedalControls'
 import { createTurnSignalAutoCancelState, resetTurnSignalAutoCancel, stepTurnSignalAutoCancel } from './input/turnSignalAutoCancel'
@@ -564,7 +564,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       if (k === 'n') v.gear = 0
       if (k === 'r') v.gear = -1
       if (automatic && k === 'g') v.gear = 1
-      if (!automatic && /^[1-5]$/.test(k)) v.gear = Number(k)
+      // Number keys are reserved for exact 10%-90% keyboard throttle levels.
       if (k === 'b') { v.horn = true; startHorn() }
       if (k === 't') v.seatbelt = !v.seatbelt
       if (k === 'm') onCycleCameraMode()
@@ -625,8 +625,13 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const dt = Math.min(rawDt, .05)
     const v = vehicle.current
     const wheel = readRacingWheelControls()
+    const keyboardFixedThrottle =
+      !controlsLocked && !wheel.deviceId
+        ? fixedThrottleFromDrivingKeys(keys.current)
+        : null
     const pedalOutput = stepPedalControls(pedalControlsState.current, {
       throttleKey: !controlsLocked && !wheel.deviceId && !!(keys.current['w'] || keys.current['arrowup']),
+      fixedThrottle: keyboardFixedThrottle,
       brakeKey: !controlsLocked && !wheel.deviceId && !!(keys.current['s'] || keys.current['arrowdown']),
       clutchFloorKey: !controlsLocked && !wheel.deviceId && !automatic && !!keys.current['c'],
       clutchBiteKey: !controlsLocked && !wheel.deviceId && !automatic && !!keys.current['shift'],
