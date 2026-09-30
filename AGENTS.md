@@ -593,3 +593,11 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Coach-demo identity must win over candidate/exam identity in the driving HUD. A demo HUD must say `教练示范` and show the active project/progress without presenting the candidate name or `模拟考试` as the primary session label. Demo-specific exit wording should say `结束示范并查看复盘`.
 - Browser coverage for demo identity must use a neutral candidate name; never make the candidate name itself contain `教练示范`, or the assertion can become a false positive.
 - Coach-demo copy must reflect the selected time of day: daytime full Subject 3 demonstration starts with the simulated light preflight, while nighttime demonstration enters night road driving directly. Result metadata for full demos must say `科目二完整示范` / `科目三完整示范`, never `模拟考试`.
+
+
+## Powertrain speed model
+
+- Reachable vehicle top speed must emerge from drivetrain force, gear ratio, engine-speed torque taper, rolling resistance, aerodynamic drag and grade. Do not use an exam-speed limit or a low vehicle-speed clamp as a substitute for powertrain physics.
+- `VEHICLE_POWERTRAIN.numericalSafetySpeed` is a corruption/instability guard only. Keep it far above every normal forward/reverse operating speed and never tune it to shape ordinary vehicle performance.
+- Manual gears must retain distinct usable speed ranges through `MANUAL_GEARS` and the shared redline/taper model. Reverse speed must likewise emerge from reverse gearing and road load.
+- Physics regressions must prove that higher gears extend usable road speed, reverse remains naturally bounded, and downhill gravity can exceed any historical low speed ceiling without numerical runaway.
