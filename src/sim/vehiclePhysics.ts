@@ -311,7 +311,7 @@ export function stepVehiclePhysics(
   const tireInput = {
     longitudinalSpeed: vehicle.speed,
     steering: vehicle.steering,
-    driveAcceleration,
+    driveAcceleration: driveAcceleration * direction,
     brake: input.brake,
     handbrake: vehicle.handbrake,
     frontServiceBrakeFactor: abs.frontPressureFactor,
