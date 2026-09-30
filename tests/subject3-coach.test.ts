@@ -7,6 +7,9 @@ import {
   stepSubject3Coach,
 } from '../src/coach/subject3Coach'
 import { DRIVING_RULES } from '../src/rules/drivingRules'
+import { actorContactCircles } from '../src/sim/collisionActorGeometry'
+import { checkVehicleCircleCollision } from '../src/sim/vehicleCollision'
+import { forwardFromHeading, rightFromHeading } from '../src/sim/vehicleFrame'
 import { stepVehiclePhysics, type PhysicsVehicle } from '../src/sim/vehiclePhysics'
 import { MANUAL_GEARS } from '../src/sim/vehiclePowertrain'
 import {
@@ -15,15 +18,21 @@ import {
   type Subject3Vehicle,
 } from '../src/subject3/Subject3Course'
 import {
+  RIGHT_EDGE_OFFSET,
+  SAME_DIRECTION_DIVIDER,
   SUBJECT3_EVENTS,
+  actorRoutePose,
   poseAtRouteDistance,
   projectToSubject3Route,
 } from '../src/subject3/subject3Route'
 import {
+  SUBJECT3_CUT_IN_SCOOTER,
   createSubject3TrafficState,
   removeSubject3TrafficHazard,
   removeSubject3TrafficVehicle,
+  subject3CutInScooterRouteState,
   updateSubject3TrafficHazard,
+  updateSubject3TrafficHazardFromWorld,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
 import {
@@ -505,6 +514,195 @@ for (const automatic of [false, true]) {
       runPhysicalDefensiveStopRecovery(automatic, scenario)
     })
   }
+}
+
+
+function runBusStopScooterCoach(automatic: boolean) {
+  const dt = 0.05
+  const vehicle = vehicleAtProgress(1275, 6)
+  vehicle.handbrake = false
+  vehicle.gear = automatic ? 1 : 3
+  vehicle.clutch = 0
+  vehicle.engineRpm = automatic
+    ? DRIVING_RULES.manualTransmission.idleRpm + 6 * 95
+    : 6 * MANUAL_GEARS[3]!.rpmPerMps
+
+  const traffic = createSubject3TrafficState()
+  let coach = createSubject3CoachRuntime()
+  let scooterTriggered = false
+  let scooterElapsedSeconds = 0
+  let sawBrake = false
+  let sawYield = false
+  let sawResume = false
+  let stallCount = 0
+  let minimumPhysicalClearance = Number.POSITIVE_INFINITY
+  let progressAtYield = 0
+  let minimumSpeedDuringConflict = Number.POSITIVE_INFINITY
+
+  for (let frame = 0; frame < 2_600; frame++) {
+    const before = projectToSubject3Route(vehicle.x, vehicle.z)
+    if (
+      !scooterTriggered &&
+      before.progress > SUBJECT3_CUT_IN_SCOOTER.triggerProgress
+    ) {
+      scooterTriggered = true
+    }
+    if (scooterTriggered) scooterElapsedSeconds += dt
+
+    const scooterRoute = subject3CutInScooterRouteState(
+      scooterTriggered,
+      scooterElapsedSeconds,
+    )
+    const scooterPose = actorRoutePose(
+      scooterRoute.progress,
+      scooterRoute.lateral,
+    )
+    const forward = forwardFromHeading(scooterPose.heading)
+    const right = rightFromHeading(scooterPose.heading)
+    const velocity = {
+      x:
+        forward.x * scooterRoute.longitudinalSpeedMps +
+        right.x * scooterRoute.lateralSpeedMps,
+      z:
+        forward.z * scooterRoute.longitudinalSpeedMps +
+        right.z * scooterRoute.lateralSpeedMps,
+    }
+    const conflict =
+      scooterTriggered &&
+      scooterRoute.lateral <= RIGHT_EDGE_OFFSET &&
+      scooterRoute.lateral >= SAME_DIRECTION_DIVIDER
+
+    updateSubject3TrafficHazardFromWorld(
+      traffic,
+      'cut-in-scooter',
+      'cut-in-scooter',
+      scooterPose,
+      velocity,
+      scooterTriggered,
+      conflict,
+    )
+
+    const next = stepSubject3Coach(
+      vehicle,
+      coach,
+      dt,
+      automatic,
+      false,
+      traffic,
+    )
+    coach = next.runtime
+    const command = next.command
+
+    vehicle.engineOn = command.engineOn
+    vehicle.handbrake = command.handbrake
+    vehicle.seatbelt = command.seatbelt
+    vehicle.gear = command.gear
+    vehicle.leftIndicator = command.leftIndicator
+    vehicle.rightIndicator = command.rightIndicator
+    vehicle.lowBeam = command.lowBeam
+    vehicle.highBeam = command.highBeam
+    vehicle.horn = command.horn
+    vehicle.lookLeft = command.lookLeft
+    vehicle.lookRight = command.lookRight
+    vehicle.lookBack = command.lookBack
+
+    sawBrake ||= command.brake > 0.4
+
+    const physics = stepVehiclePhysics(vehicle, {
+      throttle: command.throttle,
+      brake: command.brake,
+      clutch: command.clutch,
+      steer: 0,
+      steeringWheelTarget: command.steeringWheelTarget,
+    }, dt, {
+      automatic,
+      grade: 0,
+    })
+    if (physics.stalled) stallCount += 1
+
+    const scooterCircles = actorContactCircles(
+      'scooter',
+      {
+        x: scooterPose.x,
+        z: scooterPose.z,
+        heading: scooterPose.heading,
+      },
+      { tiltX: 0, tiltZ: 0 },
+    )
+    for (const circle of scooterCircles) {
+      const contact = checkVehicleCircleCollision(vehicle, circle)
+      minimumPhysicalClearance = Math.min(
+        minimumPhysicalClearance,
+        contact.distance,
+      )
+      assert.equal(
+        contact.colliding,
+        false,
+        JSON.stringify({
+          automatic,
+          frame,
+          player: projectToSubject3Route(vehicle.x, vehicle.z),
+          scooterRoute,
+          command: command.status,
+          clearance: contact.distance,
+        }),
+      )
+    }
+
+    const after = projectToSubject3Route(vehicle.x, vehicle.z)
+    if (scooterTriggered && conflict) {
+      minimumSpeedDuringConflict = Math.min(
+        minimumSpeedDuringConflict,
+        Math.abs(vehicle.speed),
+      )
+      if (
+        !sawYield &&
+        command.brake > 0.4 &&
+        Math.abs(vehicle.speed) < 4
+      ) {
+        sawYield = true
+        progressAtYield = after.progress
+      }
+    }
+    if (
+      sawYield &&
+      after.progress > progressAtYield + 18 &&
+      Math.abs(vehicle.speed) > 2
+    ) {
+      sawResume = true
+    }
+
+    if (sawResume && after.progress > 1510) break
+  }
+
+  const finalProgress = projectToSubject3Route(
+    vehicle.x,
+    vehicle.z,
+  ).progress
+
+  assert.equal(stallCount, 0)
+  assert.equal(vehicle.engineOn, true)
+  assert.equal(sawBrake, true)
+  assert.equal(sawYield, true)
+  assert.ok(
+    minimumSpeedDuringConflict < 4,
+    `${automatic ? 'C2' : 'C1'} should materially slow for the bus-stop scooter: ${minimumSpeedDuringConflict}`,
+  )
+  assert.equal(sawResume, true)
+  assert.ok(
+    minimumPhysicalClearance > 0.35,
+    `${automatic ? 'C2' : 'C1'} bus-stop scooter clearance too small: ${minimumPhysicalClearance}`,
+  )
+  assert.ok(
+    finalProgress > 1510,
+    `${automatic ? 'C2' : 'C1'} should safely continue beyond the bus stop: ${finalProgress}`,
+  )
+}
+
+for (const automatic of [false, true]) {
+  test(`${automatic ? 'C2' : 'C1'} coach safely yields to the real bus-stop cut-in scooter lifecycle`, () => {
+    runBusStopScooterCoach(automatic)
+  })
 }
 
 test('Subject 3 coach brakes for a same-lane sudden-brake vehicle', () => {

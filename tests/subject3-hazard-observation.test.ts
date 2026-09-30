@@ -7,6 +7,8 @@ import {
 } from '../src/subject3/subject3HazardObservation'
 import {
   createSubject3TrafficState,
+  subject3CutInScooterActive,
+  subject3CutInScooterRouteState,
   updateSubject3TrafficHazard,
 } from '../src/subject3/subject3Traffic'
 import { actorRoutePose } from '../src/subject3/subject3Route'
@@ -115,17 +117,29 @@ test('longitudinal meeting time is omitted when the hazard is behind or pulling 
   assert.equal(observation?.timeToLongitudinalMeetSeconds, undefined)
 })
 
-test('very low candidate speed suppresses cut-in observation', () => {
+test('bus-stop scooter stays active after five seconds until it actually stops', () => {
+  const beforeFive = subject3CutInScooterRouteState(true, 4.9)
+  const afterFive = subject3CutInScooterRouteState(true, 8)
+
+  assert.equal(subject3CutInScooterActive(true, false), true)
+  assert.equal(subject3CutInScooterActive(true, true), false)
+  assert.equal(subject3CutInScooterActive(false, false), false)
+  assert.ok(afterFive.progress > beforeFive.progress)
+  assert.equal(afterFive.lateralSpeedMps, 0)
+})
+
+test('cut-in observation remains available while the candidate is stopped', () => {
   const traffic = createSubject3TrafficState()
   publishCutIn(traffic, 'cut-in', 1010, 1.2)
 
-  assert.equal(
-    observeSubject3CutInHazard(
-      playerAt(1000, 0, SUBJECT3_CUT_IN_OBSERVATION.minimumPlayerSpeedMps - 0.01),
-      traffic,
-    ),
-    undefined,
+  const observation = observeSubject3CutInHazard(
+    playerAt(1000, 0, 0),
+    traffic,
   )
+  assert.ok(observation)
+  assert.equal(observation.hazardId, 'cut-in')
+  assert.equal(observation.conflict, true)
+  assert.equal(observation.timeToLongitudinalMeetSeconds, undefined)
 })
 
 

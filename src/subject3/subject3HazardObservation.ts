@@ -4,7 +4,9 @@ import type { Subject3TrafficState } from './subject3Traffic'
 export const SUBJECT3_CUT_IN_OBSERVATION = {
   maximumAheadMeters: 45,
   maximumBehindMeters: 4,
-  minimumPlayerSpeedMps: 0.25,
+  // Keep cut-in evidence visible while the candidate is stopped so coach
+  // mode can hold position until the slower scooter has actually cleared.
+  minimumPlayerSpeedMps: 0,
   conflictLateralToleranceMeters: LANE_WIDTH * 0.55,
 } as const
 
@@ -23,10 +25,6 @@ export function observeSubject3CutInHazard(
   player: { x: number; z: number; speed: number },
   traffic: Readonly<Subject3TrafficState>,
 ): Subject3CutInObservation | undefined {
-  if (player.speed < SUBJECT3_CUT_IN_OBSERVATION.minimumPlayerSpeedMps) {
-    return undefined
-  }
-
   const projection = projectToSubject3Route(player.x, player.z)
   let best: Subject3CutInObservation | undefined
   let bestDistance = Infinity

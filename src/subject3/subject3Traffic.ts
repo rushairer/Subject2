@@ -26,6 +26,55 @@ export const SUBJECT3_CROSSING_DURATION_SECONDS = 4.8
 export const SUBJECT3_CROSSING_START_LATERAL = 3.4
 export const SUBJECT3_CROSSING_END_LATERAL = -5.7
 
+export const SUBJECT3_CUT_IN_SCOOTER = {
+  triggerProgress: 1290,
+  startProgress: 1385,
+  longitudinalSpeedMps: 3.2,
+  startLateral: 3.2,
+  endLateral: -0.1,
+  lateralDurationSeconds: 3.4,
+} as const
+
+export function subject3CutInScooterActive(
+  triggered: boolean,
+  stopped: boolean,
+) {
+  return triggered && !stopped
+}
+
+export function subject3CutInScooterRouteState(
+  triggered: boolean,
+  elapsedSeconds: number,
+) {
+  const elapsed = triggered ? Math.max(0, elapsedSeconds) : 0
+  const lateralProgress = Math.max(
+    0,
+    Math.min(1, elapsed / SUBJECT3_CUT_IN_SCOOTER.lateralDurationSeconds),
+  )
+  return {
+    progress:
+      SUBJECT3_CUT_IN_SCOOTER.startProgress +
+      SUBJECT3_CUT_IN_SCOOTER.longitudinalSpeedMps * elapsed,
+    lateral:
+      SUBJECT3_CUT_IN_SCOOTER.startLateral +
+      (
+        SUBJECT3_CUT_IN_SCOOTER.endLateral -
+        SUBJECT3_CUT_IN_SCOOTER.startLateral
+      ) * lateralProgress,
+    longitudinalSpeedMps: triggered
+      ? SUBJECT3_CUT_IN_SCOOTER.longitudinalSpeedMps
+      : 0,
+    lateralSpeedMps:
+      triggered && lateralProgress < 1
+        ? (
+            SUBJECT3_CUT_IN_SCOOTER.endLateral -
+            SUBJECT3_CUT_IN_SCOOTER.startLateral
+          ) /
+          SUBJECT3_CUT_IN_SCOOTER.lateralDurationSeconds
+        : 0,
+  }
+}
+
 export type Subject3TrafficVehicleScenario = 'sudden-brake'
 export type Subject3TrafficHazardKind = 'cut-in-scooter' | 'crosswalk-pedestrian'
 

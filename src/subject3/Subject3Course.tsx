@@ -48,11 +48,14 @@ import {
   SUBJECT3_CROSSING_END_LATERAL,
   SUBJECT3_CROSSWALK_PROGRESS,
   SUBJECT3_CROSSWALK_TRIGGER_PROGRESS,
+  SUBJECT3_CUT_IN_SCOOTER,
   SUBJECT3_TRAFFIC_CAR,
   SUBJECT3_OVERTAKE_TARGET_LATERAL,
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  subject3CutInScooterActive,
+  subject3CutInScooterRouteState,
   removeSubject3TrafficHazard,
   removeSubject3TrafficVehicle,
   updateSubject3TrafficAfterImpact,
@@ -1554,7 +1557,6 @@ function CutInScooter({
   const group = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
   const triggered = useRef(false)
-  const progress = useRef(1385)
   const isStopped = useRef(false)
   const wheelAngle = useRef(0)
   const body = useSubject3Collision('scooter', player, onInfraction, 'subject3-collision-scooter', audioContext, audioState)
@@ -1565,24 +1567,38 @@ function CutInScooter({
     const dt = Math.min(delta, 0.05)
     body.step(dt)
     const playerProgress = projectToSubject3Route(player.current.x, player.current.z).progress
-    if (!triggered.current && playerProgress > 1290) triggered.current = true
-    if (triggered.current && !isStopped.current) {
-      elapsed.current = Math.min(5, elapsed.current + dt)
-      progress.current += 3.2 * dt
-      wheelAngle.current += (3.2 / 0.18) * dt
+    if (
+      !triggered.current &&
+      playerProgress > SUBJECT3_CUT_IN_SCOOTER.triggerProgress
+    ) {
+      triggered.current = true
     }
-    const lateral = 3.2 - Math.min(1, elapsed.current / 3.4) * 3.3
-    const world = actorWorldPosition(progress.current, lateral)
+    if (triggered.current && !isStopped.current) {
+      elapsed.current += dt
+      wheelAngle.current +=
+        (SUBJECT3_CUT_IN_SCOOTER.longitudinalSpeedMps / 0.18) * dt
+    }
+    const routeState = subject3CutInScooterRouteState(
+      triggered.current,
+      elapsed.current,
+    )
+    const world = actorWorldPosition(routeState.progress, routeState.lateral)
     const motion = body.motion.current
     const actor = { x: world.x + motion.offsetX, z: world.z + motion.offsetZ, heading: world.pose.heading }
     const tilt = body.animate(actor.heading)
     const forward = forwardFromHeading(actor.heading)
     const right = rightFromHeading(actor.heading)
-    const lateralSpeed = elapsed.current < 3.4 ? -3.3 / 3.4 : 0
     const velocity = isStopped.current
       ? { x: motion.velocityX, z: motion.velocityZ }
       : triggered.current
-        ? { x: forward.x * 3.2 + right.x * lateralSpeed, z: forward.z * 3.2 + right.z * lateralSpeed }
+        ? {
+            x:
+              forward.x * routeState.longitudinalSpeedMps +
+              right.x * routeState.lateralSpeedMps,
+            z:
+              forward.z * routeState.longitudinalSpeedMps +
+              right.z * routeState.lateralSpeedMps,
+          }
         : { x: 0, z: 0 }
     if (body.circles(actorContactCircles('scooter', actor, tilt), velocity)?.collided) isStopped.current = true
     const actual = projectToSubject3Route(actor.x, actor.z)
@@ -1596,7 +1612,10 @@ function CutInScooter({
       'cut-in-scooter',
       actor,
       velocity,
-      triggered.current && !isStopped.current && elapsed.current < 5,
+      subject3CutInScooterActive(
+        triggered.current,
+        isStopped.current,
+      ),
       conflict,
     )
     if (group.current) {
