@@ -54,6 +54,7 @@ import {
   SUBJECT3_OVERTAKE_TARGET_PROGRESS,
   createSubject3TrafficState,
   crossingPedestrianMotion,
+  subject3CutInScooterActive,
   subject3CutInScooterRouteState,
   removeSubject3TrafficHazard,
   removeSubject3TrafficVehicle,
@@ -1611,7 +1612,10 @@ function CutInScooter({
       'cut-in-scooter',
       actor,
       velocity,
-      triggered.current && !isStopped.current,
+      subject3CutInScooterActive(
+        triggered.current,
+        isStopped.current,
+      ),
       conflict,
     )
     if (group.current) {
