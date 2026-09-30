@@ -125,7 +125,11 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const exitTurnRadius = 4.31
   // Drive far enough out of the bay that the 4.4 m body is substantially
   // inside the 6.7 m lane before beginning the 90-degree forward turn.
-  const outboundTurnX = 1.7
+  // Begin the forward 90-degree exit turn slightly earlier so the south/north
+  // longitudinal lane center lands at x=-0.60 instead of x=-1.20. That gives
+  // the second setup enough lateral headroom to re-center with a short S-shift
+  // without driving the 4.4 m body against the far control-area end.
+  const outboundTurnX = 2.3
   const outboundLaneX = outboundTurnX + rearAxle - exitTurnRadius
   const exitTurnZ = exitTurnRadius + rearAxle
   const turnStartZ = reverseTurnStartZ
@@ -355,11 +359,11 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     secondSetupStartPose,
     1,
     [
-      // A symmetric 2.30 m S-shift moves the car from x=-1.20 m back to
-      // x≈0 while restoring heading≈0. Starting the mirrored reverse from the
-      // same lateral line as pass one removes the accumulated 0.575 m offset.
-      { steering: 0.58, distance: 2.3 },
-      { steering: -0.58, distance: 2.3 },
+      // With the exit lane now at x=-0.60 m, this compact S-shift lands at
+      // x≈0.025 m / heading≈0 while retaining large body clearance from the
+      // opposite control-area end.
+      { steering: 0.58, distance: 1.65 },
+      { steering: -0.58, distance: 1.65 },
     ],
     '驶向另一端 · S 形横移到标准倒库线并重新回正车身',
   )
