@@ -114,17 +114,41 @@ test('braking overrides held W and stops in both directions without reversing sp
   }
 })
 
-test('higher manual gears extend the usable speed range instead of lowering top speed', () => {
-  const speeds = [1, 2, 3].map(gear => {
+test('manual gears establish distinct natural top-speed ranges without a global speed wall', () => {
+  const speeds = [1, 2, 3, 4, 5].map(gear => {
     const sim = driving(false, gear, 20)
     // Number 9 is the real keyboard path for a sustained 90% analogue opening.
-    for (let i = 0; i < 1800; i++) sim.step({ fixedThrottle: 0.9 })
+    for (let i = 0; i < 3600; i++) sim.step({ fixedThrottle: 0.9 })
     assert.equal(sim.stalls, 0)
     return sim.vehicle.speed * 3.6
   })
-  assert.ok(speeds[0] > 25 && speeds[0] < 32)
-  assert.ok(speeds[1] > speeds[0] + 8)
-  assert.ok(speeds[2] > speeds[1] + 8)
+
+  const bands: ReadonlyArray<readonly [number, number]> = [
+    [28, 34],
+    [43, 50],
+    [61, 70],
+    [84, 96],
+    [110, 126],
+  ]
+  speeds.forEach((speed, index) => {
+    const [minimum, maximum] = bands[index]
+    assert.ok(
+      speed >= minimum && speed <= maximum,
+      `gear ${index + 1} natural speed ${speed} km/h outside ${minimum}..${maximum}`,
+    )
+  })
+  for (let index = 1; index < speeds.length; index += 1) {
+    assert.ok(speeds[index] > speeds[index - 1] + 10)
+  }
+  assert.ok(speeds[4] > 100, `fifth gear still looks artificially capped: ${speeds[4]}`)
+})
+
+test('automatic road speed also settles naturally above the old 57.6 km/h ceiling', () => {
+  const sim = driving(true, 1, 20)
+  for (let i = 0; i < 7200; i++) sim.step({ fixedThrottle: 0.9 })
+  const speed = sim.vehicle.speed * 3.6
+  assert.equal(sim.stalls, 0)
+  assert.ok(speed > 120 && speed < 150, `unexpected automatic equilibrium speed ${speed}`)
 })
 
 test('C1 can add power from the bite point on a rotated uphill without losing the gravity frame', () => {
