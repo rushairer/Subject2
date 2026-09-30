@@ -111,3 +111,39 @@ export function stepSuspensionVisual(
     rollVelocity,
   }
 }
+
+
+export interface SuspensionLocalPoint {
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * Applies the same local XYZ pitch/roll transform used by the sprung-body
+ * Three.js group around the configured suspension visual center.
+ */
+export function transformPointBySuspensionVisual(
+  point: SuspensionLocalPoint,
+  pose: SuspensionVisualPose,
+): SuspensionLocalPoint {
+  const pivotY = SUSPENSION_VISUAL.rollCenterHeightMeters
+  const y = point.y - pivotY
+  const cosRoll = Math.cos(pose.roll)
+  const sinRoll = Math.sin(pose.roll)
+  const rolledX = cosRoll * point.x - sinRoll * y
+  const rolledY = sinRoll * point.x + cosRoll * y
+
+  const cosPitch = Math.cos(pose.pitch)
+  const sinPitch = Math.sin(pose.pitch)
+  const pitchedY =
+    cosPitch * rolledY - sinPitch * point.z
+  const pitchedZ =
+    sinPitch * rolledY + cosPitch * point.z
+
+  return {
+    x: rolledX,
+    y: pitchedY + pivotY,
+    z: pitchedZ,
+  }
+}

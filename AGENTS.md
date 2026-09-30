@@ -637,4 +637,5 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Road wheels, contact footprints, tire marks, collisions and exam judging remain in the canonical rigid-body frame. Visual suspension attitude must never change judged geometry.
 - Vehicle nose is `-Z`: forward braking must produce negative X pitch (nose dive), forward acceleration positive X pitch (nose rise). Positive body-right lateral acceleration must produce positive Z roll, loading the left/outside side visually.
 - Apply suspension attitude around an explicit roll/pitch center above the road, not around the world origin, and bound/spring the response to prevent camera-frame spikes from producing unrealistic body flips.
-- Changes to suspension visual tuning require deterministic target-sign, bound, spring-response and neutral-return regressions.
+- The first-person driver eye follows the same sprung-body pose used by the cockpit; do not integrate a second camera-only suspension state. External second/third/top cameras remain horizon-stable.
+- Changes to suspension visual tuning require deterministic target-sign, bound, spring-response, eye-transform and neutral-return regressions.

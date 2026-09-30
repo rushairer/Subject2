@@ -5,6 +5,7 @@ import {
   createSuspensionVisualState,
   stepSuspensionVisual,
   suspensionTargetPose,
+  transformPointBySuspensionVisual,
 } from '../src/sim/vehicleSuspensionVisual'
 
 test('braking dives the nose and acceleration raises it', () => {
@@ -57,4 +58,24 @@ test('visual suspension returns close to neutral after acceleration clears', () 
 
   assert.ok(Math.abs(state.pitch) < 0.001)
   assert.ok(Math.abs(state.roll) < 0.001)
+})
+
+
+test('driver eye follows nose dive and outside roll around the shared visual center', () => {
+  const eye = { x: -0.43, y: 1.36, z: 0.18 }
+
+  const braking = transformPointBySuspensionVisual(
+    eye,
+    suspensionTargetPose(-8, 0),
+  )
+  // Eye is behind the pitch center, so a nose dive raises the rear cabin
+  // slightly while the front coachwork lowers.
+  assert.ok(braking.y > eye.y)
+
+  const rightTurn = transformPointBySuspensionVisual(
+    eye,
+    suspensionTargetPose(0, 6),
+  )
+  // Driver sits left of center; positive roll loads/lowers the left side.
+  assert.ok(rightTurn.y < eye.y)
 })

@@ -2,12 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
-import type { TireTelemetry } from '../sim/vehicleTireDynamics'
 import {
   SUSPENSION_VISUAL,
-  createSuspensionVisualState,
-  stepSuspensionVisual,
-  suspensionTargetPose,
+  type SuspensionVisualPose,
 } from '../sim/vehicleSuspensionVisual'
 import { ackermannFrontAngles } from '../sim/wheelContact'
 import { SantanaBody } from './SantanaBody'
@@ -101,18 +98,17 @@ function Pedal({ x, active, wide = false }: { x: number; active: number; wide?: 
 
 export function DrivingCockpit({
   vehicle,
-  tireTelemetry,
+  suspensionPose,
   showClutch,
   automatic,
 }: {
   vehicle: MutableRefObject<CockpitVehicleState>
-  tireTelemetry: MutableRefObject<TireTelemetry | null>
+  suspensionPose: MutableRefObject<SuspensionVisualPose>
   showClutch: boolean
   automatic: boolean
 }): ReactElement {
   const root = useRef<THREE.Group>(null)
   const sprungBody = useRef<THREE.Group>(null)
-  const suspensionState = useRef(createSuspensionVisualState())
   const steeringWheel = useRef<THREE.Group>(null)
   const gearLever = useRef<THREE.Group>(null)
   const leftHeadlight = useRef<THREE.SpotLight>(null)
@@ -137,19 +133,9 @@ export function DrivingCockpit({
 
   useFrame((_, delta) => {
     const v = vehicle.current
-    const telemetry = tireTelemetry.current
-    const targetPose = suspensionTargetPose(
-      telemetry?.longitudinalAccelerationMps2 ?? 0,
-      telemetry?.lateralAccelerationMps2 ?? 0,
-    )
-    suspensionState.current = stepSuspensionVisual(
-      suspensionState.current,
-      targetPose,
-      Math.min(delta, 0.05),
-    )
     if (sprungBody.current) {
-      sprungBody.current.rotation.x = suspensionState.current.pitch
-      sprungBody.current.rotation.z = suspensionState.current.roll
+      sprungBody.current.rotation.x = suspensionPose.current.pitch
+      sprungBody.current.rotation.z = suspensionPose.current.roll
     }
 
     const roadSpinStep = (v.speed * delta) / TRAINING_CAR.wheelRadiusMeters

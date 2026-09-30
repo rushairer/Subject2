@@ -48,6 +48,13 @@ import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { TireSkidMarks } from './sim/TireSkidMarks'
 import { TireSmoke } from './sim/TireSmoke'
 import type { TireTelemetry } from './sim/vehicleTireDynamics'
+import {
+  createSuspensionVisualState,
+  stepSuspensionVisual,
+  suspensionTargetPose,
+  transformPointBySuspensionVisual,
+  type SuspensionVisualPose,
+} from './sim/vehicleSuspensionVisual'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 import type { ReplayTrainingProjectId } from './replay/replayTrainingFocus'
@@ -488,6 +495,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
   const tireTelemetry = useRef<TireTelemetry | null>(null)
+  const suspensionVisualState = useRef(createSuspensionVisualState())
+  const suspensionPose = useRef<SuspensionVisualPose>({ pitch: 0, roll: 0 })
   const lastProjectStatus = useRef('')
   const completionLatched = useRef(false)
   const audioContext = useRef<AudioContext | null>(null)
@@ -774,6 +783,16 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       gradeHeading: slopeGradeHeading,
     })
     tireTelemetry.current = physics.tire
+    suspensionVisualState.current = stepSuspensionVisual(
+      suspensionVisualState.current,
+      suspensionTargetPose(
+        physics.tire.longitudinalAccelerationMps2,
+        physics.tire.lateralAccelerationMps2,
+      ),
+      dt,
+    )
+    suspensionPose.current.pitch = suspensionVisualState.current.pitch
+    suspensionPose.current.roll = suspensionVisualState.current.roll
     if (physics.stalled) {
       stallCount.current += 1
       onInfraction({
@@ -822,15 +841,27 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     const vehicleCenter = new THREE.Vector3(v.x, roadPose.y + 0.9, v.z)
 
     if (cameraMode === 'first') {
-      const driverRightOffset = DRIVER_EYE.right
-      const driverForwardOffset = DRIVER_EYE.forward
-      const driver = worldPointFromVehicle(v.x, v.z, v.heading, driverForwardOffset, driverRightOffset)
+      const eye = transformPointBySuspensionVisual({
+        x: DRIVER_EYE.right,
+        y: DRIVER_EYE.height,
+        z: -DRIVER_EYE.forward,
+      }, suspensionPose.current)
+      const cosHeading = Math.cos(v.heading)
+      const sinHeading = Math.sin(v.heading)
+      const eyeWorldX =
+        v.x + cosHeading * eye.x - sinHeading * eye.z
+      const eyeWorldZ =
+        v.z + sinHeading * eye.x + cosHeading * eye.z
       camera.position.set(
-        driver.x,
-        roadPose.y + DRIVER_EYE.height,
-        driver.z,
+        eyeWorldX,
+        roadPose.y + eye.y,
+        eyeWorldZ,
       )
-      camera.rotation.set(roadPose.pitch - 0.015, -v.heading + cameraYaw.current, 0)
+      camera.rotation.set(
+        roadPose.pitch - 0.015 + suspensionPose.current.pitch,
+        -v.heading + cameraYaw.current,
+        suspensionPose.current.roll,
+      )
       if (perspectiveCamera.fov !== 68) {
         perspectiveCamera.fov = 68
         perspectiveCamera.updateProjectionMatrix()
@@ -1017,7 +1048,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
     <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
-    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} tireTelemetry={tireTelemetry} showClutch={!automatic} automatic={automatic} /></group>
+    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} suspensionPose={suspensionPose} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
