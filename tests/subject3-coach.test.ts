@@ -532,11 +532,12 @@ function runBusStopScooterCoach(automatic: boolean) {
   let scooterTriggered = false
   let scooterElapsedSeconds = 0
   let sawBrake = false
-  let sawNearStop = false
+  let sawYield = false
   let sawResume = false
   let stallCount = 0
   let minimumPhysicalClearance = Number.POSITIVE_INFINITY
-  let progressAtNearStop = 0
+  let progressAtYield = 0
+  let minimumSpeedDuringConflict = Number.POSITIVE_INFINITY
 
   for (let frame = 0; frame < 2_600; frame++) {
     const before = projectToSubject3Route(vehicle.x, vehicle.z)
@@ -649,17 +650,23 @@ function runBusStopScooterCoach(automatic: boolean) {
     }
 
     const after = projectToSubject3Route(vehicle.x, vehicle.z)
-    if (
-      scooterTriggered &&
-      conflict &&
-      Math.abs(vehicle.speed) < 0.35
-    ) {
-      if (!sawNearStop) progressAtNearStop = after.progress
-      sawNearStop = true
+    if (scooterTriggered && conflict) {
+      minimumSpeedDuringConflict = Math.min(
+        minimumSpeedDuringConflict,
+        Math.abs(vehicle.speed),
+      )
+      if (
+        !sawYield &&
+        command.brake > 0.4 &&
+        Math.abs(vehicle.speed) < 4
+      ) {
+        sawYield = true
+        progressAtYield = after.progress
+      }
     }
     if (
-      sawNearStop &&
-      after.progress > progressAtNearStop + 18 &&
+      sawYield &&
+      after.progress > progressAtYield + 18 &&
       Math.abs(vehicle.speed) > 2
     ) {
       sawResume = true
@@ -676,7 +683,11 @@ function runBusStopScooterCoach(automatic: boolean) {
   assert.equal(stallCount, 0)
   assert.equal(vehicle.engineOn, true)
   assert.equal(sawBrake, true)
-  assert.equal(sawNearStop, true)
+  assert.equal(sawYield, true)
+  assert.ok(
+    minimumSpeedDuringConflict < 4,
+    `${automatic ? 'C2' : 'C1'} should materially slow for the bus-stop scooter: ${minimumSpeedDuringConflict}`,
+  )
   assert.equal(sawResume, true)
   assert.ok(
     minimumPhysicalClearance > 0.35,
