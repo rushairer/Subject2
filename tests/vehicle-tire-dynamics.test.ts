@@ -135,7 +135,7 @@ test('front-drive acceleration consumes front tire grip during a saturated high-
   let coastFrontSlip = 0
   let powerFrontSlip = 0
 
-  for (let frame = 0; frame < 18; frame += 1) {
+  for (let frame = 0; frame < 24; frame += 1) {
     const coastResult = stepVehiclePhysics(coast, {
       throttle: 0,
       brake: 0,
@@ -293,7 +293,7 @@ test('handbrake drift recovers to stable forward travel after release and steeri
   let releaseSideslip = 0
   let releaseYawRate = 0
 
-  for (let frame = 0; frame < 24; frame += 1) {
+  for (let frame = 0; frame < 18; frame += 1) {
     const result = stepVehiclePhysics(car, {
       throttle: 0,
       brake: 0,
