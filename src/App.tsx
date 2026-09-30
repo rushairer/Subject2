@@ -45,6 +45,8 @@ import {
 } from './coach/coachDemoSession'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
+import { TireSkidMarks } from './sim/TireSkidMarks'
+import type { TireTelemetry } from './sim/vehicleTireDynamics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
 import type { ReplayTrainingProjectId } from './replay/replayTrainingFocus'
@@ -470,6 +472,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const subject3Traffic = useRef(createSubject3TrafficState())
   const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
+  const tireTelemetry = useRef<TireTelemetry | null>(null)
   const lastProjectStatus = useRef('')
   const completionLatched = useRef(false)
   const audioContext = useRef<AudioContext | null>(null)
@@ -755,6 +758,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       grade: slopeBeforeStep.grade,
       gradeHeading: slopeGradeHeading,
     })
+    tireTelemetry.current = physics.tire
     if (physics.stalled) {
       stallCount.current += 1
       onInfraction({
@@ -996,6 +1000,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     ) : (
       <Road />
     )}
+    <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
