@@ -19,6 +19,8 @@ function telemetry(
     rearGripUsage: 0,
     frontSkidSeverity,
     rearSkidSeverity,
+    frontWheelRotationFactor: 1,
+    rearWheelRotationFactor: 1,
   }
 }
 

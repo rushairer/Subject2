@@ -21,6 +21,8 @@ export interface CockpitVehicleState {
   engineOn: boolean
   engineRpm: number
   handbrake: boolean
+  frontWheelRotationFactor?: number
+  rearWheelRotationFactor?: number
   leftIndicator: boolean
   rightIndicator: boolean
   hazard: boolean
@@ -105,7 +107,8 @@ export function DrivingCockpit({
   const leftHeadlight = useRef<THREE.SpotLight>(null)
   const rightHeadlight = useRef<THREE.SpotLight>(null)
   const headlightTarget = useRef<THREE.Object3D>(null)
-  const wheelSpin = useRef(0)
+  const frontWheelSpin = useRef(0)
+  const rearWheelSpin = useRef(0)
   const frontLeftSteer = useRef<THREE.Group>(null)
   const frontRightSteer = useRef<THREE.Group>(null)
   const frontLeftSpin = useRef<THREE.Group>(null)
@@ -123,13 +126,18 @@ export function DrivingCockpit({
 
   useFrame((_, delta) => {
     const v = vehicle.current
-    wheelSpin.current += (v.speed * delta) / TRAINING_CAR.wheelRadiusMeters
+    const roadSpinStep = (v.speed * delta) / TRAINING_CAR.wheelRadiusMeters
+    frontWheelSpin.current += roadSpinStep * (v.frontWheelRotationFactor ?? 1)
+    rearWheelSpin.current += roadSpinStep * (v.rearWheelRotationFactor ?? 1)
     if (steeringWheel.current) steeringWheel.current.rotation.z = -v.steeringWheelAngle
     const frontAngles = ackermannFrontAngles(v.steering)
     if (frontLeftSteer.current) frontLeftSteer.current.rotation.y = -frontAngles.left
     if (frontRightSteer.current) frontRightSteer.current.rotation.y = -frontAngles.right
-    for (const spin of [frontLeftSpin.current, frontRightSpin.current, rearLeftSpin.current, rearRightSpin.current]) {
-      if (spin) spin.rotation.y = wheelSpin.current
+    for (const spin of [frontLeftSpin.current, frontRightSpin.current]) {
+      if (spin) spin.rotation.y = frontWheelSpin.current
+    }
+    for (const spin of [rearLeftSpin.current, rearRightSpin.current]) {
+      if (spin) spin.rotation.y = rearWheelSpin.current
     }
 
     if (gearLever.current) {

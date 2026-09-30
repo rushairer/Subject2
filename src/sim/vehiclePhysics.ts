@@ -278,5 +278,7 @@ export function stepVehiclePhysics(
     )
   }
 
+  vehicle.frontWheelRotationFactor = tire.frontWheelRotationFactor
+  vehicle.rearWheelRotationFactor = tire.rearWheelRotationFactor
   return { stalled, tire }
 }

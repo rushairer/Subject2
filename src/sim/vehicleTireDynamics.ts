@@ -44,6 +44,10 @@ export interface TireTelemetry {
   rearGripUsage: number
   frontSkidSeverity: number
   rearSkidSeverity: number
+  /** 1 = free rolling at road speed, 0 = longitudinally locked. */
+  frontWheelRotationFactor: number
+  /** 1 = free rolling at road speed, 0 = longitudinally locked. */
+  rearWheelRotationFactor: number
 }
 
 export interface TireDynamicsInput {
@@ -130,6 +134,13 @@ export function shouldUseDynamicTireModel(input: TireDynamicsInput) {
   )
 }
 
+function longitudinalSkidSeverity(gripUsage: number) {
+  // Longitudinal lock starts only when requested braking/drive force is at the
+  // friction limit. Cornering may begin to scrub earlier without locking the
+  // wheel, so keep this threshold separate from lateral skid severity.
+  return clamp((gripUsage - 0.96) / 0.16, 0, 1)
+}
+
 function skidSeverity(slipAngle: number, gripUsage: number) {
   const angular = Math.abs(slipAngle) /
     TRAINING_CAR_DYNAMICS.slipAngleForFullSkidRadians
@@ -143,6 +154,18 @@ export function kinematicTireTelemetry(
 ): TireTelemetry {
   const budget = forceBudget(input)
   const speed = Math.max(0.1, Math.abs(input.longitudinalSpeed))
+  const frontGripUsage = clamp(
+    budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
+    0,
+    2,
+  )
+  const rearGripUsage = clamp(
+    budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
+    0,
+    2,
+  )
+  const frontLongitudinalSkid = longitudinalSkidSeverity(frontGripUsage)
+  const rearLongitudinalSkid = longitudinalSkidSeverity(rearGripUsage)
   return {
     model: 'kinematic',
     driveAxle: TRAINING_CAR_DYNAMICS.driveAxle,
@@ -151,24 +174,12 @@ export function kinematicTireTelemetry(
     sideslipAngleRadians: Math.atan2(state.lateralSpeed, speed),
     frontSlipAngleRadians: 0,
     rearSlipAngleRadians: 0,
-    frontGripUsage: clamp(
-      budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
-      0,
-      2,
-    ),
-    rearGripUsage: clamp(
-      budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
-      0,
-      2,
-    ),
-    frontSkidSeverity: 0,
-    rearSkidSeverity: input.handbrake && input.longitudinalSpeed > 1
-      ? clamp(
-          budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
-          0,
-          1,
-        )
-      : 0,
+    frontGripUsage,
+    rearGripUsage,
+    frontSkidSeverity: frontLongitudinalSkid,
+    rearSkidSeverity: rearLongitudinalSkid,
+    frontWheelRotationFactor: 1 - frontLongitudinalSkid,
+    rearWheelRotationFactor: 1 - rearLongitudinalSkid,
   }
 }
 
@@ -266,8 +277,24 @@ export function stepTireDynamics(
       rearSlipAngleRadians: rearSlipAngle,
       frontGripUsage,
       rearGripUsage,
-      frontSkidSeverity: skidSeverity(frontSlipAngle, frontGripUsage),
-      rearSkidSeverity: skidSeverity(rearSlipAngle, rearGripUsage),
+      frontSkidSeverity: Math.max(
+        skidSeverity(frontSlipAngle, frontGripUsage),
+        longitudinalSkidSeverity(
+          budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
+        ),
+      ),
+      rearSkidSeverity: Math.max(
+        skidSeverity(rearSlipAngle, rearGripUsage),
+        longitudinalSkidSeverity(
+          budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
+        ),
+      ),
+      frontWheelRotationFactor: 1 - longitudinalSkidSeverity(
+        budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
+      ),
+      rearWheelRotationFactor: 1 - longitudinalSkidSeverity(
+        budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
+      ),
     } satisfies TireTelemetry,
   }
 }

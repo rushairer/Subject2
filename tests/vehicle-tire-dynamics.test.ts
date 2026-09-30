@@ -163,3 +163,41 @@ test('front-drive acceleration consumes front tire grip during a saturated high-
     `powered FWD turn should understeer: coast=${coast.heading}, power=${power.heading}`,
   )
 })
+
+
+test('full service braking can publish front longitudinal lock without inventing yaw', () => {
+  const car = vehicle({ speed: 14 })
+
+  const result = stepVehiclePhysics(car, {
+    throttle: 0,
+    brake: 1,
+    clutch: 0,
+    steer: 0,
+    steeringWheelTarget: 0,
+  }, 1 / 60, {
+    automatic: true,
+    grade: 0,
+  })
+
+  assert.ok(result.tire.frontSkidSeverity > 0.2, JSON.stringify(result.tire))
+  assert.ok(result.tire.frontWheelRotationFactor < 0.8, JSON.stringify(result.tire))
+  assert.ok(Math.abs(car.heading) < 1e-9)
+  assert.ok(Math.abs(car.lateralSpeed ?? 0) < 1e-9)
+})
+
+test('moving parking brake locks rear wheel rotation before front wheel rotation', () => {
+  const car = vehicle({ speed: 10, handbrake: true })
+  const result = stepVehiclePhysics(car, {
+    throttle: 0,
+    brake: 0,
+    clutch: 0,
+    steer: 0,
+    steeringWheelTarget: 0,
+  }, 1 / 60, {
+    automatic: true,
+    grade: 0,
+  })
+
+  assert.ok(result.tire.rearWheelRotationFactor < 0.15, JSON.stringify(result.tire))
+  assert.ok(result.tire.frontWheelRotationFactor > 0.95, JSON.stringify(result.tire))
+})

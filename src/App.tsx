@@ -131,6 +131,10 @@ interface Vehicle {
   lookRight: boolean
   lookBack: boolean
   biteLatched?: boolean
+  frontWheelRotationFactor?: number
+  rearWheelRotationFactor?: number
+  lateralSpeed?: number
+  yawRate?: number
 }
 interface Infraction {
   id: string
@@ -243,6 +247,10 @@ const initialVehicle = (
     lookRight: false,
     lookBack: false,
     biteLatched: false,
+    frontWheelRotationFactor: 1,
+    rearWheelRotationFactor: 1,
+    lateralSpeed: 0,
+    yawRate: 0,
   }
 }
 
