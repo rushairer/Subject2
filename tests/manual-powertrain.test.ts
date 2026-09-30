@@ -141,3 +141,19 @@ test('parking brake blocks drive force and automatic transmission never stalls',
   assert.equal(automatic.engineOn, true)
   assert.equal(automatic.speed, 0)
 })
+
+
+test('reverse speed is limited by reverse gearing and road load rather than a fixed 19.8 km/h clamp', () => {
+  const vehicle = manualVehicle({ gear: -1, clutch: 0 })
+  stepMany(vehicle, {
+    throttle: 0.9,
+    brake: 0,
+    clutch: 0,
+    steer: 0,
+  }, 3600)
+
+  const speedKmh = Math.abs(vehicle.speed) * 3.6
+  assert.ok(speedKmh > 20, `reverse speed still looks hard-capped: ${speedKmh}`)
+  assert.ok(speedKmh < 28, `reverse gearing no longer bounds speed naturally: ${speedKmh}`)
+  assert.equal(vehicle.engineOn, true)
+})
