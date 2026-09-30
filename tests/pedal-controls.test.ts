@@ -68,7 +68,7 @@ test('braking and input reset immediately cancel residual throttle', () => {
   assert.equal(stepPedalControls(state, { ...input, throttleKey: false }).throttle, 0)
 })
 
-test('repressing after release returns to stable partial throttle', () => {
+test('repressing after the double-tap window returns to stable partial throttle', () => {
   const state = createPedalControlsState()
   const input = {
     throttleKey: true, brakeKey: false, clutchFloorKey: false, clutchBiteKey: false,
@@ -77,6 +77,9 @@ test('repressing after release returns to stable partial throttle', () => {
   stepPedalControls(state, input)
   const release = stepPedalControls(state, { ...input, throttleKey: false }).throttle
   assert.ok(release < PEDAL_CONFIG.tapThrottle)
+  for (let i = 0; i < 6; i++) {
+    stepPedalControls(state, { ...input, throttleKey: false })
+  }
   assert.equal(stepPedalControls(state, input).throttle, PEDAL_CONFIG.tapThrottle)
 })
 
