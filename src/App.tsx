@@ -1017,7 +1017,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
     <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
-    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
+    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} tireTelemetry={tireTelemetry} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }

@@ -629,3 +629,12 @@ The “本次优先改进” block must remain readable inside the result-card c
 - ABS releases pressure when an axle approaches longitudinal lock and reapplies pressure after wheel rotation recovers. Keep deterministic rates/hysteresis in the shared brake-dynamics module so rendering and input paths cannot invent separate ABS behavior.
 - ABS is inactive at walking speed and for light brake commands; ordinary low-speed Subject 2 pedal behavior must remain deterministic.
 - Physics regressions must cover axle-selective release, pressure reapplication, parking-brake bypass, sustained-lock reduction with ABS enabled and lock behavior with ABS explicitly disabled.
+
+
+## Suspension visual attitude
+
+- Coachwork pitch/roll is a visual sprung-mass response driven by shared tire telemetry (`longitudinalAccelerationMps2` / `lateralAccelerationMps2`). Do not create a second acceleration estimator in rendering.
+- Road wheels, contact footprints, tire marks, collisions and exam judging remain in the canonical rigid-body frame. Visual suspension attitude must never change judged geometry.
+- Vehicle nose is `-Z`: forward braking must produce negative X pitch (nose dive), forward acceleration positive X pitch (nose rise). Positive body-right lateral acceleration must produce positive Z roll, loading the left/outside side visually.
+- Apply suspension attitude around an explicit roll/pitch center above the road, not around the world origin, and bound/spring the response to prevent camera-frame spikes from producing unrealistic body flips.
+- Changes to suspension visual tuning require deterministic target-sign, bound, spring-response and neutral-return regressions.

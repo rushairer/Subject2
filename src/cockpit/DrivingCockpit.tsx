@@ -2,6 +2,13 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, type MutableRefObject, type ReactElement } from 'react'
 import * as THREE from 'three'
 import { TRAINING_CAR } from '../sim/vehicleDimensions'
+import type { TireTelemetry } from '../sim/vehicleTireDynamics'
+import {
+  SUSPENSION_VISUAL,
+  createSuspensionVisualState,
+  stepSuspensionVisual,
+  suspensionTargetPose,
+} from '../sim/vehicleSuspensionVisual'
 import { ackermannFrontAngles } from '../sim/wheelContact'
 import { SantanaBody } from './SantanaBody'
 import { VehicleMirrors } from './VehicleMirrors'
@@ -94,14 +101,18 @@ function Pedal({ x, active, wide = false }: { x: number; active: number; wide?: 
 
 export function DrivingCockpit({
   vehicle,
+  tireTelemetry,
   showClutch,
   automatic,
 }: {
   vehicle: MutableRefObject<CockpitVehicleState>
+  tireTelemetry: MutableRefObject<TireTelemetry | null>
   showClutch: boolean
   automatic: boolean
 }): ReactElement {
   const root = useRef<THREE.Group>(null)
+  const sprungBody = useRef<THREE.Group>(null)
+  const suspensionState = useRef(createSuspensionVisualState())
   const steeringWheel = useRef<THREE.Group>(null)
   const gearLever = useRef<THREE.Group>(null)
   const leftHeadlight = useRef<THREE.SpotLight>(null)
@@ -126,6 +137,21 @@ export function DrivingCockpit({
 
   useFrame((_, delta) => {
     const v = vehicle.current
+    const telemetry = tireTelemetry.current
+    const targetPose = suspensionTargetPose(
+      telemetry?.longitudinalAccelerationMps2 ?? 0,
+      telemetry?.lateralAccelerationMps2 ?? 0,
+    )
+    suspensionState.current = stepSuspensionVisual(
+      suspensionState.current,
+      targetPose,
+      Math.min(delta, 0.05),
+    )
+    if (sprungBody.current) {
+      sprungBody.current.rotation.x = suspensionState.current.pitch
+      sprungBody.current.rotation.z = suspensionState.current.roll
+    }
+
     const roadSpinStep = (v.speed * delta) / TRAINING_CAR.wheelRadiusMeters
     frontWheelSpin.current += roadSpinStep * (v.frontWheelRotationFactor ?? 1)
     rearWheelSpin.current += roadSpinStep * (v.rearWheelRotationFactor ?? 1)
@@ -161,14 +187,20 @@ export function DrivingCockpit({
 
   return <group ref={root}>
     <CarContactShadow />
-    <SantanaBody headlights={v.lowBeam || v.highBeam} braking={v.brake > 0.05} />
 
     <RoadWheel x={-TRAINING_CAR.trackWidthMeters / 2} z={-TRAINING_CAR.frontAxleFromCenterMeters} steerRef={frontLeftSteer} spinRef={frontLeftSpin} />
     <RoadWheel x={TRAINING_CAR.trackWidthMeters / 2} z={-TRAINING_CAR.frontAxleFromCenterMeters} steerRef={frontRightSteer} spinRef={frontRightSpin} />
     <RoadWheel x={-TRAINING_CAR.trackWidthMeters / 2} z={TRAINING_CAR.rearAxleFromCenterMeters} spinRef={rearLeftSpin} />
     <RoadWheel x={TRAINING_CAR.trackWidthMeters / 2} z={TRAINING_CAR.rearAxleFromCenterMeters} spinRef={rearRightSpin} />
 
-    <Dashboard vehicle={vehicle} automatic={automatic} />
+    <group
+      ref={sprungBody}
+      position={[0, SUSPENSION_VISUAL.rollCenterHeightMeters, 0]}
+    >
+      <group position={[0, -SUSPENSION_VISUAL.rollCenterHeightMeters, 0]}>
+        <SantanaBody headlights={v.lowBeam || v.highBeam} braking={v.brake > 0.05} />
+
+        <Dashboard vehicle={vehicle} automatic={automatic} />
     <Rod from={[-0.43, 0.90, -0.73]} to={[-0.43, 0.965, -0.42]} radius={0.037} />
     <Rod from={[-0.48, 0.98, -0.48]} to={[-0.66, 1.00, -0.49]} radius={0.009} />
     <Rod from={[-0.38, 0.98, -0.48]} to={[-0.24, 1.00, -0.49]} radius={0.009} />
@@ -214,7 +246,9 @@ export function DrivingCockpit({
     <CabinInterior seatbelt={v.seatbelt} />
 
     <object3D ref={headlightTarget} position={[0, 0.45, -40]} />
-    <spotLight ref={leftHeadlight} position={[-0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
-    <spotLight ref={rightHeadlight} position={[0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
+        <spotLight ref={leftHeadlight} position={[-0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
+        <spotLight ref={rightHeadlight} position={[0.56, 0.68, -2.16]} color="#fff8df" intensity={0} angle={0.28} penumbra={0.55} distance={62} />
+      </group>
+    </group>
   </group>
 }
