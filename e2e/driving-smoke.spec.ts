@@ -265,7 +265,7 @@ test('C1 Subject 3 replay surfaces non-scoring gear-speed observation from live 
   await page.keyboard.press('t')
   await page.keyboard.press('i')
   await page.keyboard.down('c')
-  await page.keyboard.press('1')
+  await page.keyboard.press(']')
   await page.keyboard.press('Space')
   // New keyboard model: make every clutch phase observable. Holding Shift
   // while C is still down is not enough on a slow renderer because no frame may
