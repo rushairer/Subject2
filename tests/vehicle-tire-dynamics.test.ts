@@ -189,10 +189,11 @@ test('full service braking can publish front longitudinal lock without inventing
   }, 1 / 60, {
     automatic: true,
     grade: 0,
+    absEnabled: false,
   })
 
-  assert.ok(result.tire.frontSkidSeverity > 0.2, JSON.stringify(result.tire))
-  assert.ok(result.tire.frontWheelRotationFactor < 0.8, JSON.stringify(result.tire))
+  assert.ok(result.tire.rearSkidSeverity > 0.2, JSON.stringify(result.tire))
+  assert.ok(result.tire.rearWheelRotationFactor < 0.8, JSON.stringify(result.tire))
   assert.ok(Math.abs(car.heading) < 1e-9)
   assert.ok(Math.abs(car.lateralSpeed ?? 0) < 1e-9)
 })

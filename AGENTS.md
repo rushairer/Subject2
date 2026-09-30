@@ -620,3 +620,12 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Front/rear friction-circle capacity must be assembled from the individual tire loads, not from a fixed axle grip constant. This is especially important for trail braking, heavy braking while cornering and FWD power-on understeer.
 - Ordinary low-speed Subject 2 geometry remains on the deterministic kinematic path; dynamic load telemetry may be computed there but must not perturb the path unless the shared tire model enters its nonlinear regime.
 - Any change to load-transfer constants requires regressions for static weight conservation, forward braking transfer and outside-wheel cornering transfer.
+
+
+## ABS braking
+
+- Service-brake ABS is axle-selective: front and rear hydraulic pressure factors are modulated independently from shared tire-lock telemetry. Do not implement ABS as a fixed global brake multiplier.
+- The mechanical rear parking brake bypasses ABS completely.
+- ABS releases pressure when an axle approaches longitudinal lock and reapplies pressure after wheel rotation recovers. Keep deterministic rates/hysteresis in the shared brake-dynamics module so rendering and input paths cannot invent separate ABS behavior.
+- ABS is inactive at walking speed and for light brake commands; ordinary low-speed Subject 2 pedal behavior must remain deterministic.
+- Physics regressions must cover axle-selective release, pressure reapplication, parking-brake bypass, sustained-lock reduction with ABS enabled and lock behavior with ABS explicitly disabled.

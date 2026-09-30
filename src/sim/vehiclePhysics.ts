@@ -33,6 +33,9 @@ export interface PhysicsVehicle {
   frontWheelRotationFactor?: number
   /** Visual wheel rotation multiplier from longitudinal tire slip. */
   rearWheelRotationFactor?: number
+  absFrontPressureFactor?: number
+  absRearPressureFactor?: number
+  absActive?: boolean
 }
 
 export interface PhysicsInput {
@@ -46,6 +49,7 @@ export interface PhysicsInput {
 export interface PhysicsStepResult {
   stalled: boolean
   tire: TireTelemetry
+  abs: AbsAxleState
 }
 
 export interface PhysicsOptions {
@@ -53,6 +57,8 @@ export interface PhysicsOptions {
   grade: number
   /** World-space heading of the uphill direction for the supplied grade. */
   gradeHeading?: number
+  /** Defaults to the training car's production ABS configuration. */
+  absEnabled?: boolean
 }
 
 export function longitudinalGravityAcceleration(
@@ -86,9 +92,15 @@ export function stepVehiclePhysics(
       brake: input.brake,
       handbrake: vehicle.handbrake,
     }, { lateralSpeed, yawRate })
-    return { stalled: false, tire }
+    const abs = createAbsAxleState()
+    return { stalled: false, tire, abs }
   }
-  const { automatic, grade, gradeHeading = 0 } = options
+  const {
+    automatic,
+    grade,
+    gradeHeading = 0,
+    absEnabled = true,
+  } = options
   const powertrain = VEHICLE_POWERTRAIN
   vehicle.throttle = input.throttle
   vehicle.brake = input.brake
@@ -218,11 +230,61 @@ export function stepVehiclePhysics(
     ) * dt
   }
 
+  const previousAbs: AbsAxleState = {
+    frontPressureFactor: vehicle.absFrontPressureFactor ?? 1,
+    rearPressureFactor: vehicle.absRearPressureFactor ?? 1,
+    active: vehicle.absActive ?? false,
+  }
+  const previewYawRate = kinematicYawRate(
+    vehicle.speed,
+    vehicle.steering,
+  )
+  const previewTire = kinematicTireTelemetry({
+    longitudinalSpeed: vehicle.speed,
+    steering: vehicle.steering,
+    driveAcceleration: driveAcceleration * direction,
+    brake: input.brake,
+    handbrake: vehicle.handbrake,
+    frontServiceBrakeFactor: previousAbs.frontPressureFactor,
+    rearServiceBrakeFactor: previousAbs.rearPressureFactor,
+    lateralAccelerationEstimate: vehicle.speed * previewYawRate,
+  }, {
+    lateralSpeed: vehicle.lateralSpeed ?? 0,
+    yawRate: vehicle.yawRate ?? previewYawRate,
+  })
+  const abs = vehicle.handbrake
+    ? createAbsAxleState()
+    : stepAbsAxleState(
+        previousAbs,
+        previewTire,
+        input.brake,
+        vehicle.speed,
+        dt,
+        absEnabled,
+      )
+  vehicle.absFrontPressureFactor = abs.frontPressureFactor
+  vehicle.absRearPressureFactor = abs.rearPressureFactor
+  vehicle.absActive = abs.active
+
+  const effectiveServiceBraking =
+    input.brake *
+    TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration *
+    (
+      TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias *
+        abs.frontPressureFactor +
+      (1 - TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias) *
+        abs.rearPressureFactor
+    )
   const braking =
-    input.brake * TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration +
-    (vehicle.handbrake ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration : 0)
+    effectiveServiceBraking +
+    (vehicle.handbrake
+      ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration
+      : 0)
   if (Math.abs(vehicle.speed) > 0.001) {
-    vehicle.speed -= Math.sign(vehicle.speed) * Math.min(Math.abs(vehicle.speed), braking * dt)
+    vehicle.speed -= Math.sign(vehicle.speed) * Math.min(
+      Math.abs(vehicle.speed),
+      braking * dt,
+    )
   }
 
   const resistance = powertrain.rollingResistance + powertrain.aerodynamicDrag * vehicle.speed ** 2
@@ -252,6 +314,8 @@ export function stepVehiclePhysics(
     driveAcceleration,
     brake: input.brake,
     handbrake: vehicle.handbrake,
+    frontServiceBrakeFactor: abs.frontPressureFactor,
+    rearServiceBrakeFactor: abs.rearPressureFactor,
   }
   const recoveringFromSlip =
     vehicle.speed > 0.5 &&
@@ -317,5 +381,5 @@ export function stepVehiclePhysics(
 
   vehicle.frontWheelRotationFactor = tire.frontWheelRotationFactor
   vehicle.rearWheelRotationFactor = tire.rearWheelRotationFactor
-  return { stalled, tire }
+  return { stalled, tire, abs }
 }

@@ -74,6 +74,10 @@ export interface TireDynamicsInput {
   driveAcceleration: number
   brake: number
   handbrake: boolean
+  /** ABS/service-brake pressure multiplier for the front axle. */
+  frontServiceBrakeFactor?: number
+  /** ABS/service-brake pressure multiplier for the rear axle. */
+  rearServiceBrakeFactor?: number
   lateralAccelerationEstimate?: number
 }
 
@@ -150,6 +154,14 @@ function forceBudget(
 ) {
   const serviceBraking =
     clamp(input.brake, 0, 1) * TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration
+  const frontServiceBraking =
+    serviceBraking *
+    TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias *
+    clamp(input.frontServiceBrakeFactor ?? 1, 0, 1)
+  const rearServiceBraking =
+    serviceBraking *
+    (1 - TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias) *
+    clamp(input.rearServiceBrakeFactor ?? 1, 0, 1)
   const parkingBraking =
     input.handbrake ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration : 0
   const travelSign =
@@ -158,18 +170,20 @@ function forceBudget(
     1
   const longitudinalAccelerationMps2 =
     input.driveAcceleration -
-    travelSign * (serviceBraking + parkingBraking)
+    travelSign * (
+      frontServiceBraking +
+      rearServiceBraking +
+      parkingBraking
+    )
   const normalLoads = calculateWheelNormalLoads(
     longitudinalAccelerationMps2,
     lateralAccelerationMps2,
   )
 
   const frontLongitudinal =
-    Math.abs(input.driveAcceleration) +
-    serviceBraking * TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias
+    Math.abs(input.driveAcceleration) + frontServiceBraking
   const rearLongitudinal =
-    serviceBraking * (1 - TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias) +
-    parkingBraking
+    rearServiceBraking + parkingBraking
 
   const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN)
   const frontRightGrip = gripAcceleration(normalLoads.frontRightN)
