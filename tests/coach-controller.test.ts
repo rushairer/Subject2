@@ -393,9 +393,9 @@ test('coach second reverse-parking pass keeps margin across frame timing and sma
       ...createCoachRuntime(),
       waypointIndex: secondTurnIndex,
     }
-    let course = {
+    let course: ReturnType<typeof createReverseParkingRuntime> = {
       ...createReverseParkingRuntime(),
-      phase: 'cross-to-opposite' as const,
+      phase: 'cross-to-opposite',
       started: true,
       firstControlPassed: true,
       oppositeControlPassed: true,
