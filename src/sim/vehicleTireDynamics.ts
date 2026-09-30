@@ -13,6 +13,7 @@ export const TRAINING_CAR_DYNAMICS = {
   yawInertiaKgM2: 2250,
   gravityMps2: 9.81,
   frontStaticWeightFraction: 0.61,
+  centerOfMassHeightMeters: 0.52,
   tireFrictionCoefficient: 0.92,
   frontCorneringAccelerationPerRadian: 43,
   rearCorneringAccelerationPerRadian: 46,
@@ -24,6 +25,16 @@ export const TRAINING_CAR_DYNAMICS = {
   nonlinearDemandFraction: 0.90,
   slipAngleForFullSkidRadians: 0.18,
 } as const
+
+export interface WheelNormalLoads {
+  frontLeftN: number
+  frontRightN: number
+  rearLeftN: number
+  rearRightN: number
+  frontAxleN: number
+  rearAxleN: number
+  totalN: number
+}
 
 export interface TireDynamicsState {
   /** Body-center lateral velocity, positive to vehicle-right. */
@@ -48,21 +59,84 @@ export interface TireTelemetry {
   frontWheelRotationFactor: number
   /** 1 = free rolling at road speed, 0 = longitudinally locked. */
   rearWheelRotationFactor: number
+  /** Instantaneous four-wheel vertical loads after longitudinal/lateral transfer. */
+  normalLoads: WheelNormalLoads
+  /** Body-forward acceleration used for longitudinal load transfer. */
+  longitudinalAccelerationMps2: number
+  /** Body-right acceleration used for lateral load transfer. */
+  lateralAccelerationMps2: number
 }
 
 export interface TireDynamicsInput {
   longitudinalSpeed: number
   steering: number
+  /** Signed body-forward drive acceleration. Reverse drive is negative. */
   driveAcceleration: number
   brake: number
   handbrake: boolean
+  lateralAccelerationEstimate?: number
 }
 
-function axleGripAcceleration(weightFraction: number) {
+export function calculateWheelNormalLoads(
+  longitudinalAccelerationMps2: number,
+  lateralAccelerationMps2: number,
+): WheelNormalLoads {
+  const dynamics = TRAINING_CAR_DYNAMICS
+  const totalN = dynamics.massKg * dynamics.gravityMps2
+  const staticFrontN = totalN * dynamics.frontStaticWeightFraction
+
+  // Positive longitudinal acceleration unloads the front axle; braking in the
+  // forward direction is negative and therefore transfers load forward.
+  const longitudinalTransferN =
+    dynamics.massKg *
+    longitudinalAccelerationMps2 *
+    dynamics.centerOfMassHeightMeters /
+    TRAINING_CAR.wheelbaseMeters
+  const minimumAxleN = totalN * 0.05
+  const frontAxleN = clamp(
+    staticFrontN - longitudinalTransferN,
+    minimumAxleN,
+    totalN - minimumAxleN,
+  )
+  const rearAxleN = totalN - frontAxleN
+
+  // Positive lateral acceleration is vehicle-right, so load transfers to the
+  // left/outside wheels. Split roll moment between axles in proportion to the
+  // instantaneous axle load, then preserve each axle's total vertical load.
+  const lateralShiftN =
+    dynamics.massKg *
+    lateralAccelerationMps2 *
+    dynamics.centerOfMassHeightMeters /
+    TRAINING_CAR.trackWidthMeters
+  const frontShare = frontAxleN / totalN
+  const rearShare = rearAxleN / totalN
+  const frontShift = clamp(
+    lateralShiftN * frontShare,
+    -frontAxleN * 0.48,
+    frontAxleN * 0.48,
+  )
+  const rearShift = clamp(
+    lateralShiftN * rearShare,
+    -rearAxleN * 0.48,
+    rearAxleN * 0.48,
+  )
+
+  return {
+    frontLeftN: frontAxleN / 2 + frontShift,
+    frontRightN: frontAxleN / 2 - frontShift,
+    rearLeftN: rearAxleN / 2 + rearShift,
+    rearRightN: rearAxleN / 2 - rearShift,
+    frontAxleN,
+    rearAxleN,
+    totalN,
+  }
+}
+
+function gripAcceleration(normalLoadN: number) {
   return (
     TRAINING_CAR_DYNAMICS.tireFrictionCoefficient *
-    TRAINING_CAR_DYNAMICS.gravityMps2 *
-    weightFraction
+    normalLoadN /
+    TRAINING_CAR_DYNAMICS.massKg
   )
 }
 
@@ -70,32 +144,69 @@ function lateralCapacity(totalGrip: number, longitudinalDemand: number) {
   return Math.sqrt(Math.max(0, totalGrip ** 2 - longitudinalDemand ** 2))
 }
 
-function forceBudget(input: TireDynamicsInput) {
-  const frontWeight = TRAINING_CAR_DYNAMICS.frontStaticWeightFraction
-  const rearWeight = 1 - frontWeight
-  const frontGrip = axleGripAcceleration(frontWeight)
-  const rearGrip = axleGripAcceleration(rearWeight)
+function forceBudget(
+  input: TireDynamicsInput,
+  lateralAccelerationMps2: number,
+) {
   const serviceBraking =
     clamp(input.brake, 0, 1) * TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration
+  const parkingBraking =
+    input.handbrake ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration : 0
+  const travelSign =
+    Math.sign(input.longitudinalSpeed) ||
+    Math.sign(input.driveAcceleration) ||
+    1
+  const longitudinalAccelerationMps2 =
+    input.driveAcceleration -
+    travelSign * (serviceBraking + parkingBraking)
+  const normalLoads = calculateWheelNormalLoads(
+    longitudinalAccelerationMps2,
+    lateralAccelerationMps2,
+  )
+
   const frontLongitudinal =
     Math.abs(input.driveAcceleration) +
     serviceBraking * TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias
   const rearLongitudinal =
     serviceBraking * (1 - TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias) +
-    (input.handbrake ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration : 0)
-  const rearCorneringGrip = rearGrip * (
-    input.handbrake
-      ? TRAINING_CAR_DYNAMICS.rearGripFractionWithParkingBrake
-      : 1
-  )
+    parkingBraking
+
+  const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN)
+  const frontRightGrip = gripAcceleration(normalLoads.frontRightN)
+  const rearLeftGrip = gripAcceleration(normalLoads.rearLeftN)
+  const rearRightGrip = gripAcceleration(normalLoads.rearRightN)
+  const frontWheelLongitudinal = frontLongitudinal / 2
+  const rearWheelLongitudinal = rearLongitudinal / 2
+  const rearCorneringFactor = input.handbrake
+    ? TRAINING_CAR_DYNAMICS.rearGripFractionWithParkingBrake
+    : 1
 
   return {
-    frontGrip,
-    rearGrip,
+    normalLoads,
+    longitudinalAccelerationMps2,
+    lateralAccelerationMps2,
     frontLongitudinal,
     rearLongitudinal,
-    frontLateral: lateralCapacity(frontGrip, frontLongitudinal),
-    rearLateral: lateralCapacity(rearCorneringGrip, rearLongitudinal),
+    frontWheelLongitudinal,
+    rearWheelLongitudinal,
+    frontLeftGrip,
+    frontRightGrip,
+    rearLeftGrip,
+    rearRightGrip,
+    frontGrip: frontLeftGrip + frontRightGrip,
+    rearGrip: rearLeftGrip + rearRightGrip,
+    frontLateral:
+      lateralCapacity(frontLeftGrip, frontWheelLongitudinal) +
+      lateralCapacity(frontRightGrip, frontWheelLongitudinal),
+    rearLateral:
+      lateralCapacity(
+        rearLeftGrip * rearCorneringFactor,
+        rearWheelLongitudinal,
+      ) +
+      lateralCapacity(
+        rearRightGrip * rearCorneringFactor,
+        rearWheelLongitudinal,
+      ),
   }
 }
 
@@ -111,33 +222,31 @@ export function kinematicYawRate(
   )
 }
 
+function requestedLateralAcceleration(input: TireDynamicsInput) {
+  return input.lateralAccelerationEstimate ?? (
+    input.longitudinalSpeed *
+    kinematicYawRate(input.longitudinalSpeed, input.steering)
+  )
+}
+
 export function shouldUseDynamicTireModel(input: TireDynamicsInput) {
   if (input.longitudinalSpeed <= TRAINING_CAR_DYNAMICS.minimumDynamicSpeedMps) {
     return false
   }
   if (input.handbrake) return true
 
-  const budget = forceBudget(input)
-  const yawRate = kinematicYawRate(
-    input.longitudinalSpeed,
-    input.steering,
-  )
-  const requestedLateralAcceleration =
-    Math.abs(input.longitudinalSpeed * yawRate)
-  const availableLateralAcceleration =
-    budget.frontLateral + budget.rearLateral
+  const lateralAcceleration = requestedLateralAcceleration(input)
+  const budget = forceBudget(input, lateralAcceleration)
+  const requested = Math.abs(lateralAcceleration)
+  const available = budget.frontLateral + budget.rearLateral
 
   return (
-    requestedLateralAcceleration >
-    availableLateralAcceleration *
-      TRAINING_CAR_DYNAMICS.nonlinearDemandFraction
+    requested >
+    available * TRAINING_CAR_DYNAMICS.nonlinearDemandFraction
   )
 }
 
 function longitudinalSkidSeverity(gripUsage: number) {
-  // Longitudinal lock starts only when requested braking/drive force is at the
-  // friction limit. Cornering may begin to scrub earlier without locking the
-  // wheel, so keep this threshold separate from lateral skid severity.
   return clamp((gripUsage - 0.96) / 0.16, 0, 1)
 }
 
@@ -148,24 +257,58 @@ function skidSeverity(slipAngle: number, gripUsage: number) {
   return clamp(Math.max(angular, saturation), 0, 1)
 }
 
+function axleUsage(
+  leftGrip: number,
+  rightGrip: number,
+  wheelLongitudinal: number,
+  axleLateral: number,
+  leftNormal: number,
+  rightNormal: number,
+) {
+  const axleNormal = Math.max(0.001, leftNormal + rightNormal)
+  const leftLateral = axleLateral * leftNormal / axleNormal
+  const rightLateral = axleLateral * rightNormal / axleNormal
+  return Math.max(
+    Math.hypot(wheelLongitudinal, leftLateral) /
+      Math.max(0.001, leftGrip),
+    Math.hypot(wheelLongitudinal, rightLateral) /
+      Math.max(0.001, rightGrip),
+  )
+}
+
+function axleLongitudinalUsage(
+  leftGrip: number,
+  rightGrip: number,
+  wheelLongitudinal: number,
+) {
+  return Math.max(
+    wheelLongitudinal / Math.max(0.001, leftGrip),
+    wheelLongitudinal / Math.max(0.001, rightGrip),
+  )
+}
+
 export function kinematicTireTelemetry(
   input: TireDynamicsInput,
   state: TireDynamicsState,
 ): TireTelemetry {
-  const budget = forceBudget(input)
   const speed = Math.max(0.1, Math.abs(input.longitudinalSpeed))
-  const frontGripUsage = clamp(
-    budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
-    0,
-    2,
+  const lateralAcceleration = requestedLateralAcceleration(input)
+  const budget = forceBudget(input, lateralAcceleration)
+  const frontLongitudinalUsage = axleLongitudinalUsage(
+    budget.frontLeftGrip,
+    budget.frontRightGrip,
+    budget.frontWheelLongitudinal,
   )
-  const rearGripUsage = clamp(
-    budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
-    0,
-    2,
+  const rearLongitudinalUsage = axleLongitudinalUsage(
+    budget.rearLeftGrip,
+    budget.rearRightGrip,
+    budget.rearWheelLongitudinal,
   )
-  const frontLongitudinalSkid = longitudinalSkidSeverity(frontGripUsage)
-  const rearLongitudinalSkid = longitudinalSkidSeverity(rearGripUsage)
+  const frontLongitudinalSkid =
+    longitudinalSkidSeverity(frontLongitudinalUsage)
+  const rearLongitudinalSkid =
+    longitudinalSkidSeverity(rearLongitudinalUsage)
+
   return {
     model: 'kinematic',
     driveAxle: TRAINING_CAR_DYNAMICS.driveAxle,
@@ -174,12 +317,15 @@ export function kinematicTireTelemetry(
     sideslipAngleRadians: Math.atan2(state.lateralSpeed, speed),
     frontSlipAngleRadians: 0,
     rearSlipAngleRadians: 0,
-    frontGripUsage,
-    rearGripUsage,
+    frontGripUsage: frontLongitudinalUsage,
+    rearGripUsage: rearLongitudinalUsage,
     frontSkidSeverity: frontLongitudinalSkid,
     rearSkidSeverity: rearLongitudinalSkid,
     frontWheelRotationFactor: 1 - frontLongitudinalSkid,
     rearWheelRotationFactor: 1 - rearLongitudinalSkid,
+    normalLoads: budget.normalLoads,
+    longitudinalAccelerationMps2: budget.longitudinalAccelerationMps2,
+    lateralAccelerationMps2: lateralAcceleration,
   }
 }
 
@@ -188,7 +334,6 @@ export function stepTireDynamics(
   input: TireDynamicsInput,
   dt: number,
 ) {
-  const budget = forceBudget(input)
   const frontDistance = TRAINING_CAR.frontAxleFromCenterMeters
   const rearDistance = TRAINING_CAR.rearAxleFromCenterMeters
   const speedForAngles = Math.max(2, input.longitudinalSpeed)
@@ -200,8 +345,16 @@ export function stepTireDynamics(
   let rearSlipAngle = 0
   let frontLateralAcceleration = 0
   let rearLateralAcceleration = 0
+  let budget = forceBudget(
+    input,
+    input.longitudinalSpeed * yawRate,
+  )
 
   for (let step = 0; step < substeps; step += 1) {
+    const lateralAccelerationEstimate =
+      input.longitudinalSpeed * yawRate
+    budget = forceBudget(input, lateralAccelerationEstimate)
+
     frontSlipAngle =
       input.steering -
       Math.atan2(
@@ -242,8 +395,6 @@ export function stepTireDynamics(
     lateralSpeed += lateralAcceleration * h
     yawRate += yawAcceleration * h
 
-    // Small chassis damping prevents numerical energy gain while leaving tire
-    // saturation, not an arbitrary heading clamp, responsible for recovery.
     lateralSpeed *= Math.exp(-0.10 * h)
     yawRate *= Math.exp(-0.06 * h)
   }
@@ -252,14 +403,36 @@ export function stepTireDynamics(
   lateralSpeed = clamp(lateralSpeed, -lateralLimit, lateralLimit)
   yawRate = clamp(yawRate, -3.5, 3.5)
 
-  const frontGripUsage = Math.hypot(
-    budget.frontLongitudinal,
+  const lateralAccelerationMps2 =
+    frontLateralAcceleration + rearLateralAcceleration
+  budget = forceBudget(input, lateralAccelerationMps2)
+
+  const frontGripUsage = axleUsage(
+    budget.frontLeftGrip,
+    budget.frontRightGrip,
+    budget.frontWheelLongitudinal,
     frontLateralAcceleration,
-  ) / Math.max(0.001, budget.frontGrip)
-  const rearGripUsage = Math.hypot(
-    budget.rearLongitudinal,
+    budget.normalLoads.frontLeftN,
+    budget.normalLoads.frontRightN,
+  )
+  const rearGripUsage = axleUsage(
+    budget.rearLeftGrip,
+    budget.rearRightGrip,
+    budget.rearWheelLongitudinal,
     rearLateralAcceleration,
-  ) / Math.max(0.001, budget.rearGrip)
+    budget.normalLoads.rearLeftN,
+    budget.normalLoads.rearRightN,
+  )
+  const frontLongitudinalUsage = axleLongitudinalUsage(
+    budget.frontLeftGrip,
+    budget.frontRightGrip,
+    budget.frontWheelLongitudinal,
+  )
+  const rearLongitudinalUsage = axleLongitudinalUsage(
+    budget.rearLeftGrip,
+    budget.rearRightGrip,
+    budget.rearWheelLongitudinal,
+  )
   const nextState = { lateralSpeed, yawRate }
 
   return {
@@ -279,22 +452,19 @@ export function stepTireDynamics(
       rearGripUsage,
       frontSkidSeverity: Math.max(
         skidSeverity(frontSlipAngle, frontGripUsage),
-        longitudinalSkidSeverity(
-          budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
-        ),
+        longitudinalSkidSeverity(frontLongitudinalUsage),
       ),
       rearSkidSeverity: Math.max(
         skidSeverity(rearSlipAngle, rearGripUsage),
-        longitudinalSkidSeverity(
-          budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
-        ),
+        longitudinalSkidSeverity(rearLongitudinalUsage),
       ),
-      frontWheelRotationFactor: 1 - longitudinalSkidSeverity(
-        budget.frontLongitudinal / Math.max(0.001, budget.frontGrip),
-      ),
-      rearWheelRotationFactor: 1 - longitudinalSkidSeverity(
-        budget.rearLongitudinal / Math.max(0.001, budget.rearGrip),
-      ),
+      frontWheelRotationFactor:
+        1 - longitudinalSkidSeverity(frontLongitudinalUsage),
+      rearWheelRotationFactor:
+        1 - longitudinalSkidSeverity(rearLongitudinalUsage),
+      normalLoads: budget.normalLoads,
+      longitudinalAccelerationMps2: budget.longitudinalAccelerationMps2,
+      lateralAccelerationMps2,
     } satisfies TireTelemetry,
   }
 }

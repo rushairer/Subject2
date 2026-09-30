@@ -5,7 +5,7 @@ import {
   stepVehiclePhysics,
   type PhysicsVehicle,
 } from '../src/sim/vehiclePhysics'
-import { TRAINING_CAR_DYNAMICS } from '../src/sim/vehicleTireDynamics'
+import {\n  TRAINING_CAR_DYNAMICS,\n  calculateWheelNormalLoads,\n} from '../src/sim/vehicleTireDynamics'
 
 function vehicle(overrides: Partial<PhysicsVehicle> = {}): PhysicsVehicle {
   return {
@@ -212,4 +212,63 @@ test('moving parking brake locks rear wheel rotation before front wheel rotation
 
   assert.ok(result.tire.rearWheelRotationFactor < 0.15, JSON.stringify(result.tire))
   assert.ok(result.tire.frontWheelRotationFactor > 0.95, JSON.stringify(result.tire))
+})
+
+
+test('static wheel loads conserve vehicle weight and preserve front-heavy balance', () => {
+  const loads = calculateWheelNormalLoads(0, 0)
+  const expectedTotal =
+    TRAINING_CAR_DYNAMICS.massKg * TRAINING_CAR_DYNAMICS.gravityMps2
+  assert.ok(Math.abs(loads.totalN - expectedTotal) < 1e-6)
+  assert.ok(
+    Math.abs(
+      loads.frontLeftN + loads.frontRightN +
+      loads.rearLeftN + loads.rearRightN -
+      expectedTotal
+    ) < 1e-6,
+  )
+  assert.ok(loads.frontAxleN > loads.rearAxleN)
+  assert.ok(Math.abs(loads.frontLeftN - loads.frontRightN) < 1e-9)
+})
+
+test('hard forward braking transfers vertical load from rear axle to front axle', () => {
+  const staticLoads = calculateWheelNormalLoads(0, 0)
+  const brakingLoads = calculateWheelNormalLoads(-8.5, 0)
+  assert.ok(brakingLoads.frontAxleN > staticLoads.frontAxleN + 1500)
+  assert.ok(brakingLoads.rearAxleN < staticLoads.rearAxleN - 1500)
+  assert.ok(
+    Math.abs(brakingLoads.totalN - staticLoads.totalN) < 1e-6,
+  )
+})
+
+test('rightward cornering loads the left outside tires while conserving each axle', () => {
+  const staticLoads = calculateWheelNormalLoads(0, 0)
+  const cornering = calculateWheelNormalLoads(0, 6)
+  assert.ok(cornering.frontLeftN > cornering.frontRightN)
+  assert.ok(cornering.rearLeftN > cornering.rearRightN)
+  assert.ok(
+    Math.abs(cornering.frontAxleN - staticLoads.frontAxleN) < 1e-6,
+  )
+  assert.ok(
+    Math.abs(cornering.rearAxleN - staticLoads.rearAxleN) < 1e-6,
+  )
+})
+
+test('tire telemetry exposes forward load transfer during a full service stop', () => {
+  const car = vehicle({ speed: 14 })
+  const result = stepVehiclePhysics(car, {
+    throttle: 0,
+    brake: 1,
+    clutch: 0,
+    steer: 0,
+    steeringWheelTarget: 0,
+  }, 1 / 60, {
+    automatic: true,
+    grade: 0,
+  })
+  assert.ok(
+    result.tire.normalLoads.frontAxleN >
+      result.tire.normalLoads.rearAxleN,
+  )
+  assert.ok(result.tire.longitudinalAccelerationMps2 < -8)
 })

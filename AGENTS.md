@@ -611,3 +611,12 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Keep the exact rear-axle kinematic bicycle model for ordinary low-speed Subject 2 maneuvers and reverse. Enter the dynamic tire model only when forward-speed tire demand approaches the grip envelope, a moving parking brake is applied, or an existing slip state is recovering.
 - Tire effects such as skid marks and smoke must consume telemetry from the shared tire-dynamics model. Rendering must not maintain a second independent slip heuristic.
 - Changes to drivetrain layout, grip budgets, handbrake behavior or the kinematic/dynamic transition require deterministic physics regressions, including straight-line handbrake stability and a saturated-turn case.
+
+
+## Dynamic normal loads
+
+- Tire grip must derive from four-wheel normal loads. Compute longitudinal transfer from body-forward acceleration, center-of-mass height and wheelbase, and lateral transfer from body-right acceleration, center-of-mass height and track width.
+- Preserve total vehicle weight and each axle's instantaneous vertical-load budget when distributing lateral transfer. Positive body-right acceleration loads the left/outside tires.
+- Front/rear friction-circle capacity must be assembled from the individual tire loads, not from a fixed axle grip constant. This is especially important for trail braking, heavy braking while cornering and FWD power-on understeer.
+- Ordinary low-speed Subject 2 geometry remains on the deterministic kinematic path; dynamic load telemetry may be computed there but must not perturb the path unless the shared tire model enters its nonlinear regime.
+- Any change to load-transfer constants requires regressions for static weight conservation, forward braking transfer and outside-wheel cornering transfer.
