@@ -311,8 +311,13 @@ export function stepVehiclePhysics(
   const headingBefore = vehicle.heading
   const requestedYawRate = kinematicYawRate(vehicle.speed, vehicle.steering)
   const kinematicLateralSpeed = requestedYawRate * rearAxleFromCenter
-  const previousLateralSpeed = vehicle.lateralSpeed ?? kinematicLateralSpeed
+  const previousLateralSpeed =
+    vehicle.lateralSpeed ?? kinematicLateralSpeed
   const previousYawRate = vehicle.yawRate ?? requestedYawRate
+  const groundSpeedBefore = Math.hypot(
+    vehicle.speed,
+    previousLateralSpeed,
+  )
   const tireInput = {
     longitudinalSpeed: vehicle.speed,
     steering: vehicle.steering,
@@ -322,25 +327,53 @@ export function stepVehiclePhysics(
     frontServiceBrakeFactor: abs.frontPressureFactor,
     rearServiceBrakeFactor: abs.rearPressureFactor,
   }
+  const lateralRecoveryError = Math.abs(
+    previousLateralSpeed - kinematicLateralSpeed,
+  )
+  const yawRecoveryError = Math.abs(
+    previousYawRate - requestedYawRate,
+  )
   const recoveringFromSlip =
-    vehicle.speed > 0.5 &&
+    groundSpeedBefore >
+      TRAINING_CAR_DYNAMICS.recoveryMinimumGroundSpeedMps &&
     (
-      Math.abs(previousLateralSpeed - kinematicLateralSpeed) > 0.18 ||
-      Math.abs(previousYawRate - requestedYawRate) > 0.10
+      lateralRecoveryError >
+        TRAINING_CAR_DYNAMICS.recoveryLateralSpeedErrorMps ||
+      yawRecoveryError >
+        TRAINING_CAR_DYNAMICS.recoveryYawRateErrorRps
     )
   const dynamicTires =
-    vehicle.speed > 0 &&
-    (shouldUseDynamicTireModel(tireInput) || recoveringFromSlip)
+    groundSpeedBefore >
+      TRAINING_CAR_DYNAMICS.recoveryMinimumGroundSpeedMps &&
+    (
+      shouldUseDynamicTireModel(tireInput) ||
+      recoveringFromSlip
+    )
 
   let tire: TireTelemetry
 
   if (dynamicTires) {
     const dynamics = stepTireDynamics({
+      longitudinalSpeed: vehicle.speed,
       lateralSpeed: previousLateralSpeed,
       yawRate: previousYawRate,
     }, tireInput, dt)
+    vehicle.speed =
+      dynamics.state.longitudinalSpeed ?? vehicle.speed
     vehicle.lateralSpeed = dynamics.state.lateralSpeed
     vehicle.yawRate = dynamics.state.yawRate
+
+    if (!Number.isFinite(vehicle.speed)) {
+      vehicle.speed = 0
+    } else {
+      vehicle.speed = Math.max(
+        -powertrain.numericalSafetySpeed,
+        Math.min(
+          powertrain.numericalSafetySpeed,
+          vehicle.speed,
+        ),
+      )
+    }
 
     const headingDelta = vehicle.yawRate * dt
     const headingMid = headingBefore + headingDelta * 0.5

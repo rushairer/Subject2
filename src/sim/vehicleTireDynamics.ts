@@ -24,6 +24,9 @@ export const TRAINING_CAR_DYNAMICS = {
   minimumDynamicSpeedMps: 4,
   nonlinearDemandFraction: 0.90,
   slipAngleForFullSkidRadians: 0.18,
+  recoveryMinimumGroundSpeedMps: 0.5,
+  recoveryLateralSpeedErrorMps: 0.12,
+  recoveryYawRateErrorRps: 0.08,
 } as const
 
 export interface WheelNormalLoads {
@@ -37,6 +40,11 @@ export interface WheelNormalLoads {
 }
 
 export interface TireDynamicsState {
+  /**
+   * Body-center longitudinal velocity, positive vehicle-forward.
+   * Optional for compatibility with kinematic telemetry callers.
+   */
+  longitudinalSpeed?: number
   /** Body-center lateral velocity, positive to vehicle-right. */
   lateralSpeed: number
   /** Heading rate, positive for a right turn. */
@@ -49,6 +57,8 @@ export interface TireTelemetry {
   lateralSpeedMps: number
   yawRateRps: number
   sideslipAngleRadians: number
+  /** Magnitude of the body-center velocity over the road plane. */
+  groundSpeedMps: number
   frontSlipAngleRadians: number
   rearSlipAngleRadians: number
   frontGripUsage: number
@@ -329,6 +339,10 @@ export function kinematicTireTelemetry(
     lateralSpeedMps: state.lateralSpeed,
     yawRateRps: state.yawRate,
     sideslipAngleRadians: Math.atan2(state.lateralSpeed, speed),
+    groundSpeedMps: Math.hypot(
+      input.longitudinalSpeed,
+      state.lateralSpeed,
+    ),
     frontSlipAngleRadians: 0,
     rearSlipAngleRadians: 0,
     frontGripUsage: frontLongitudinalUsage,
@@ -350,9 +364,10 @@ export function stepTireDynamics(
 ) {
   const frontDistance = TRAINING_CAR.frontAxleFromCenterMeters
   const rearDistance = TRAINING_CAR.rearAxleFromCenterMeters
-  const speedForAngles = Math.max(2, input.longitudinalSpeed)
   const substeps = Math.max(1, Math.ceil(dt / 0.01))
   const h = dt / substeps
+  let longitudinalSpeed =
+    state.longitudinalSpeed ?? input.longitudinalSpeed
   let lateralSpeed = state.lateralSpeed
   let yawRate = state.yawRate
   let frontSlipAngle = 0
@@ -361,13 +376,24 @@ export function stepTireDynamics(
   let rearLateralAcceleration = 0
   let budget = forceBudget(
     input,
-    input.longitudinalSpeed * yawRate,
+    longitudinalSpeed * yawRate,
   )
 
   for (let step = 0; step < substeps; step += 1) {
+    const dynamicInput = {
+      ...input,
+      longitudinalSpeed,
+    }
     const lateralAccelerationEstimate =
-      input.longitudinalSpeed * yawRate
-    budget = forceBudget(input, lateralAccelerationEstimate)
+      longitudinalSpeed * yawRate
+    budget = forceBudget(
+      dynamicInput,
+      lateralAccelerationEstimate,
+    )
+    const speedForAngles = Math.max(
+      2,
+      Math.abs(longitudinalSpeed),
+    )
 
     frontSlipAngle =
       input.steering -
@@ -394,10 +420,15 @@ export function stepTireDynamics(
       budget.rearLateral,
     )
 
+    // Full planar body-frame coupling. Without the +v*r term in u-dot a
+    // drifting car can keep rotating while its velocity never realigns with
+    // the body, producing the non-physical permanent-donut state.
+    const longitudinalCouplingAcceleration =
+      lateralSpeed * yawRate
     const lateralAcceleration =
       frontLateralAcceleration +
       rearLateralAcceleration -
-      input.longitudinalSpeed * yawRate
+      longitudinalSpeed * yawRate
     const yawAcceleration =
       TRAINING_CAR_DYNAMICS.massKg /
       TRAINING_CAR_DYNAMICS.yawInertiaKgM2 *
@@ -406,20 +437,36 @@ export function stepTireDynamics(
         rearDistance * rearLateralAcceleration
       )
 
+    longitudinalSpeed +=
+      longitudinalCouplingAcceleration * h
     lateralSpeed += lateralAcceleration * h
     yawRate += yawAcceleration * h
 
+    // Tire scrub dissipates slip energy while the body-frame coupling above
+    // preserves the correct exchange between longitudinal/lateral components.
     lateralSpeed *= Math.exp(-0.10 * h)
     yawRate *= Math.exp(-0.06 * h)
   }
 
-  const lateralLimit = Math.abs(input.longitudinalSpeed) * 1.4 + 2
+  const groundSpeed = Math.hypot(
+    longitudinalSpeed,
+    lateralSpeed,
+  )
+  const lateralLimit = groundSpeed * 1.4 + 2
   lateralSpeed = clamp(lateralSpeed, -lateralLimit, lateralLimit)
+  longitudinalSpeed = clamp(
+    longitudinalSpeed,
+    -groundSpeed * 1.25 - 1,
+    groundSpeed * 1.25 + 1,
+  )
   yawRate = clamp(yawRate, -3.5, 3.5)
 
   const lateralAccelerationMps2 =
     frontLateralAcceleration + rearLateralAcceleration
-  budget = forceBudget(input, lateralAccelerationMps2)
+  budget = forceBudget({
+    ...input,
+    longitudinalSpeed,
+  }, lateralAccelerationMps2)
 
   const frontGripUsage = axleUsage(
     budget.frontLeftGrip,
@@ -447,7 +494,11 @@ export function stepTireDynamics(
     budget.rearRightGrip,
     budget.rearWheelLongitudinal,
   )
-  const nextState = { lateralSpeed, yawRate }
+  const nextState = {
+    longitudinalSpeed,
+    lateralSpeed,
+    yawRate,
+  }
 
   return {
     state: nextState,
@@ -458,7 +509,11 @@ export function stepTireDynamics(
       yawRateRps: yawRate,
       sideslipAngleRadians: Math.atan2(
         lateralSpeed,
-        Math.max(0.1, Math.abs(input.longitudinalSpeed)),
+        Math.max(0.1, longitudinalSpeed),
+      ),
+      groundSpeedMps: Math.hypot(
+        longitudinalSpeed,
+        lateralSpeed,
       ),
       frontSlipAngleRadians: frontSlipAngle,
       rearSlipAngleRadians: rearSlipAngle,

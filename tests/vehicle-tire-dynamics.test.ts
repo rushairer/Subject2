@@ -276,3 +276,84 @@ test('tire telemetry exposes forward load transfer during a full service stop', 
   )
   assert.ok(result.tire.longitudinalAccelerationMps2 < -8)
 })
+
+
+test('handbrake drift recovers to stable forward travel after release and steering return', () => {
+  const roadAngle = 0.34
+  const car = vehicle({
+    speed: 10,
+    steering: roadAngle,
+    steeringWheelAngle: steeringWheelForRoadAngle(roadAngle),
+    handbrake: true,
+    engineOn: true,
+    engineRpm: 2200,
+    gear: 1,
+  })
+
+  let releaseSideslip = 0
+  let releaseYawRate = 0
+
+  for (let frame = 0; frame < 24; frame += 1) {
+    const result = stepVehiclePhysics(car, {
+      throttle: 0,
+      brake: 0,
+      clutch: 0,
+      steer: 0,
+      steeringWheelTarget: car.steeringWheelAngle,
+    }, 1 / 60, {
+      automatic: true,
+      grade: 0,
+    })
+    releaseSideslip = Math.abs(result.tire.sideslipAngleRadians)
+    releaseYawRate = Math.abs(result.tire.yawRateRps)
+  }
+
+  assert.ok(
+    releaseSideslip > 0.08,
+    `handbrake failed to create meaningful sideslip: ${releaseSideslip}`,
+  )
+  assert.ok(
+    releaseYawRate > 0.2,
+    `handbrake failed to create meaningful yaw: ${releaseYawRate}`,
+  )
+
+  car.handbrake = false
+  let final = null as ReturnType<typeof stepVehiclePhysics> | null
+  let sawRecoveryDynamicModel = false
+
+  for (let frame = 0; frame < 120; frame += 1) {
+    final = stepVehiclePhysics(car, {
+      throttle: 0.32,
+      brake: 0,
+      clutch: 0,
+      steer: 0,
+      steeringWheelTarget: 0,
+    }, 1 / 60, {
+      automatic: true,
+      grade: 0,
+    })
+    if (final.tire.model === 'dynamic') {
+      sawRecoveryDynamicModel = true
+    }
+  }
+
+  assert.equal(sawRecoveryDynamicModel, true)
+  assert.ok(final)
+  assert.ok(
+    Math.abs(final.tire.sideslipAngleRadians) < 0.04,
+    `sideslip did not recover: ${final.tire.sideslipAngleRadians}`,
+  )
+  assert.ok(
+    Math.abs(final.tire.yawRateRps) < 0.08,
+    `yaw did not recover: ${final.tire.yawRateRps}`,
+  )
+  assert.ok(
+    Math.abs(car.lateralSpeed ?? 0) <
+      Math.max(0.2, Math.abs(car.speed) * 0.06),
+    `velocity did not realign: u=${car.speed}, v=${car.lateralSpeed}`,
+  )
+  assert.ok(
+    car.speed > 2,
+    `car failed to resume forward travel: u=${car.speed}`,
+  )
+})

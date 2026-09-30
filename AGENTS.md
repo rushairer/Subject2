@@ -639,3 +639,11 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Apply suspension attitude around an explicit roll/pitch center above the road, not around the world origin, and bound/spring the response to prevent camera-frame spikes from producing unrealistic body flips.
 - The first-person driver eye follows the same sprung-body pose used by the cockpit; do not integrate a second camera-only suspension state. External second/third/top cameras remain horizon-stable.
 - Changes to suspension visual tuning require deterministic target-sign, bound, spring-response, eye-transform and neutral-return regressions.
+
+
+## Drift recovery dynamics
+
+- Dynamic road-speed handling uses the planar body-frame state `u` (longitudinal speed), `v` (lateral speed) and `yawRate`. Integrate both rotating-frame coupling terms: `uDot += v * yawRate` and `vDot -= u * yawRate`; never leave longitudinal speed as an uncoupled scalar during a drift.
+- After a handbrake slide, releasing the parking brake and returning steering must let tire forces physically dissipate sideslip/yaw and realign the velocity vector with the body. Do not force `lateralSpeed` or `yawRate` to zero as a drift-exit shortcut.
+- Stay in the dynamic model while meaningful slip/yaw residual remains, using ground speed rather than longitudinal speed alone for recovery gating. Return to the exact low-speed kinematic model only after residuals fall below shared recovery thresholds.
+- Ordinary low-speed/reverse Subject 2 geometry remains deterministic. Changes to drift recovery require a regression that creates a real handbrake slide, releases the brake, centers steering, reapplies moderate FWD throttle and proves stable forward travel returns within roughly two seconds.
