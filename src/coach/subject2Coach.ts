@@ -183,24 +183,25 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     return pose
   }
 
+  // Keep real body clearance through the L-shaped lane/bay mouth instead of
+  // merely following a centerline that is mathematically legal by millimetres.
+  // The previous path had < 1 mm theoretical body margin at the bay corner,
+  // which made the second pass highly sensitive to frame timing/steering lag.
+  // This compound path keeps about 0.11 m ideal-kinematic clearance and lands
+  // near the bay center with the body already parallel to the bay.
   const reverseParkingSegments = [
-    { steering: -0.58, distance: 0.75 },
-    { steering: 0, distance: 0.75 },
-    { steering: -0.58, distance: 2.25 },
-    { steering: -0.15, distance: 0.25 },
-    { steering: -0.58, distance: 3.5 },
-    { steering: -0.45, distance: 0.25 },
-    { steering: 0, distance: 2.9 },
+    { steering: -0.58, distance: 0.6 },
+    { steering: 0, distance: 0.68 },
+    { steering: -0.58, distance: 2.3 },
+    { steering: -0.15, distance: 0.13 },
+    { steering: -0.58, distance: 3.62 },
+    { steering: -0.45, distance: 0.29 },
+    { steering: 0, distance: 2.87 },
   ] as const
   const secondReverseParkingSegments = reverseParkingSegments.map(
-    (segment, index) => ({
+    segment => ({
       steering: -segment.steering,
-      // Keep a little extra rear clearance from the 5.1 m bay back line on
-      // the mirrored second entry. The real body judge includes all corners.
-      distance:
-        index === reverseParkingSegments.length - 1
-          ? segment.distance - 0.15
-          : segment.distance,
+      distance: segment.distance,
     }),
   )
 
@@ -354,10 +355,13 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     secondSetupStartPose,
     1,
     [
-      { steering: 0.58, distance: 1.65 },
-      { steering: -0.58, distance: 1.65 },
+      // A symmetric 2.30 m S-shift moves the car from x=-1.20 m back to
+      // x≈0 while restoring heading≈0. Starting the mirrored reverse from the
+      // same lateral line as pass one removes the accumulated 0.575 m offset.
+      { steering: 0.58, distance: 2.3 },
+      { steering: -0.58, distance: 2.3 },
     ],
-    '驶向另一端 · S 形横移并重新回正车身',
+    '驶向另一端 · S 形横移到标准倒库线并重新回正车身',
   )
   push({
     x: secondStagingPose.x,
@@ -413,8 +417,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   )
 
   push({
-    x: bayCenterX,
-    z: 0,
+    x: secondParkPose.x,
+    z: secondParkPose.z,
     targetSpeedMps: 0,
     gear: -1,
     stop: true,
@@ -422,7 +426,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     arrivalRadiusMeters: 0.18,
     pathCurvaturePerMeter: 0,
     headingHoldRadians: Math.PI * 1.5,
-    label: '第二次倒库 · 对准库位中心后停稳',
+    requireCapture: true,
+    label: '第二次倒库 · 完全入库并停稳',
   })
 
 
