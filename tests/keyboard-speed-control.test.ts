@@ -132,8 +132,8 @@ test('C1 can add power from the bite point on a rotated uphill without losing th
     const sim = driving(false)
     sim.vehicle.heading = heading
     for (let i = 0; i < 180; i++) {
-      // Number 3 supplies a deterministic 30% opening while Shift holds the bite point.
-      sim.step({ fixedThrottle: 0.3, clutchBiteKey: true }, 0.1, heading)
+      // Number 5 supplies a deterministic 50% opening while Shift holds the bite point.
+      sim.step({ fixedThrottle: 0.5, clutchBiteKey: true }, 0.1, heading)
     }
     assert.ok(sim.vehicle.speed > 0.5)
     assert.equal(sim.stalls, 0)
