@@ -125,7 +125,11 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   const exitTurnRadius = 4.31
   // Drive far enough out of the bay that the 4.4 m body is substantially
   // inside the 6.7 m lane before beginning the 90-degree forward turn.
-  const outboundTurnX = 1.7
+  // Begin the forward 90-degree exit turn slightly earlier so the south/north
+  // longitudinal lane center lands at x=-0.60 instead of x=-1.20. That gives
+  // the second setup enough lateral headroom to re-center with a short S-shift
+  // without driving the 4.4 m body against the far control-area end.
+  const outboundTurnX = 2.3
   const outboundLaneX = outboundTurnX + rearAxle - exitTurnRadius
   const exitTurnZ = exitTurnRadius + rearAxle
   const turnStartZ = reverseTurnStartZ
@@ -183,24 +187,25 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     return pose
   }
 
+  // Keep real body clearance through the L-shaped lane/bay mouth instead of
+  // merely following a centerline that is mathematically legal by millimetres.
+  // The previous path had < 1 mm theoretical body margin at the bay corner,
+  // which made the second pass highly sensitive to frame timing/steering lag.
+  // This compound path keeps about 0.11 m ideal-kinematic clearance and lands
+  // near the bay center with the body already parallel to the bay.
   const reverseParkingSegments = [
-    { steering: -0.58, distance: 0.75 },
-    { steering: 0, distance: 0.75 },
-    { steering: -0.58, distance: 2.25 },
-    { steering: -0.15, distance: 0.25 },
-    { steering: -0.58, distance: 3.5 },
-    { steering: -0.45, distance: 0.25 },
-    { steering: 0, distance: 2.9 },
+    { steering: -0.58, distance: 0.6 },
+    { steering: 0, distance: 0.68 },
+    { steering: -0.58, distance: 2.3 },
+    { steering: -0.15, distance: 0.13 },
+    { steering: -0.58, distance: 3.62 },
+    { steering: -0.45, distance: 0.29 },
+    { steering: 0, distance: 2.87 },
   ] as const
   const secondReverseParkingSegments = reverseParkingSegments.map(
-    (segment, index) => ({
+    segment => ({
       steering: -segment.steering,
-      // Keep a little extra rear clearance from the 5.1 m bay back line on
-      // the mirrored second entry. The real body judge includes all corners.
-      distance:
-        index === reverseParkingSegments.length - 1
-          ? segment.distance - 0.15
-          : segment.distance,
+      distance: segment.distance,
     }),
   )
 
@@ -354,10 +359,13 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     secondSetupStartPose,
     1,
     [
+      // With the exit lane now at x=-0.60 m, this compact S-shift lands at
+      // x≈0.025 m / heading≈0 while retaining large body clearance from the
+      // opposite control-area end.
       { steering: 0.58, distance: 1.65 },
       { steering: -0.58, distance: 1.65 },
     ],
-    '驶向另一端 · S 形横移并重新回正车身',
+    '驶向另一端 · S 形横移到标准倒库线并重新回正车身',
   )
   push({
     x: secondStagingPose.x,
@@ -372,9 +380,10 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     label: '另一端控制线外停稳 · 车身已回正，准备第二次倒库',
   })
 
+  const secondTurnStartZ = turnStartZ + 0.03
   for (
     let z = secondStagingPose.z + 0.3;
-    z < -turnStartZ - 0.16;
+    z < -secondTurnStartZ - 0.16;
     z += 0.3
   ) {
     push({
@@ -391,7 +400,10 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
 
   const secondTurnPose = {
     x: secondStagingPose.x,
-    z: -turnStartZ,
+    // Bias the mirrored second entry 3 cm farther from the bay mouth so the
+    // full two-pass sequence retains the same real body-clearance margin as
+    // the isolated second-pass regression after accumulated tracking error.
+    z: -secondTurnStartZ,
     heading: 0,
   }
   push({
@@ -413,8 +425,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
   )
 
   push({
-    x: bayCenterX,
-    z: 0,
+    x: secondParkPose.x,
+    z: secondParkPose.z,
     targetSpeedMps: 0,
     gear: -1,
     stop: true,
@@ -422,7 +434,8 @@ function reverseParkingWaypoints(): CoachWaypoint[] {
     arrivalRadiusMeters: 0.18,
     pathCurvaturePerMeter: 0,
     headingHoldRadians: Math.PI * 1.5,
-    label: '第二次倒库 · 对准库位中心后停稳',
+    requireCapture: true,
+    label: '第二次倒库 · 完全入库并停稳',
   })
 
 

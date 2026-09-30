@@ -190,7 +190,18 @@ export function stepVehiclePhysics(
 
   const resistance = powertrain.rollingResistance + powertrain.aerodynamicDrag * vehicle.speed ** 2
   vehicle.speed -= Math.sign(vehicle.speed) * Math.min(Math.abs(vehicle.speed), resistance * dt)
-  vehicle.speed = Math.max(-powertrain.maxReverseSpeed, Math.min(powertrain.maxForwardSpeed, vehicle.speed))
+
+  // This is not a performance limiter. Normal top speed must emerge from the
+  // balance between drivetrain force, gearing, road load and grade. The guard
+  // only prevents a corrupted/unstable state from exploding the simulation.
+  if (!Number.isFinite(vehicle.speed)) {
+    vehicle.speed = 0
+  } else {
+    vehicle.speed = Math.max(
+      -powertrain.numericalSafetySpeed,
+      Math.min(powertrain.numericalSafetySpeed, vehicle.speed),
+    )
+  }
 
   const wheelbase = DRIVING_RULES.steering.wheelbaseMeters
   const rearAxleFromCenter = DRIVING_RULES.steering.rearAxleFromCenterMeters
