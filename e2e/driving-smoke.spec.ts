@@ -141,7 +141,10 @@ async function expectPedalReadoutClearOfHelp(page: Page) {
 }
 
 test('C2 reverse-parking scene renders, accepts progressive pedals, and cycles all four cameras', async ({ page }) => {
-  test.setTimeout(90_000) // Includes two viewport captures and pedal checks with software WebGL.
+  // This smoke intentionally combines two screenshots, responsive viewport
+  // changes, four camera renders and live input checks. Software WebGL on CI
+  // can legitimately exceed 90 s before the final launch assertion begins.
+  test.setTimeout(150_000)
   const runtimeErrors = captureRuntimeErrors(page)
   await createC2Candidate(page)
 
