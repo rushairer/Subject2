@@ -3,6 +3,9 @@ import { DRIVING_RULES } from '../rules/drivingRules'
 export interface PedalControlsState {
   elapsedSeconds: number
   throttleHoldTime: number
+  throttleKeyDown: boolean
+  lastThrottlePressTime: number
+  fullThrottleMode: boolean
   throttle: number
   brakeHoldTime: number
   lastBrakeReleaseTime: number
@@ -13,6 +16,7 @@ export interface PedalControlsState {
 
 export interface PedalControlsInput {
   throttleKey: boolean
+  fixedThrottle?: number | null
   brakeKey: boolean
   clutchFloorKey: boolean
   clutchBiteKey: boolean
@@ -30,10 +34,11 @@ export interface PedalControlsOutput {
 }
 
 export const PEDAL_CONFIG = {
-  // Throttle progression
+  // Keyboard virtual analogue throttle: a normal hold stays partial; a quick
+  // double-tap then hold progressively requests full throttle.
   tapThrottle: 0.18,
-  throttleRampDelay: 0.35, // Allow deliberate small corrections before adding power.
-  throttleRampDuration: 1.25,
+  fullThrottleDoubleTapWindow: 0.28,
+  fullThrottleRampDuration: 0.9,
   throttleReleasePerSecond: 3.5, // At most 0.29 s from full throttle to released.
 
   // Brake progression
@@ -61,6 +66,9 @@ export function createPedalControlsState(): PedalControlsState {
   return {
     elapsedSeconds: 0,
     throttleHoldTime: 0,
+    throttleKeyDown: false,
+    lastThrottlePressTime: -999,
+    fullThrottleMode: false,
     throttle: 0,
     brakeHoldTime: 0,
     lastBrakeReleaseTime: -999,
@@ -73,6 +81,9 @@ export function createPedalControlsState(): PedalControlsState {
 export function resetPedalControls(state: PedalControlsState) {
   state.elapsedSeconds = 0
   state.throttleHoldTime = 0
+  state.throttleKeyDown = false
+  state.lastThrottlePressTime = -999
+  state.fullThrottleMode = false
   state.throttle = 0
   state.brakeHoldTime = 0
   state.lastBrakeReleaseTime = -999
@@ -84,7 +95,9 @@ export function resetPedalControls(state: PedalControlsState) {
 /**
  * Calculates smoothed, progressive throttle, brake and clutch values.
  * Features:
- * 1. Gentle initial throttle for smooth acceleration and steady cruising.
+ * 1. ETS/ATS-style keyboard virtual throttle: normal hold stays partial,
+ *    quick double-tap + hold progressively requests full throttle, and
+ *    number-key levels can provide exact analogue openings.
  * 2. Progressive braking with light deceleration on tap, full brake on hold,
  *    and instant 100% emergency brake on double-tap.
  * 3. Low-speed brake modulation for C2 automatic reverse/parking control.
@@ -96,6 +109,7 @@ export function stepPedalControls(
 ): PedalControlsOutput {
   const {
     throttleKey,
+    fixedThrottle,
     brakeKey,
     clutchFloorKey,
     clutchBiteKey,
@@ -117,22 +131,62 @@ export function stepPedalControls(
   state.elapsedSeconds += dt
 
   // --- 1. Throttle Calculation ---
+  const throttlePressed = throttleKey && !state.throttleKeyDown
+  if (throttlePressed) {
+    const sincePreviousPress = state.elapsedSeconds - state.lastThrottlePressTime
+    state.fullThrottleMode =
+      sincePreviousPress <= PEDAL_CONFIG.fullThrottleDoubleTapWindow
+    state.lastThrottlePressTime = state.elapsedSeconds
+    state.throttleHoldTime = 0
+  }
+  if (!throttleKey && state.throttleKeyDown) {
+    state.fullThrottleMode = false
+    state.throttleHoldTime = 0
+  }
+  state.throttleKeyDown = throttleKey
+
+  const fixedThrottleTarget = fixedThrottle == null
+    ? null
+    : Math.max(0, Math.min(1, fixedThrottle))
   let throttle = state.throttle
-  if (throttleKey && !brakeKey) {
+
+  if (brakeKey) {
+    throttle = 0
+    state.fullThrottleMode = false
+    state.throttleHoldTime = 0
+  } else if (fixedThrottleTarget != null) {
+    // Number-key throttle levels are intentionally exact while held.
+    throttle = fixedThrottleTarget
+    state.fullThrottleMode = false
+    state.throttleHoldTime = 0
+  } else if (throttleKey) {
     state.throttleHoldTime += dt
-    if (state.throttleHoldTime <= PEDAL_CONFIG.throttleRampDelay) {
-      throttle = Math.max(state.throttle, PEDAL_CONFIG.tapThrottle)
-    } else {
+    if (state.fullThrottleMode) {
       const progress = Math.min(
         1,
-        (state.throttleHoldTime - PEDAL_CONFIG.throttleRampDelay) / PEDAL_CONFIG.throttleRampDuration,
+        state.throttleHoldTime / PEDAL_CONFIG.fullThrottleRampDuration,
       )
       const easedProgress = progress * progress * (3 - 2 * progress)
-      throttle = Math.max(state.throttle, PEDAL_CONFIG.tapThrottle + easedProgress * (1.0 - PEDAL_CONFIG.tapThrottle))
+      const requested =
+        PEDAL_CONFIG.tapThrottle +
+        easedProgress * (1.0 - PEDAL_CONFIG.tapThrottle)
+      throttle = Math.max(state.throttle, requested)
+    } else {
+      // A normal hold behaves like a stable partial accelerator rather than
+      // silently climbing toward 100%.
+      throttle = state.throttle > PEDAL_CONFIG.tapThrottle
+        ? Math.max(
+            PEDAL_CONFIG.tapThrottle,
+            state.throttle - PEDAL_CONFIG.throttleReleasePerSecond * dt,
+          )
+        : PEDAL_CONFIG.tapThrottle
     }
   } else {
     state.throttleHoldTime = 0
-    throttle = brakeKey ? 0 : Math.max(0, state.throttle - PEDAL_CONFIG.throttleReleasePerSecond * dt)
+    throttle = Math.max(
+      0,
+      state.throttle - PEDAL_CONFIG.throttleReleasePerSecond * dt,
+    )
   }
   state.throttle = throttle
 
