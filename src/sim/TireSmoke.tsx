@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useRef, type MutableRefObject } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { forwardFromHeading, rightFromHeading } from './vehicleFrame'
 import { wheelContactFootprints, type WheelId } from './wheelContact'
@@ -59,6 +59,10 @@ export function TireSmoke({
   const quaternion = useRef(new THREE.Quaternion())
   const scale = useRef(new THREE.Vector3())
 
+  useEffect(() => {
+    if (mesh.current) mesh.current.count = 0
+  }, [])
+
   useFrame((_, rawDt) => {
     const instanced = mesh.current
     const tire = telemetry.current
@@ -74,7 +78,7 @@ export function TireSmoke({
       emission.current[wheel.id] = (emission.current[wheel.id] ?? 0) + rate * dt
 
       while ((emission.current[wheel.id] ?? 0) >= 1) {
-        emission.current[wheel.id]! -= 1
+        emission.current[wheel.id] = (emission.current[wheel.id] ?? 0) - 1
         const particle = particles.current[spawnCursor.current]
         spawnCursor.current = (spawnCursor.current + 1) % PARTICLE_CAPACITY
         const phase = particle.phase + spawnCursor.current * 0.37
@@ -127,6 +131,7 @@ export function TireSmoke({
       )
       instanced.setMatrixAt(index, matrix.current)
     }
+    instanced.count = PARTICLE_CAPACITY
     instanced.instanceMatrix.needsUpdate = true
   }, 1)
 

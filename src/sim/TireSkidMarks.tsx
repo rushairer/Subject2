@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useRef, type MutableRefObject } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { TRAINING_CAR } from './vehicleDimensions'
 import { wheelContactFootprints, type WheelId } from './wheelContact'
@@ -44,6 +44,10 @@ export function TireSkidMarks({
   const quaternion = useRef(new THREE.Quaternion())
   const scale = useRef(new THREE.Vector3())
   const euler = useRef(new THREE.Euler())
+
+  useEffect(() => {
+    if (mesh.current) mesh.current.count = 0
+  }, [])
 
   useFrame(() => {
     const instanced = mesh.current
