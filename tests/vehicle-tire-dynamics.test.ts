@@ -5,7 +5,10 @@ import {
   stepVehiclePhysics,
   type PhysicsVehicle,
 } from '../src/sim/vehiclePhysics'
-import {\n  TRAINING_CAR_DYNAMICS,\n  calculateWheelNormalLoads,\n} from '../src/sim/vehicleTireDynamics'
+import {
+  TRAINING_CAR_DYNAMICS,
+  calculateWheelNormalLoads,
+} from '../src/sim/vehicleTireDynamics'
 
 function vehicle(overrides: Partial<PhysicsVehicle> = {}): PhysicsVehicle {
   return {
