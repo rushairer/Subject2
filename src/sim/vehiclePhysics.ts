@@ -1,5 +1,13 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
-import { forwardFromHeading } from './vehicleFrame'
+import { forwardFromHeading, rightFromHeading } from './vehicleFrame'
+import {
+  TRAINING_CAR_DYNAMICS,
+  kinematicTireTelemetry,
+  kinematicYawRate,
+  shouldUseDynamicTireModel,
+  stepTireDynamics,
+  type TireTelemetry,
+} from './vehicleTireDynamics'
 import { MANUAL_GEARS, VEHICLE_POWERTRAIN } from './vehiclePowertrain'
 
 export interface PhysicsVehicle {
@@ -17,6 +25,14 @@ export interface PhysicsVehicle {
   engineRpm: number
   stallTimer: number
   handbrake: boolean
+  /** Body-center lateral velocity, positive to vehicle-right. */
+  lateralSpeed?: number
+  /** Heading rate, positive for a right turn. */
+  yawRate?: number
+  /** Visual wheel rotation multiplier from longitudinal tire slip. */
+  frontWheelRotationFactor?: number
+  /** Visual wheel rotation multiplier from longitudinal tire slip. */
+  rearWheelRotationFactor?: number
 }
 
 export interface PhysicsInput {
@@ -25,6 +41,11 @@ export interface PhysicsInput {
   clutch: number
   steer: number
   steeringWheelTarget?: number
+}
+
+export interface PhysicsStepResult {
+  stalled: boolean
+  tire: TireTelemetry
 }
 
 export interface PhysicsOptions {
@@ -53,8 +74,20 @@ export function stepVehiclePhysics(
   input: PhysicsInput,
   dt: number,
   options: PhysicsOptions,
-) {
-  if (dt <= 0) return { stalled: false }
+): PhysicsStepResult {
+  if (dt <= 0) {
+    const yawRate = kinematicYawRate(vehicle.speed, vehicle.steering)
+    const lateralSpeed =
+      yawRate * DRIVING_RULES.steering.rearAxleFromCenterMeters
+    const tire = kinematicTireTelemetry({
+      longitudinalSpeed: vehicle.speed,
+      steering: vehicle.steering,
+      driveAcceleration: 0,
+      brake: input.brake,
+      handbrake: vehicle.handbrake,
+    }, { lateralSpeed, yawRate })
+    return { stalled: false, tire }
+  }
   const { automatic, grade, gradeHeading = 0 } = options
   const powertrain = VEHICLE_POWERTRAIN
   vehicle.throttle = input.throttle
@@ -90,6 +123,7 @@ export function stepVehiclePhysics(
   const clutchEngagement = automatic ? 1 : Math.max(0, Math.min(1, 1 - vehicle.clutch))
   const slippingClutch = !automatic && vehicle.clutch > powertrain.minSlippingClutch && vehicle.clutch < powertrain.maxSlippingClutch
   let stalled = false
+  let driveAcceleration = 0
 
   if (vehicle.engineOn) {
     if (automatic) {
@@ -160,7 +194,8 @@ export function stepVehiclePhysics(
     // Creep is idle torque at walking speed, never propulsion at road speed.
     const automaticCreep = automatic ? powertrain.automaticCreepAcceleration * creepHeadroom * (1 - input.throttle) : 0
     const driveForce = (throttleForce + biteAssist + automaticCreep) * driveFactor * clutchEngagement
-    vehicle.speed += driveForce * direction * dt
+    driveAcceleration = driveForce
+    vehicle.speed += driveAcceleration * direction * dt
 
     const closedThrottle = Math.max(0, 1 - input.throttle / powertrain.engineBrakeReleaseThrottle)
     const engineBraking = automatic
@@ -175,7 +210,7 @@ export function stepVehiclePhysics(
   }
 
   // Service braking opposes gravity; a lightly pressed pedal is not a hill hold.
-  if (!vehicle.handbrake) {
+  if (!vehicle.handbrake || Math.abs(vehicle.speed) > 0.08) {
     vehicle.speed += longitudinalGravityAcceleration(
       vehicle.heading,
       grade,
@@ -183,7 +218,9 @@ export function stepVehiclePhysics(
     ) * dt
   }
 
-  const braking = input.brake * 9.4 + (vehicle.handbrake ? 12.5 : 0)
+  const braking =
+    input.brake * TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration +
+    (vehicle.handbrake ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration : 0)
   if (Math.abs(vehicle.speed) > 0.001) {
     vehicle.speed -= Math.sign(vehicle.speed) * Math.min(Math.abs(vehicle.speed), braking * dt)
   }
