@@ -35,6 +35,13 @@ export const SUBJECT3_CUT_IN_SCOOTER = {
   lateralDurationSeconds: 3.4,
 } as const
 
+export function subject3CutInScooterActive(
+  triggered: boolean,
+  stopped: boolean,
+) {
+  return triggered && !stopped
+}
+
 export function subject3CutInScooterRouteState(
   triggered: boolean,
   elapsedSeconds: number,
