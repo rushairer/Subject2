@@ -132,3 +132,21 @@ test('light service brake opposes slope gravity continuously; sufficient brake h
     assert.equal(speeds[3], 0)
   }
 })
+
+
+test('downhill gravity can carry the vehicle beyond the former 57.6 km/h clamp', () => {
+  const downhill = vehicle(Math.PI)
+  downhill.speed = 15.5
+
+  for (let frame = 0; frame < 300; frame += 1) {
+    stepVehiclePhysics(downhill, idleInput, 1 / 60, {
+      automatic: false,
+      grade: 0.1,
+      gradeHeading: 0,
+    })
+  }
+
+  const speedKmh = downhill.speed * 3.6
+  assert.ok(speedKmh > 60, `downhill speed still looks hard-capped: ${speedKmh}`)
+  assert.ok(speedKmh < 90, `road load failed to bound short downhill acceleration: ${speedKmh}`)
+})
