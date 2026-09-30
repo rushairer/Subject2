@@ -211,6 +211,12 @@ test('coach reverse-parking plan completes both parking passes through real phys
   let coach = createCoachRuntime()
   let course = createReverseParkingRuntime()
   const infractions: string[] = []
+  const parkedPoses: Array<{
+    phase: 'first-parked' | 'second-parked'
+    x: number
+    z: number
+    heading: number
+  }> = []
   const checkpoints: Array<{
     waypoint: number
     x: number
@@ -269,8 +275,20 @@ test('coach reverse-parking plan completes both parking passes through real phys
       grade: 0,
     })
 
+    const previousPhase = course.phase
     const judged = updateReverseParking(vehicle, course, dt)
     course = judged.runtime
+    if (
+      course.phase !== previousPhase &&
+      (course.phase === 'first-parked' || course.phase === 'second-parked')
+    ) {
+      parkedPoses.push({
+        phase: course.phase,
+        x: vehicle.x,
+        z: vehicle.z,
+        heading: vehicle.heading,
+      })
+    }
     if (!firstInfraction && judged.infractions.length > 0) {
       firstInfraction = {
         frame,
@@ -308,8 +326,140 @@ test('coach reverse-parking plan completes both parking passes through real phys
     }),
   )
   assert.equal(infractions.length, 0, JSON.stringify(firstInfraction))
+  assert.equal(parkedPoses.length, 2, JSON.stringify(parkedPoses))
+  for (const parked of parkedPoses) {
+    // Bay width is 2.30 m vs a 1.80 m body. Keep the coach comfortably away
+    // from the 2 cm legality edge instead of accepting a barely-inside pose.
+    assert.ok(
+      Math.abs(parked.z) <= 0.14,
+      `${parked.phase} should retain >=11 cm lateral body margin: ${JSON.stringify(parked)}`,
+    )
+    assert.ok(
+      parked.x >= 5.72 && parked.x <= 6.08,
+      `${parked.phase} should stop near the longitudinal bay center: ${JSON.stringify(parked)}`,
+    )
+    const expectedHeading = parked.phase === 'first-parked'
+      ? Math.PI * 1.5
+      : -Math.PI / 2
+    const headingError = Math.atan2(
+      Math.sin(parked.heading - expectedHeading),
+      Math.cos(parked.heading - expectedHeading),
+    )
+    assert.ok(
+      Math.abs(headingError) <= 0.08,
+      `${parked.phase} should be parallel to the bay: ${JSON.stringify(parked)}`,
+    )
+  }
 })
 
+
+
+test('coach second reverse-parking pass keeps margin across frame timing and small pose errors', () => {
+  const plan = subject2CoachPlan('reverse-parking')
+  assert.ok(plan)
+
+  const secondTurnIndex = plan.waypoints.findIndex(
+    waypoint => waypoint.label === '第二次倒库 · 精确对中后进入复合转向',
+  )
+  assert.ok(secondTurnIndex > 0)
+  const secondTurn = plan.waypoints[secondTurnIndex]!
+  assert.ok(Math.abs(secondTurn.x) <= 0.03, JSON.stringify(secondTurn))
+
+  const cases = [
+    { dt: 1 / 60, dx: 0, dz: 0, dh: 0 },
+    { dt: 1 / 30, dx: 0, dz: 0, dh: 0 },
+    { dt: 1 / 60, dx: 0.035, dz: -0.025, dh: 0.008 },
+    { dt: 1 / 30, dx: -0.035, dz: 0.025, dh: -0.008 },
+  ]
+
+  for (const scenario of cases) {
+    const vehicle = {
+      x: secondTurn.x + scenario.dx,
+      z: secondTurn.z + scenario.dz,
+      heading: (secondTurn.headingHoldRadians ?? 0) + scenario.dh,
+      speed: 0,
+      steering: 0,
+      steeringWheelAngle: 0,
+      throttle: 0,
+      brake: 0,
+      clutch: 0,
+      gear: -1,
+      engineOn: true,
+      engineRpm: 820,
+      stallTimer: 0,
+      handbrake: false,
+    }
+    let coach = {
+      ...createCoachRuntime(),
+      waypointIndex: secondTurnIndex,
+    }
+    let course = {
+      ...createReverseParkingRuntime(),
+      phase: 'cross-to-opposite' as const,
+      started: true,
+      firstControlPassed: true,
+      oppositeControlPassed: true,
+      elapsed: 25,
+    }
+    const infractions: string[] = []
+
+    for (
+      let frame = 0;
+      frame < 5000 && course.phase !== 'second-parked';
+      frame++
+    ) {
+      const next = stepCoachController(
+        plan,
+        vehicle,
+        coach,
+        scenario.dt,
+        true,
+      )
+      coach = next.runtime
+      vehicle.gear = next.command.gear
+      vehicle.engineOn = next.command.engineOn
+      vehicle.handbrake = next.command.handbrake
+
+      stepVehiclePhysics(vehicle, {
+        throttle: next.command.throttle,
+        brake: next.command.brake,
+        clutch: next.command.clutch,
+        steer: 0,
+        steeringWheelTarget: next.command.steeringWheelTarget,
+      }, scenario.dt, {
+        automatic: true,
+        grade: 0,
+      })
+
+      const judged = updateReverseParking(
+        vehicle,
+        course,
+        scenario.dt,
+      )
+      course = judged.runtime
+      infractions.push(...judged.infractions.map(item => item.id))
+    }
+
+    assert.equal(
+      course.phase,
+      'second-parked',
+      JSON.stringify({ scenario, vehicle, coach, course, infractions }),
+    )
+    assert.deepEqual(
+      infractions,
+      [],
+      JSON.stringify({ scenario, vehicle, coach, course, infractions }),
+    )
+    assert.ok(
+      Math.abs(vehicle.z) <= 0.15,
+      JSON.stringify({ scenario, vehicle }),
+    )
+    assert.ok(
+      vehicle.x >= 5.70 && vehicle.x <= 6.10,
+      JSON.stringify({ scenario, vehicle }),
+    )
+  }
+})
 
 
 test('coach side-parking plan parks and exits through real physics without penalties', () => {
