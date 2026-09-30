@@ -9,6 +9,11 @@ import {
   type TireTelemetry,
 } from './vehicleTireDynamics'
 import { MANUAL_GEARS, VEHICLE_POWERTRAIN } from './vehiclePowertrain'
+import {
+  createAbsAxleState,
+  stepAbsAxleState,
+  type AbsAxleState,
+} from './vehicleBrakeDynamics'
 
 export interface PhysicsVehicle {
   x: number
