@@ -342,7 +342,12 @@ export function stepVehiclePhysics(
       yawRecoveryError >
         TRAINING_CAR_DYNAMICS.recoveryYawRateErrorRps
     )
+  // Reverse Subject 2 maneuvers intentionally remain on the exact
+  // kinematic bicycle. The current nonlinear tire equations are calibrated
+  // for forward road-speed handling; feeding reverse velocity into them can
+  // invert slip-angle signs and corrupt deterministic parking geometry.
   const dynamicTires =
+    vehicle.gear >= 0 &&
     groundSpeedBefore >
       TRAINING_CAR_DYNAMICS.recoveryMinimumGroundSpeedMps &&
     (

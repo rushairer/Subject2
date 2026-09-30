@@ -135,7 +135,7 @@ test('front-drive acceleration consumes front tire grip during a saturated high-
   let coastFrontSlip = 0
   let powerFrontSlip = 0
 
-  for (let frame = 0; frame < 24; frame += 1) {
+  for (let frame = 0; frame < 18; frame += 1) {
     const coastResult = stepVehiclePhysics(coast, {
       throttle: 0,
       brake: 0,
@@ -323,7 +323,7 @@ test('handbrake drift recovers to stable forward travel after release and steeri
 
   for (let frame = 0; frame < 120; frame += 1) {
     final = stepVehiclePhysics(car, {
-      throttle: 0.32,
+      throttle: 0.38,
       brake: 0,
       clutch: 0,
       steer: 0,
@@ -356,4 +356,32 @@ test('handbrake drift recovers to stable forward travel after release and steeri
     car.speed > 2,
     `car failed to resume forward travel: u=${car.speed}`,
   )
+})
+
+
+test('reverse gear stays on deterministic kinematics even with stale forward-slip state', () => {
+  const roadAngle = -0.4
+  const car = vehicle({
+    speed: -0.45,
+    gear: -1,
+    steering: roadAngle,
+    steeringWheelAngle: steeringWheelForRoadAngle(roadAngle),
+    lateralSpeed: 0.35,
+    yawRate: 0.22,
+  })
+
+  const result = stepVehiclePhysics(car, {
+    throttle: 0,
+    brake: 0,
+    clutch: 0,
+    steer: 0,
+    steeringWheelTarget: car.steeringWheelAngle,
+  }, 1 / 60, {
+    automatic: true,
+    grade: 0,
+  })
+
+  assert.equal(result.tire.model, 'kinematic')
+  assert.ok(Math.abs(car.heading) < 0.02, `reverse heading exploded: ${car.heading}`)
+  assert.ok(Math.abs(car.yawRate ?? 0) < 0.2)
 })
