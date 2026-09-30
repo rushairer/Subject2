@@ -137,7 +137,7 @@ export function stepVehiclePhysics(
     vehicle.stallTimer = 0
   }
 
-  if (vehicle.engineOn && !vehicle.handbrake && vehicle.gear !== 0) {
+  if (vehicle.engineOn && vehicle.gear !== 0) {
     const driveFactor = vehicle.gear < 0
       ? powertrain.reverseDriveFactor
       : automatic
@@ -203,31 +203,80 @@ export function stepVehiclePhysics(
     )
   }
 
-  const wheelbase = DRIVING_RULES.steering.wheelbaseMeters
   const rearAxleFromCenter = DRIVING_RULES.steering.rearAxleFromCenterMeters
   const headingBefore = vehicle.heading
-  const forwardBefore = forwardFromHeading(headingBefore)
+  const requestedYawRate = kinematicYawRate(vehicle.speed, vehicle.steering)
+  const kinematicLateralSpeed = requestedYawRate * rearAxleFromCenter
+  const previousLateralSpeed = vehicle.lateralSpeed ?? kinematicLateralSpeed
+  const previousYawRate = vehicle.yawRate ?? requestedYawRate
+  const tireInput = {
+    longitudinalSpeed: vehicle.speed,
+    steering: vehicle.steering,
+    driveAcceleration,
+    brake: input.brake,
+    handbrake: vehicle.handbrake,
+  }
+  const recoveringFromSlip =
+    vehicle.speed > 0.5 &&
+    (
+      Math.abs(previousLateralSpeed - kinematicLateralSpeed) > 0.18 ||
+      Math.abs(previousYawRate - requestedYawRate) > 0.10
+    )
+  const dynamicTires =
+    vehicle.speed > 0 &&
+    (shouldUseDynamicTireModel(tireInput) || recoveringFromSlip)
 
-  // Kinematic bicycle model: the rear axle is the constrained axle, while
-  // the front axle steers. Vehicle x/z remains the body center so existing
-  // exam geometry and collision checks continue to use the same reference.
-  let rearAxleX = vehicle.x - forwardBefore.x * rearAxleFromCenter
-  let rearAxleZ = vehicle.z - forwardBefore.z * rearAxleFromCenter
+  let tire: TireTelemetry
 
-  const yawRate =
-    Math.abs(vehicle.steering) < 0.0001
-      ? 0
-      : (vehicle.speed / wheelbase) * Math.tan(vehicle.steering)
-  const headingDelta = yawRate * dt
-  const headingMid = headingBefore + headingDelta * 0.5
+  if (dynamicTires) {
+    const dynamics = stepTireDynamics({
+      lateralSpeed: previousLateralSpeed,
+      yawRate: previousYawRate,
+    }, tireInput, dt)
+    vehicle.lateralSpeed = dynamics.state.lateralSpeed
+    vehicle.yawRate = dynamics.state.yawRate
 
-  rearAxleX += Math.sin(headingMid) * vehicle.speed * dt
-  rearAxleZ -= Math.cos(headingMid) * vehicle.speed * dt
-  vehicle.heading = headingBefore + headingDelta
+    const headingDelta = vehicle.yawRate * dt
+    const headingMid = headingBefore + headingDelta * 0.5
+    const forwardMid = forwardFromHeading(headingMid)
+    const rightMid = rightFromHeading(headingMid)
+    vehicle.x += (
+      forwardMid.x * vehicle.speed +
+      rightMid.x * vehicle.lateralSpeed
+    ) * dt
+    vehicle.z += (
+      forwardMid.z * vehicle.speed +
+      rightMid.z * vehicle.lateralSpeed
+    ) * dt
+    vehicle.heading = headingBefore + headingDelta
+    tire = dynamics.telemetry
+  } else {
+    // Preserve the exact rear-axle kinematic bicycle at low speed. Subject 2
+    // geometry depends on this deterministic path and should not inherit tire
+    // solver noise when the tires are comfortably inside their grip budget.
+    const forwardBefore = forwardFromHeading(headingBefore)
+    let rearAxleX = vehicle.x - forwardBefore.x * rearAxleFromCenter
+    let rearAxleZ = vehicle.z - forwardBefore.z * rearAxleFromCenter
+    const headingDelta = requestedYawRate * dt
+    const headingMid = headingBefore + headingDelta * 0.5
 
-  const forwardAfter = forwardFromHeading(vehicle.heading)
-  vehicle.x = rearAxleX + forwardAfter.x * rearAxleFromCenter
-  vehicle.z = rearAxleZ + forwardAfter.z * rearAxleFromCenter
+    rearAxleX += Math.sin(headingMid) * vehicle.speed * dt
+    rearAxleZ -= Math.cos(headingMid) * vehicle.speed * dt
+    vehicle.heading = headingBefore + headingDelta
 
-  return { stalled }
+    const forwardAfter = forwardFromHeading(vehicle.heading)
+    vehicle.x = rearAxleX + forwardAfter.x * rearAxleFromCenter
+    vehicle.z = rearAxleZ + forwardAfter.z * rearAxleFromCenter
+    vehicle.lateralSpeed = kinematicLateralSpeed
+    vehicle.yawRate = requestedYawRate
+    tire = kinematicTireTelemetry(
+      tireInput,
+      {
+        lateralSpeed: kinematicLateralSpeed,
+        yawRate: requestedYawRate,
+      },
+    )
+  }
+
+  return { stalled, tire }
 }

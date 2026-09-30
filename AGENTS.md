@@ -602,3 +602,12 @@ The “本次优先改进” block must remain readable inside the result-card c
 - `VEHICLE_POWERTRAIN.numericalSafetySpeed` is a corruption/instability guard only. Keep it far above every normal forward/reverse operating speed and never tune it to shape ordinary vehicle performance.
 - Manual gears must retain distinct usable speed ranges through `MANUAL_GEARS` and the shared redline/taper model. Reverse speed must likewise emerge from reverse gearing and road load.
 - Physics regressions must prove that higher gears extend usable road speed, reverse remains naturally bounded, and downhill gravity can exceed any historical low speed ceiling without numerical runaway.
+
+
+## Training-car tire dynamics
+
+- The canonical training car is front-engine/front-wheel drive for handling simulation. Engine drive torque consumes front-axle tire grip; do not model propulsion as rear-wheel drive or all-wheel drive.
+- The mechanical parking brake acts on the rear axle. At road speed it may lock/saturate rear longitudinal grip and reduce rear lateral grip; never implement a moving handbrake as an unexplained whole-car heading or drift toggle.
+- Keep the exact rear-axle kinematic bicycle model for ordinary low-speed Subject 2 maneuvers and reverse. Enter the dynamic tire model only when forward-speed tire demand approaches the grip envelope, a moving parking brake is applied, or an existing slip state is recovering.
+- Tire effects such as skid marks and smoke must consume telemetry from the shared tire-dynamics model. Rendering must not maintain a second independent slip heuristic.
+- Changes to drivetrain layout, grip budgets, handbrake behavior or the kinematic/dynamic transition require deterministic physics regressions, including straight-line handbrake stability and a saturated-turn case.
