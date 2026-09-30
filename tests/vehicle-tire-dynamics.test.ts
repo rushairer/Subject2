@@ -385,3 +385,28 @@ test('reverse gear stays on deterministic kinematics even with stale forward-sli
   assert.ok(Math.abs(car.heading) < 0.02, `reverse heading exploded: ${car.heading}`)
   assert.ok(Math.abs(car.yawRate ?? 0) < 0.2)
 })
+
+
+test('dynamic CG axle arms are consistent with the configured static weight distribution', () => {
+  const dynamics = TRAINING_CAR_DYNAMICS
+  const wheelbase = DRIVING_RULES.steering.wheelbaseMeters
+
+  assert.ok(
+    Math.abs(
+      dynamics.frontAxleFromCgMeters +
+      dynamics.rearAxleFromCgMeters -
+      wheelbase
+    ) < 1e-9,
+  )
+  assert.ok(
+    Math.abs(
+      dynamics.rearAxleFromCgMeters / wheelbase -
+      dynamics.frontStaticWeightFraction
+    ) < 1e-9,
+  )
+  assert.ok(
+    dynamics.frontAxleFromCgMeters <
+      dynamics.rearAxleFromCgMeters,
+  )
+  assert.ok(dynamics.cgForwardFromBodyCenterMeters > 0)
+})
