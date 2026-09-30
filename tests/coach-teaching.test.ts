@@ -77,6 +77,27 @@ test('Subject 3 hazard explanations identify braking as a defensive response', (
   assert.match(hint.operation, /制动 64%/)
 })
 
+test('Subject 3 post-hazard recovery explains low-speed drivetrain recovery', () => {
+  const hint = buildCoachTeachingHint({
+    examId: 'subject3',
+    status: '科目三示范 · 危险解除，一挡重新起步并顺序升挡',
+    automatic: false,
+    vehicle: vehicle({
+      speed: 0.1,
+      gear: 1,
+      clutch: 0.52,
+      throttle: 0.32,
+    }),
+  })
+
+  assert.ok(hint)
+  assert.match(hint.action, /危险解除/)
+  assert.match(hint.reason, /避免高挡憋熄火/)
+  assert.match(hint.watch, /挡位和发动机状态/)
+  assert.match(hint.operation, /1 挡/)
+  assert.match(hint.operation, /离合 52%/)
+})
+
 test('Subject 3 lane-change explanation preserves observation-signal-maneuver ordering', () => {
   const hint = buildCoachTeachingHint({
     examId: 'subject3',

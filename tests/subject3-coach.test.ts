@@ -8,6 +8,7 @@ import {
 } from '../src/coach/subject3Coach'
 import { DRIVING_RULES } from '../src/rules/drivingRules'
 import { stepVehiclePhysics, type PhysicsVehicle } from '../src/sim/vehiclePhysics'
+import { MANUAL_GEARS } from '../src/sim/vehiclePowertrain'
 import {
   createSubject3Runtime,
   updateSubject3,
@@ -20,6 +21,8 @@ import {
 } from '../src/subject3/subject3Route'
 import {
   createSubject3TrafficState,
+  removeSubject3TrafficHazard,
+  removeSubject3TrafficVehicle,
   updateSubject3TrafficHazard,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
@@ -309,6 +312,197 @@ for (const automatic of [false, true]) {
   for (const slice of SUBJECT3_PRACTICE_SLICES) {
     test(`${automatic ? 'C2' : 'C1'} Subject 3 coach completes ${slice.id} practice through real physics without infractions`, () => {
       runSubject3PracticeCoach(automatic, slice.id)
+    })
+  }
+}
+
+type DefensiveScenario = 'sudden-brake' | 'cut-in' | 'pedestrian'
+
+function runPhysicalDefensiveStopRecovery(
+  automatic: boolean,
+  scenario: DefensiveScenario,
+) {
+  const dt = 0.05
+  const startProgress =
+    scenario === 'pedestrian' ? 2500 : scenario === 'cut-in' ? 1500 : 2700
+  const vehicle = vehicleAtProgress(startProgress, 6)
+  vehicle.handbrake = false
+  vehicle.gear = automatic ? 1 : 3
+  vehicle.clutch = 0
+  vehicle.engineRpm = automatic
+    ? DRIVING_RULES.manualTransmission.idleRpm + 6 * 95
+    : 6 * MANUAL_GEARS[3]!.rpmPerMps
+
+  const traffic = createSubject3TrafficState()
+  let coach = createSubject3CoachRuntime()
+  let hazardProgress = startProgress + 14
+  let sawBrake = false
+  let sawFullClutch = false
+  let sawRecovery = false
+  let minSpeedBeforeClear = Number.POSITIVE_INFINITY
+  let minGapBeforeClear = Number.POSITIVE_INFINITY
+  let stallCount = 0
+  let progressAtClear = startProgress
+
+  const setHazard = () => {
+    const projection = projectToSubject3Route(vehicle.x, vehicle.z)
+
+    if (scenario === 'sudden-brake') {
+      updateSubject3TrafficVehicle(
+        traffic,
+        'physical-sudden-brake',
+        hazardProgress,
+        projection.lateral,
+        0,
+        false,
+        'sudden-brake',
+      )
+      return
+    }
+
+    if (scenario === 'cut-in') {
+      updateSubject3TrafficHazard(
+        traffic,
+        'physical-cut-in',
+        'cut-in-scooter',
+        hazardProgress,
+        projection.lateral,
+        0,
+        -0.8,
+        true,
+        true,
+      )
+      return
+    }
+
+    traffic.crosswalkPedestrianConflict = true
+    updateSubject3TrafficHazard(
+      traffic,
+      'physical-pedestrian',
+      'crosswalk-pedestrian',
+      hazardProgress,
+      projection.lateral,
+      0,
+      -0.6,
+      true,
+      true,
+    )
+  }
+
+  const clearHazard = () => {
+    if (scenario === 'sudden-brake') {
+      removeSubject3TrafficVehicle(traffic, 'physical-sudden-brake')
+    } else if (scenario === 'cut-in') {
+      removeSubject3TrafficHazard(traffic, 'physical-cut-in')
+    } else {
+      traffic.crosswalkPedestrianConflict = false
+      removeSubject3TrafficHazard(traffic, 'physical-pedestrian')
+    }
+  }
+
+  for (let frame = 0; frame < 320; frame++) {
+    const hazardActive = frame < 100
+    if (hazardActive) setHazard()
+    else if (frame === 100) {
+      clearHazard()
+      progressAtClear = projectToSubject3Route(
+        vehicle.x,
+        vehicle.z,
+      ).progress
+    }
+
+    const next = stepSubject3Coach(
+      vehicle,
+      coach,
+      dt,
+      automatic,
+      false,
+      traffic,
+    )
+    coach = next.runtime
+    const command = next.command
+
+    vehicle.engineOn = command.engineOn
+    vehicle.handbrake = command.handbrake
+    vehicle.seatbelt = command.seatbelt
+    vehicle.gear = command.gear
+    vehicle.leftIndicator = command.leftIndicator
+    vehicle.rightIndicator = command.rightIndicator
+    vehicle.lowBeam = command.lowBeam
+    vehicle.highBeam = command.highBeam
+    vehicle.horn = command.horn
+    vehicle.lookLeft = command.lookLeft
+    vehicle.lookRight = command.lookRight
+    vehicle.lookBack = command.lookBack
+
+    sawBrake ||= command.brake > 0.4
+    if (!automatic) sawFullClutch ||= command.clutch > 0.95
+    sawRecovery ||= /危险解除/.test(command.status)
+
+    const physics = stepVehiclePhysics(vehicle, {
+      throttle: command.throttle,
+      brake: command.brake,
+      clutch: command.clutch,
+      steer: 0,
+      steeringWheelTarget: command.steeringWheelTarget,
+    }, dt, {
+      automatic,
+      grade: 0,
+    })
+    if (physics.stalled) stallCount += 1
+
+    const projection = projectToSubject3Route(vehicle.x, vehicle.z)
+    if (hazardActive) {
+      minSpeedBeforeClear = Math.min(
+        minSpeedBeforeClear,
+        Math.abs(vehicle.speed),
+      )
+      minGapBeforeClear = Math.min(
+        minGapBeforeClear,
+        hazardProgress - projection.progress,
+      )
+    }
+  }
+
+  const finalProgress = projectToSubject3Route(
+    vehicle.x,
+    vehicle.z,
+  ).progress
+
+  assert.equal(
+    stallCount,
+    0,
+    `${automatic ? 'C2' : 'C1'} ${scenario} must not stall`,
+  )
+  assert.equal(vehicle.engineOn, true)
+  assert.equal(sawBrake, true)
+  if (!automatic) assert.equal(sawFullClutch, true)
+  assert.ok(
+    minSpeedBeforeClear < 0.35,
+    `${automatic ? 'C2' : 'C1'} ${scenario} should physically stop before clear: ${minSpeedBeforeClear}`,
+  )
+  assert.ok(
+    minGapBeforeClear > 3.5,
+    `${automatic ? 'C2' : 'C1'} ${scenario} should preserve physical clearance: ${minGapBeforeClear}`,
+  )
+  assert.ok(
+    finalProgress > progressAtClear + 12,
+    `${automatic ? 'C2' : 'C1'} ${scenario} should resume after clear`,
+  )
+  if (!automatic) {
+    assert.equal(sawRecovery, true)
+    assert.ok(vehicle.gear >= 2)
+  }
+}
+
+for (const automatic of [false, true]) {
+  for (const scenario of [
+    'sudden-brake',
+    'cut-in',
+    'pedestrian',
+  ] as const) {
+    test(`${automatic ? 'C2' : 'C1'} Subject 3 coach physically stops and resumes for ${scenario}`, () => {
+      runPhysicalDefensiveStopRecovery(automatic, scenario)
     })
   }
 }
