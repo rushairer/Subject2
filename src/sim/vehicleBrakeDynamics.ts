@@ -52,7 +52,7 @@ export function stepAbsAxleState(
   brakeCommand: number,
   speedMps: number,
   dt: number,
-  enabled = ABS_CONFIG.enabled,
+  enabled: boolean = ABS_CONFIG.enabled,
 ): AbsAxleState {
   const brake = clamp01(brakeCommand)
   if (
