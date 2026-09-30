@@ -7,12 +7,27 @@ const clamp = (value: number, minimum: number, maximum: number) =>
  * Training-car handling parameters. These are simulator tuning values, not a
  * claim to reproduce one exact production Santana variant.
  */
+const FRONT_STATIC_WEIGHT_FRACTION = 0.61
+const FRONT_AXLE_FROM_CG_METERS =
+  TRAINING_CAR.wheelbaseMeters *
+  (1 - FRONT_STATIC_WEIGHT_FRACTION)
+const REAR_AXLE_FROM_CG_METERS =
+  TRAINING_CAR.wheelbaseMeters *
+  FRONT_STATIC_WEIGHT_FRACTION
+const CG_FORWARD_FROM_BODY_CENTER_METERS =
+  TRAINING_CAR.frontAxleFromCenterMeters -
+  FRONT_AXLE_FROM_CG_METERS
+
 export const TRAINING_CAR_DYNAMICS = {
   driveAxle: 'front',
   massKg: 1250,
   yawInertiaKgM2: 2250,
   gravityMps2: 9.81,
-  frontStaticWeightFraction: 0.61,
+  frontStaticWeightFraction: FRONT_STATIC_WEIGHT_FRACTION,
+  frontAxleFromCgMeters: FRONT_AXLE_FROM_CG_METERS,
+  rearAxleFromCgMeters: REAR_AXLE_FROM_CG_METERS,
+  cgForwardFromBodyCenterMeters:
+    CG_FORWARD_FROM_BODY_CENTER_METERS,
   centerOfMassHeightMeters: 0.52,
   tireFrictionCoefficient: 0.92,
   frontCorneringAccelerationPerRadian: 43,
@@ -362,14 +377,23 @@ export function stepTireDynamics(
   input: TireDynamicsInput,
   dt: number,
 ) {
-  const frontDistance = TRAINING_CAR.frontAxleFromCenterMeters
-  const rearDistance = TRAINING_CAR.rearAxleFromCenterMeters
+  const frontDistance =
+    TRAINING_CAR_DYNAMICS.frontAxleFromCgMeters
+  const rearDistance =
+    TRAINING_CAR_DYNAMICS.rearAxleFromCgMeters
+  const cgForwardOffset =
+    TRAINING_CAR_DYNAMICS.cgForwardFromBodyCenterMeters
   const substeps = Math.max(1, Math.ceil(dt / 0.01))
   const h = dt / substeps
   let longitudinalSpeed =
     state.longitudinalSpeed ?? input.longitudinalSpeed
-  let lateralSpeed = state.lateralSpeed
   let yawRate = state.yawRate
+  // Public vehicle state is kept at the geometric body center because exam,
+  // collision and rendering geometry use that reference. Tire dynamics are
+  // solved at the actual CG, which is forward of the geometric center on this
+  // front-heavy training car.
+  let lateralSpeedAtCg =
+    state.lateralSpeed + cgForwardOffset * yawRate
   let frontSlipAngle = 0
   let rearSlipAngle = 0
   let frontLateralAcceleration = 0
@@ -398,12 +422,12 @@ export function stepTireDynamics(
     frontSlipAngle =
       input.steering -
       Math.atan2(
-        lateralSpeed + frontDistance * yawRate,
+        lateralSpeedAtCg + frontDistance * yawRate,
         speedForAngles,
       )
     rearSlipAngle =
       -Math.atan2(
-        lateralSpeed - rearDistance * yawRate,
+        lateralSpeedAtCg - rearDistance * yawRate,
         speedForAngles,
       )
 
@@ -424,7 +448,7 @@ export function stepTireDynamics(
     // drifting car can keep rotating while its velocity never realigns with
     // the body, producing the non-physical permanent-donut state.
     const longitudinalCouplingAcceleration =
-      lateralSpeed * yawRate
+      lateralSpeedAtCg * yawRate
     const lateralAcceleration =
       frontLateralAcceleration +
       rearLateralAcceleration -
@@ -439,27 +463,33 @@ export function stepTireDynamics(
 
     longitudinalSpeed +=
       longitudinalCouplingAcceleration * h
-    lateralSpeed += lateralAcceleration * h
+    lateralSpeedAtCg += lateralAcceleration * h
     yawRate += yawAcceleration * h
 
     // Tire scrub dissipates slip energy while the body-frame coupling above
     // preserves the correct exchange between longitudinal/lateral components.
-    lateralSpeed *= Math.exp(-0.10 * h)
+    lateralSpeedAtCg *= Math.exp(-0.10 * h)
     yawRate *= Math.exp(-0.06 * h)
   }
 
+  yawRate = clamp(yawRate, -3.5, 3.5)
+  let lateralSpeed =
+    lateralSpeedAtCg - cgForwardOffset * yawRate
   const groundSpeed = Math.hypot(
     longitudinalSpeed,
     lateralSpeed,
   )
   const lateralLimit = groundSpeed * 1.4 + 2
-  lateralSpeed = clamp(lateralSpeed, -lateralLimit, lateralLimit)
+  lateralSpeed = clamp(
+    lateralSpeed,
+    -lateralLimit,
+    lateralLimit,
+  )
   longitudinalSpeed = clamp(
     longitudinalSpeed,
     -groundSpeed * 1.25 - 1,
     groundSpeed * 1.25 + 1,
   )
-  yawRate = clamp(yawRate, -3.5, 3.5)
 
   const lateralAccelerationMps2 =
     frontLateralAcceleration + rearLateralAcceleration
