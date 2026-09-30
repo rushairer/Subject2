@@ -91,6 +91,11 @@ async function expectProgressiveKeyboardPedals(page: Page) {
   } finally {
     await page.keyboard.up('4')
   }
+  // Releasing a fixed throttle key must stop requesting 40% immediately.
+  // The exact smooth-return duration is covered by deterministic unit tests;
+  // software WebGL may not render enough frames here to observe zero reliably.
+  await expect.poll(throttleOpening, { timeout: 5_000 }).toBeLessThan(40)
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
   await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
 
   await page.keyboard.down('w')
