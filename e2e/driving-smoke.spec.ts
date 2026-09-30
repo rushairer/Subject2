@@ -85,6 +85,14 @@ async function expectProgressiveKeyboardPedals(page: Page) {
   // Exact release timing is covered in simulation tests; allow software-WebGL frames here.
   await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
 
+  await page.keyboard.down('4')
+  try {
+    await expect(throttle).toHaveAttribute('value', '40', { timeout: 5_000 })
+  } finally {
+    await page.keyboard.up('4')
+  }
+  await expect(throttle).toHaveAttribute('value', '0', { timeout: 5_000 })
+
   await page.keyboard.down('w')
   try {
     await expect.poll(throttleOpening).toBeGreaterThan(0)
