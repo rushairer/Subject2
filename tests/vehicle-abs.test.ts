@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  ABS_CONFIG,
   createAbsAxleState,
   stepAbsAxleState,
 } from '../src/sim/vehicleBrakeDynamics'
@@ -78,7 +79,9 @@ test('service ABS does not interfere with the mechanical parking brake path', ()
 test('full service braking activates ABS and prevents sustained rear-wheel lock', () => {
   const car = vehicle()
   let activeFrames = 0
-  let lockedFrames = 0
+  let lockedFramesWhileRegulating = 0
+  let consecutiveLockedFrames = 0
+  let longestLockedRun = 0
   let minimumRearRotation = 1
 
   for (let frame = 0; frame < 120; frame += 1) {
@@ -93,7 +96,21 @@ test('full service braking activates ABS and prevents sustained rear-wheel lock'
       grade: 0,
     })
     if (result.abs.active) activeFrames += 1
-    if (result.tire.rearWheelRotationFactor < 0.2) lockedFrames += 1
+    const inAbsSpeedRange =
+      Math.abs(car.speed) >= ABS_CONFIG.minimumSpeedMps
+    if (
+      inAbsSpeedRange &&
+      result.tire.rearWheelRotationFactor < 0.2
+    ) {
+      lockedFramesWhileRegulating += 1
+      consecutiveLockedFrames += 1
+      longestLockedRun = Math.max(
+        longestLockedRun,
+        consecutiveLockedFrames,
+      )
+    } else {
+      consecutiveLockedFrames = 0
+    }
     minimumRearRotation = Math.min(
       minimumRearRotation,
       result.tire.rearWheelRotationFactor,
@@ -102,8 +119,12 @@ test('full service braking activates ABS and prevents sustained rear-wheel lock'
 
   assert.ok(activeFrames > 5, `ABS active for only ${activeFrames} frames`)
   assert.ok(
-    lockedFrames < 20,
-    `rear remained near-lock for ${lockedFrames} frames`,
+    longestLockedRun <= 3,
+    `rear stayed continuously near-lock for ${longestLockedRun} frames while ABS should regulate`,
+  )
+  assert.ok(
+    lockedFramesWhileRegulating < 20,
+    `rear entered near-lock for ${lockedFramesWhileRegulating} regulated-speed frames`,
   )
   assert.ok(minimumRearRotation < 0.95)
   assert.ok(car.speed < 5, `car failed to decelerate: ${car.speed}`)
