@@ -7,67 +7,52 @@ import {
   PEDAL_CONFIG,
 } from '../src/input/pedalControls'
 
-test('throttle leaves time for light corrections, deepens on hold, and releases promptly', () => {
+test('normal keyboard hold stays at partial throttle and releases promptly', () => {
   const state = createPedalControlsState()
   const dt = 0.05
-
-  // First tap frame
-  const initial = stepPedalControls(state, {
-    throttleKey: true,
-    brakeKey: false,
-    clutchFloorKey: false,
-    clutchBiteKey: false,
-    automatic: false,
-    speed: 0,
-    gear: 1,
-    dt,
-  })
-
-  assert.equal(initial.throttle, PEDAL_CONFIG.tapThrottle)
-
-  // A deliberate half-second press must still be light, not already full power.
-  let finalThrottle = 0
-  for (let i = 0; i < 9; i++) {
-    finalThrottle = stepPedalControls(state, {
-      throttleKey: true,
-      brakeKey: false,
-      clutchFloorKey: false,
-      clutchBiteKey: false,
-      automatic: false,
-      speed: 10,
-      gear: 2,
-      dt,
-    }).throttle
-  }
-
-  assert.ok(finalThrottle >= 0.15 && finalThrottle < 0.3)
-
   const input = {
     throttleKey: true, brakeKey: false, clutchFloorKey: false, clutchBiteKey: false,
     automatic: false, speed: 10, gear: 2, dt,
   }
-  let previous = finalThrottle
-  for (let i = 0; i < 24; i++) {
-    finalThrottle = stepPedalControls(state, input).throttle
-    assert.ok(finalThrottle >= previous && finalThrottle <= 1)
-    previous = finalThrottle
-  }
-  assert.equal(finalThrottle, 1)
 
-  // Release throttle
-  const released = stepPedalControls(state, {
-    throttleKey: false,
-    brakeKey: false,
-    clutchFloorKey: false,
-    clutchBiteKey: false,
-    automatic: false,
-    speed: 10,
-    gear: 2,
-    dt,
-  })
-  assert.ok(released.throttle > 0 && released.throttle < 1)
+  for (let i = 0; i < 80; i++) {
+    assert.equal(stepPedalControls(state, input).throttle, PEDAL_CONFIG.tapThrottle)
+  }
+
+  const released = stepPedalControls(state, { ...input, throttleKey: false }).throttle
+  assert.ok(released >= 0 && released < PEDAL_CONFIG.tapThrottle)
   for (let i = 0; i < 6; i++) stepPedalControls(state, { ...input, throttleKey: false })
   assert.equal(state.throttle, 0)
+})
+
+test('quick double-tap then hold progressively reaches full throttle', () => {
+  const state = createPedalControlsState()
+  const input = {
+    throttleKey: true, brakeKey: false, clutchFloorKey: false, clutchBiteKey: false,
+    automatic: true, speed: 8, gear: 1, dt: 0.05,
+  }
+
+  assert.equal(stepPedalControls(state, input).throttle, PEDAL_CONFIG.tapThrottle)
+  stepPedalControls(state, { ...input, throttleKey: false })
+  const secondPress = stepPedalControls(state, input)
+  assert.ok(secondPress.throttle >= PEDAL_CONFIG.tapThrottle)
+
+  let throttle = secondPress.throttle
+  for (let i = 0; i < 24; i++) throttle = stepPedalControls(state, input).throttle
+  assert.equal(throttle, 1)
+})
+
+test('number-key fixed throttle is exact while held and brake still wins', () => {
+  const state = createPedalControlsState()
+  const base = {
+    throttleKey: false, brakeKey: false, clutchFloorKey: false, clutchBiteKey: false,
+    automatic: true, speed: 8, gear: 1, dt: 0.05,
+  }
+
+  assert.equal(stepPedalControls(state, { ...base, fixedThrottle: 0.1 }).throttle, 0.1)
+  assert.equal(stepPedalControls(state, { ...base, fixedThrottle: 0.8 }).throttle, 0.8)
+  assert.equal(stepPedalControls(state, { ...base, fixedThrottle: 0.9 }).throttle, 0.9)
+  assert.equal(stepPedalControls(state, { ...base, fixedThrottle: 0.9, brakeKey: true }).throttle, 0)
 })
 
 test('braking and input reset immediately cancel residual throttle', () => {
@@ -83,15 +68,16 @@ test('braking and input reset immediately cancel residual throttle', () => {
   assert.equal(stepPedalControls(state, { ...input, throttleKey: false }).throttle, 0)
 })
 
-test('repressing during release does not snap the pedal down to its initial opening', () => {
+test('repressing after release returns to stable partial throttle', () => {
   const state = createPedalControlsState()
   const input = {
     throttleKey: true, brakeKey: false, clutchFloorKey: false, clutchBiteKey: false,
     automatic: true, speed: 5, gear: 1, dt: 0.05,
   }
-  for (let i = 0; i < 40; i++) stepPedalControls(state, input)
+  stepPedalControls(state, input)
   const release = stepPedalControls(state, { ...input, throttleKey: false }).throttle
-  assert.equal(stepPedalControls(state, input).throttle, release)
+  assert.ok(release < PEDAL_CONFIG.tapThrottle)
+  assert.equal(stepPedalControls(state, input).throttle, PEDAL_CONFIG.tapThrottle)
 })
 
 test('progressive brake provides gentle deceleration on tap and full brake on hold', () => {
