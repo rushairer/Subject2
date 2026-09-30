@@ -133,6 +133,9 @@ interface Vehicle {
   biteLatched?: boolean
   frontWheelRotationFactor?: number
   rearWheelRotationFactor?: number
+  absFrontPressureFactor?: number
+  absRearPressureFactor?: number
+  absActive?: boolean
   lateralSpeed?: number
   yawRate?: number
 }
@@ -249,6 +252,9 @@ const initialVehicle = (
     biteLatched: false,
     frontWheelRotationFactor: 1,
     rearWheelRotationFactor: 1,
+    absFrontPressureFactor: 1,
+    absRearPressureFactor: 1,
+    absActive: false,
     lateralSpeed: 0,
     yawRate: 0,
   }

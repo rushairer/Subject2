@@ -177,7 +177,7 @@ test('front-drive acceleration consumes front tire grip during a saturated high-
 })
 
 
-test('full service braking can publish front longitudinal lock without inventing yaw', () => {
+test('with ABS disabled, hard braking can lock the unloaded rear axle without inventing yaw', () => {
   const car = vehicle({ speed: 14 })
 
   const result = stepVehiclePhysics(car, {
