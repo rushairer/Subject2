@@ -676,9 +676,18 @@ test('training center coach demo auto-takes over without polluting personal hist
   await expect(demoStatus).not.toContainText('科目二模拟考试')
   await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
   await expect(page.getByRole('button', { name: '结束示范并查看复盘' })).toBeVisible()
-  await expect(
-    page.getByRole('complementary', { name: '教练实时讲解' }),
-  ).toBeVisible({ timeout: 10_000 })
+  const teaching = page.getByRole('complementary', { name: '教练实时讲解' })
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: '我来接管' }).click()
+  await expect(teaching).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '教练接管' })).toBeVisible()
+  await expect(demoStatus).toContainText(/教练示范 · 科目二 \d+\/\d+ ·/)
+
+  await page.getByRole('button', { name: '教练接管' }).click()
+  await expect(page.getByRole('button', { name: '我来接管' })).toBeVisible()
+  await expect(teaching).toBeVisible({ timeout: 10_000 })
+  await expect(demoStatus).toContainText(/教练示范 · 科目二 \d+\/\d+ ·/)
 
   await page.getByRole('button', { name: '结束示范并查看复盘' }).click()
 
