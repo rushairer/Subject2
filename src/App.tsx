@@ -46,6 +46,7 @@ import {
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { TireSkidMarks } from './sim/TireSkidMarks'
+import { TireSmoke } from './sim/TireSmoke'
 import type { TireTelemetry } from './sim/vehicleTireDynamics'
 import { forwardFromHeading, rightFromHeading, worldPointFromVehicle } from './sim/vehicleFrame'
 import { ExamReplay, type TrajectorySample } from './replay/ExamReplay'
@@ -1001,6 +1002,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       <Road />
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
+    <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>

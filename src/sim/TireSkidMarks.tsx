@@ -3,11 +3,10 @@ import { useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { TRAINING_CAR } from './vehicleDimensions'
 import { wheelContactFootprints, type WheelId } from './wheelContact'
+import { TIRE_EFFECT_THRESHOLDS, wheelSkidSeverity } from './tireEffects'
 import type { TireTelemetry } from './vehicleTireDynamics'
 
 const MARK_CAPACITY = 1400
-const MIN_MARK_SPEED_MPS = 1.5
-const MIN_SKID_SEVERITY = 0.18
 const MIN_SEGMENT_METERS = 0.10
 const MAX_SEGMENT_METERS = 0.65
 
@@ -24,7 +23,6 @@ interface MarkPoint {
   z: number
 }
 
-const isFrontWheel = (id: WheelId) => id.startsWith('front-')
 
 /**
  * Persistent road-space tire marks driven exclusively by shared tire telemetry.
@@ -55,13 +53,14 @@ export function TireSkidMarks({
     const car = vehicle.current
     const speed = Math.abs(car.speed)
     for (const wheel of wheelContactFootprints(car)) {
-      const severity = isFrontWheel(wheel.id)
-        ? tire.frontSkidSeverity
-        : tire.rearSkidSeverity
+      const severity = wheelSkidSeverity(tire, wheel.id)
       const current = wheel.center
       const prior = previous.current[wheel.id]
 
-      if (speed < MIN_MARK_SPEED_MPS || severity < MIN_SKID_SEVERITY) {
+      if (
+        speed < TIRE_EFFECT_THRESHOLDS.markMinimumSpeedMps ||
+        severity < TIRE_EFFECT_THRESHOLDS.markMinimumSeverity
+      ) {
         previous.current[wheel.id] = undefined
         continue
       }
