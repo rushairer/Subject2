@@ -8,6 +8,13 @@ import {
 } from './vehicleCollision'
 import { orientedRectangleFootprint, vehicleBodyFootprint } from './vehicleFootprint'
 import { forwardFromHeading, rightFromHeading, type XZVector } from './vehicleFrame'
+import {
+  interpolateCollisionCircle,
+  interpolateCollisionPose,
+  sweptCircleContactFraction,
+  sweptPolygonContactFraction,
+  sweptVehicleContactFraction,
+} from './sweptCollision'
 
 export type CollisionKind = 'pedestrian' | 'vehicle' | 'scooter' | 'pole' | 'tree' | 'building' | 'cone'
 
@@ -334,6 +341,114 @@ function resolveFootprintImpact(
     x: -collision.normal.x,
     z: -collision.normal.z,
   }, collision.penetration, actorVelocity)
+}
+
+/**
+ * A swept query finds the first contact on the body-center path. Reuse the
+ * existing narrow-phase impulse, separation, actor animation and scoring
+ * pipeline at that contact. Do not apply a synthetic speed clamp or teleport
+ * past an object that the final-frame overlap test would have missed.
+ */
+function resolveFirstSweptContact(
+  player: InteractiveVehicle,
+  before: VehiclePose | undefined,
+  fraction: number | null,
+  atFraction: (fraction: number) => CollisionImpact,
+  atEnd: () => CollisionImpact,
+): CollisionImpact {
+  if (!before || fraction === null) return atEnd()
+  const end = { x: player.x, z: player.z, heading: player.heading }
+
+  // Conservative advancement stops within a micrometre of contact. Step a
+  // small additional fraction to obtain an actual overlapping manifold from
+  // the unchanged narrow-phase resolver; near misses stay misses.
+  for (const margin of [0, 0.00001, 0.0001, 0.001, 0.005]) {
+    const contactFraction = Math.min(1, fraction + margin)
+    const contactPose = interpolateCollisionPose(before, end, contactFraction)
+    player.x = contactPose.x
+    player.z = contactPose.z
+    player.heading = contactPose.heading
+    const impact = atFraction(contactFraction)
+    if (impact.collided) return impact
+  }
+
+  player.x = end.x
+  player.z = end.z
+  player.heading = end.heading
+  return atEnd()
+}
+
+export function resolveSweptCircleImpact(
+  player: InteractiveVehicle,
+  playerBefore: VehiclePose | undefined,
+  obstacle: CircleObstacle,
+  kind: CollisionKind,
+  actorVelocity: XZVector = { x: 0, z: 0 },
+  obstacleBefore: CircleObstacle = obstacle,
+): CollisionImpact {
+  const fraction = playerBefore
+    ? sweptCircleContactFraction(playerBefore, player, obstacleBefore, obstacle)
+    : null
+  return resolveFirstSweptContact(player, playerBefore, fraction,
+    t => resolveCircleImpact(player,
+      interpolateCollisionCircle(obstacleBefore, obstacle, t), kind, actorVelocity),
+    () => resolveCircleImpact(player, obstacle, kind, actorVelocity))
+}
+
+export function resolveSweptCircleCompoundImpact(
+  player: InteractiveVehicle,
+  playerBefore: VehiclePose | undefined,
+  obstacles: readonly CircleObstacle[],
+  kind: CollisionKind,
+  actorVelocity: XZVector = { x: 0, z: 0 },
+  obstaclesBefore: readonly CircleObstacle[] = obstacles,
+): CollisionImpact {
+  let earliest: number | null = null
+  const canSweep = playerBefore && obstaclesBefore.length === obstacles.length
+  if (canSweep) {
+    for (let i = 0; i < obstacles.length; i += 1) {
+      const fraction = sweptCircleContactFraction(
+        playerBefore, player, obstaclesBefore[i], obstacles[i],
+      )
+      if (fraction !== null && (earliest === null || fraction < earliest)) earliest = fraction
+    }
+  }
+  return resolveFirstSweptContact(player, playerBefore, earliest,
+    t => resolveCircleCompoundImpact(player,
+      obstacles.map((obstacle, i) =>
+        interpolateCollisionCircle(obstaclesBefore[i], obstacle, t)),
+      kind, actorVelocity),
+    () => resolveCircleCompoundImpact(player, obstacles, kind, actorVelocity))
+}
+
+export function resolveSweptVehicleImpact(
+  player: InteractiveVehicle,
+  playerBefore: VehiclePose | undefined,
+  actor: VehiclePose,
+  dimensions: { lengthMeters: number; widthMeters: number },
+  actorVelocity: XZVector = { x: 0, z: 0 },
+  actorBefore: VehiclePose = actor,
+): CollisionImpact {
+  const fraction = playerBefore
+    ? sweptVehicleContactFraction(playerBefore, player, actorBefore, actor, dimensions)
+    : null
+  return resolveFirstSweptContact(player, playerBefore, fraction,
+    t => resolveVehicleImpact(player,
+      interpolateCollisionPose(actorBefore, actor, t), dimensions, actorVelocity),
+    () => resolveVehicleImpact(player, actor, dimensions, actorVelocity))
+}
+
+export function resolveSweptPolygonImpact(
+  player: InteractiveVehicle,
+  playerBefore: VehiclePose | undefined,
+  polygon: readonly XZVector[],
+): CollisionImpact {
+  const fraction = playerBefore
+    ? sweptPolygonContactFraction(playerBefore, player, polygon)
+    : null
+  return resolveFirstSweptContact(player, playerBefore, fraction,
+    () => resolvePolygonImpact(player, polygon, 'building'),
+    () => resolvePolygonImpact(player, polygon, 'building'))
 }
 
 export interface CollisionMotion {
