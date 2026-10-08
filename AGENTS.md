@@ -648,3 +648,11 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Stay in the dynamic model while meaningful slip/yaw residual remains, using ground speed rather than longitudinal speed alone for recovery gating. Return to the exact low-speed kinematic model only after residuals fall below shared recovery thresholds.
 - Dynamic yaw moments are solved about the physical center of gravity, not the geometric body center. Front/rear axle moment arms must remain consistent with the configured static axle-load fraction and sum to wheelbase; convert lateral velocity between CG and geometric body-center references at the tire-model boundary.
 - Reverse-gear Subject 2 motion remains on the deterministic kinematic bicycle even if stale forward-slip state is present; the forward-road-speed dynamic tire solver must never leak into parking reverse geometry. Changes to drift recovery require regressions for both a controlled handbrake slide that returns to stable forward travel after release/centering/moderate FWD throttle and reverse-gear isolation.
+
+
+## Bounded frame-time physics
+
+- `src/sim/vehiclePhysics.ts` must integrate frame deltas above 1/60 second using bounded physics substeps while holding the caller's controls constant. At 60 Hz or faster, preserve the existing single-step vehicle behavior so canonical Subject 2 coach paths do not drift.
+- Aggregate transient events (especially a C1 engine stall) across every substep; returning only the final substep's `stalled` flag hides a genuine failure.
+- Use the same powertrain, brake, tire, rear-axle parking geometry and shared telemetry on every substep; do not bypass course judges or teleport poses.
+- Changes require deterministic comparisons of long-frame and equivalent repeated short-frame behavior across reverse parking, dynamic handbrake slip, hard ABS braking and rotated uphill rollback.
