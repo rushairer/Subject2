@@ -64,9 +64,11 @@
 ## 本地运行
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+项目提交了 npm lockfile，开发机和 CI 使用 `npm ci` 安装锁定的完整依赖树；仅在明确升级依赖时再运行 `npm install` 并提交新的 `package-lock.json`。
 
 生产构建与回归：
 
