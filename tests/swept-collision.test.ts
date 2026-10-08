@@ -133,15 +133,15 @@ test('moving vehicle sweeps preserve the oriented actor footprint, not a center 
 
 test('an oncoming car crossing a stopped player is detected from relative travel', () => {
   const player = car(0, 0, 0, 0)
-  const actorBefore = { x: -8, z: 0, heading: Math.PI / 2 }
-  const actorAfter = { x: 8, z: 0, heading: Math.PI / 2 }
+  const actorBefore = { x: -6, z: 0, heading: Math.PI / 2 }
+  const actorAfter = { x: 6, z: 0, heading: Math.PI / 2 }
   const dimensions = { lengthMeters: 4.2, widthMeters: 1.9 }
   assert.equal(sweptVehicleContactFraction(player, player, actorBefore,
     actorAfter, dimensions) !== null, true)
   const impact = resolveSweptVehicleImpact(player, player,
-    actorAfter, dimensions, { x: 16, z: 0 }, actorBefore)
+    actorAfter, dimensions, { x: 12, z: 0 }, actorBefore)
   assert.equal(impact.collided, true)
-  close(impact.impactSpeed, 16)
+  close(impact.impactSpeed, 12)
   close(player.speed, 0)
 })
 
