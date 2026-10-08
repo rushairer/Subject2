@@ -380,17 +380,19 @@ export function stepVehiclePhysics(
       )
     }
 
-    // Use the same substep-integrated displacement as the CG tire solver.
-    // Applying the final yaw/speed to an entire long frame magnifies slides.
-    const forwardStart = forwardFromHeading(headingBefore)
-    const rightStart = rightFromHeading(headingBefore)
-    vehicle.x +=
-      forwardStart.x * dynamics.motion.forwardMeters +
-      rightStart.x * dynamics.motion.rightMeters
-    vehicle.z +=
-      forwardStart.z * dynamics.motion.forwardMeters +
-      rightStart.z * dynamics.motion.rightMeters
-    vehicle.heading = headingBefore + dynamics.motion.headingDeltaRadians
+    const headingDelta = vehicle.yawRate * dt
+    const headingMid = headingBefore + headingDelta * 0.5
+    const forwardMid = forwardFromHeading(headingMid)
+    const rightMid = rightFromHeading(headingMid)
+    vehicle.x += (
+      forwardMid.x * vehicle.speed +
+      rightMid.x * vehicle.lateralSpeed
+    ) * dt
+    vehicle.z += (
+      forwardMid.z * vehicle.speed +
+      rightMid.z * vehicle.lateralSpeed
+    ) * dt
+    vehicle.heading = headingBefore + headingDelta
     tire = dynamics.telemetry
   } else {
     // Preserve the exact rear-axle kinematic bicycle at low speed. Subject 2
