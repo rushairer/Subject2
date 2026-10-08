@@ -80,7 +80,10 @@ export function longitudinalGravityAcceleration(
   return -grade * 9.81 * uphillAlignment
 }
 
-export function stepVehiclePhysics(
+// Internal integrator for one bounded physics step. Keep the legacy 60 Hz
+// execution path unchanged so parking geometry and coach trajectories retain
+// their existing deterministic reference.
+function stepVehiclePhysicsSubstep(
   vehicle: PhysicsVehicle,
   input: PhysicsInput,
   dt: number,
@@ -425,4 +428,39 @@ export function stepVehiclePhysics(
   vehicle.frontWheelRotationFactor = tire.frontWheelRotationFactor
   vehicle.rearWheelRotationFactor = tire.rearWheelRotationFactor
   return { stalled, tire, abs }
+}
+
+
+/** Long render frames must not turn into one large, unstable physics step. */
+export const MAX_PHYSICS_STEP_SECONDS = 1 / 60
+
+/**
+ * Advance the same drivetrain, tires, ABS and rigid-body pose through bounded
+ * substeps. At 60 Hz or faster this is the existing one-step integrator; at
+ * lower frame rates controls are held constant while physics catches up.
+ * Keep the stall event from any internal step, not just the final step.
+ */
+export function stepVehiclePhysics(
+  vehicle: PhysicsVehicle,
+  input: PhysicsInput,
+  dt: number,
+  options: PhysicsOptions,
+): PhysicsStepResult {
+  if (!Number.isFinite(dt)) {
+    return stepVehiclePhysicsSubstep(vehicle, input, 0, options)
+  }
+  if (dt <= MAX_PHYSICS_STEP_SECONDS) {
+    return stepVehiclePhysicsSubstep(vehicle, input, dt, options)
+  }
+
+  const count = Math.ceil(dt / MAX_PHYSICS_STEP_SECONDS)
+  const h = dt / count
+  let stalled = false
+  let last: PhysicsStepResult | undefined
+  for (let i = 0; i < count; i += 1) {
+    last = stepVehiclePhysicsSubstep(vehicle, input, h, options)
+    stalled ||= last.stalled
+  }
+  // A positive dt always takes at least one substep.
+  return { ...last!, stalled }
 }
