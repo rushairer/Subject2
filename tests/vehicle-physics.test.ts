@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { DRIVING_RULES } from '../src/rules/drivingRules'
 import test from 'node:test'
 import { SUBJECT2_EXAM_PLACEMENTS } from '../src/subject2/subject2ExamLayout'
 import {
   longitudinalGravityAcceleration,
+  MAX_PHYSICS_STEP_SECONDS,
   stepVehiclePhysics,
   type PhysicsVehicle,
 } from '../src/sim/vehiclePhysics'
@@ -149,4 +151,92 @@ test('downhill gravity can carry the vehicle beyond the former 57.6 km/h clamp',
   const speedKmh = downhill.speed * 3.6
   assert.ok(speedKmh > 60, `downhill speed still looks hard-capped: ${speedKmh}`)
   assert.ok(speedKmh < 90, `road load failed to bound short downhill acceleration: ${speedKmh}`)
+})
+
+
+test('long render frames match repeated bounded steps for parking, ABS and drift', () => {
+  const cases: {
+    title: string
+    car: PhysicsVehicle
+    input: Parameters<typeof stepVehiclePhysics>[1]
+    options: Parameters<typeof stepVehiclePhysics>[3]
+  }[] = [
+    {
+      title: 'reverse parking kinematics',
+      car: { ...vehicle(0.3), speed: -1.1, gear: -1, steeringWheelAngle: -1.3 },
+      input: { ...idleInput, steeringWheelTarget: -1.3 },
+      options: { automatic: false, grade: 0 },
+    },
+    {
+      title: 'high-speed moving handbrake with lateral slip',
+      car: { ...vehicle(0.2, true), speed: 12, gear: 3, steeringWheelAngle: 1.5 },
+      input: { ...idleInput, steeringWheelTarget: 1.5 },
+      options: { automatic: true, grade: 0 },
+    },
+    {
+      title: 'axle-selective ABS under hard braking',
+      car: { ...vehicle(0), speed: 14, gear: 1 },
+      input: { ...idleInput, brake: 1, steeringWheelTarget: 0 },
+      options: { automatic: true, grade: 0 },
+    },
+    {
+      title: 'rotated uphill rollback',
+      car: { ...vehicle(Math.PI / 2), gear: 0 },
+      input: idleInput,
+      options: { automatic: false, grade: 0.12, gradeHeading: Math.PI / 2 },
+    },
+  ]
+
+  const frameSeconds = 0.1
+  const steps = Math.ceil(frameSeconds / MAX_PHYSICS_STEP_SECONDS)
+  const h = frameSeconds / steps
+  for (const scenario of cases) {
+    const coarse = structuredClone(scenario.car)
+    const reference = structuredClone(scenario.car)
+    const oneFrame = stepVehiclePhysics(
+      coarse, scenario.input, frameSeconds, scenario.options,
+    )
+    let lastStep: ReturnType<typeof stepVehiclePhysics> | undefined
+    let observedStall = false
+    for (let i = 0; i < steps; i += 1) {
+      lastStep = stepVehiclePhysics(
+        reference, scenario.input, h, scenario.options,
+      )
+      observedStall ||= lastStep.stalled
+    }
+
+    assert.deepEqual(coarse, reference, scenario.title)
+    assert.deepEqual(oneFrame, { ...lastStep!, stalled: observedStall }, scenario.title)
+    assert.ok(Number.isFinite(coarse.heading), scenario.title)
+    assert.ok(Number.isFinite(coarse.speed), scenario.title)
+  }
+})
+
+test('a C1 engine stall in the first substep survives an entire long frame', () => {
+  const manual = {
+    ...vehicle(0, true),
+    gear: 1,
+    engineOn: true,
+    engineRpm: DRIVING_RULES.manualTransmission.idleRpm,
+    stallTimer: DRIVING_RULES.manualTransmission.stallDelaySeconds - 0.005,
+  }
+  const result = stepVehiclePhysics(manual, idleInput, 0.15, {
+    automatic: false, grade: 0,
+  })
+  assert.equal(result.stalled, true)
+  assert.equal(manual.engineOn, false)
+  assert.equal(manual.engineRpm, 0)
+})
+
+test('invalid frame delta does not corrupt vehicle geometry', () => {
+  const car = vehicle(0.4)
+  const pose = { x: car.x, z: car.z, heading: car.heading, speed: car.speed }
+  const result = stepVehiclePhysics(car, idleInput, Number.POSITIVE_INFINITY, {
+    automatic: true, grade: 0,
+  })
+  assert.equal(result.stalled, false)
+  assert.deepEqual(
+    { x: car.x, z: car.z, heading: car.heading, speed: car.speed },
+    pose,
+  )
 })
