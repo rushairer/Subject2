@@ -402,19 +402,8 @@ export function stepTireDynamics(
     input,
     longitudinalSpeed * yawRate,
   )
-  // Displacement belongs to the geometric body center, as do collision and
-  // exam coordinates. Integrate it at the tire solver's substep cadence so
-  // a longer render frame does not apply its final yaw/velocity to the whole
-  // frame and exaggerate drift travel.
-  let frameHeadingDelta = 0
-  let frameForwardMeters = 0
-  let frameRightMeters = 0
 
   for (let step = 0; step < substeps; step += 1) {
-    const previousLongitudinalSpeed = longitudinalSpeed
-    const previousYawRate = yawRate
-    const previousLateralSpeedAtCenter =
-      lateralSpeedAtCg - cgForwardOffset * yawRate
     const dynamicInput = {
       ...input,
       longitudinalSpeed,
@@ -481,26 +470,6 @@ export function stepTireDynamics(
     // preserves the correct exchange between longitudinal/lateral components.
     lateralSpeedAtCg *= Math.exp(-0.10 * h)
     yawRate *= Math.exp(-0.06 * h)
-
-    // Midpoint integration in the frame's starting body axes. The tire solver
-    // evolves CG lateral velocity, but the public pose follows body-center
-    // velocity (vCG minus the CG offset times yaw rate).
-    const headingStep = (previousYawRate + yawRate) * h * 0.5
-    const midHeading = frameHeadingDelta + headingStep * 0.5
-    const averageForward =
-      (previousLongitudinalSpeed + longitudinalSpeed) * 0.5
-    const averageRight =
-      (previousLateralSpeedAtCenter +
-        lateralSpeedAtCg - cgForwardOffset * yawRate) * 0.5
-    frameForwardMeters += (
-      Math.cos(midHeading) * averageForward -
-      Math.sin(midHeading) * averageRight
-    ) * h
-    frameRightMeters += (
-      Math.sin(midHeading) * averageForward +
-      Math.cos(midHeading) * averageRight
-    ) * h
-    frameHeadingDelta += headingStep
   }
 
   yawRate = clamp(yawRate, -3.5, 3.5)
@@ -563,11 +532,6 @@ export function stepTireDynamics(
 
   return {
     state: nextState,
-    motion: {
-      forwardMeters: frameForwardMeters,
-      rightMeters: frameRightMeters,
-      headingDeltaRadians: frameHeadingDelta,
-    },
     telemetry: {
       model: 'dynamic',
       driveAxle: TRAINING_CAR_DYNAMICS.driveAxle,
