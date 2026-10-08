@@ -596,6 +596,13 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Coach-demo copy must reflect the selected time of day: daytime full Subject 3 demonstration starts with the simulated light preflight, while nighttime demonstration enters night road driving directly. Result metadata for full demos must say `科目二完整示范` / `科目三完整示范`, never `模拟考试`.
 
 
+## Deterministic dependency installs
+
+- Commit `package-lock.json` and keep it consistent with `package.json`. CI and ordinary local development must use `npm ci`; do not resolve unpinned transitive updates on each release.
+- GitHub Pages must run unit tests, TypeScript/Vite build, and Chromium/WebGL browser smoke before deployment. Keep npm caching keyed to the committed lockfile.
+- An intentional dependency upgrade updates both manifest and lockfile in the same PR, followed by the full test/build/E2E gate.
+
+
 ## Powertrain speed model
 
 - Reachable vehicle top speed must emerge from drivetrain force, gear ratio, engine-speed torque taper, rolling resistance, aerodynamic drag and grade. Do not use an exam-speed limit or a low vehicle-speed clamp as a substitute for powertrain physics.
