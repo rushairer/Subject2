@@ -24,6 +24,20 @@ export interface InteractiveVehicle extends VehiclePose {
 
 export type Vehicle = InteractiveVehicle
 
+// One snapshot per physics frame, shared by every course collision adapter.
+// Weak keys avoid retaining completed practice sessions or replaced vehicles.
+const beforePhysicsPose = new WeakMap<VehiclePose, VehiclePose>()
+
+export function recordVehicleBeforePhysics(vehicle: VehiclePose): void {
+  beforePhysicsPose.set(vehicle, {
+    x: vehicle.x, z: vehicle.z, heading: vehicle.heading,
+  })
+}
+
+export function vehiclePoseBeforePhysics(vehicle: VehiclePose): VehiclePose | undefined {
+  return beforePhysicsPose.get(vehicle)
+}
+
 export interface VehicleCircleCollisionResult {
   colliding: boolean
   distance: number

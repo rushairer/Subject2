@@ -427,6 +427,15 @@ For any subsystem the user reports as "previously correct":
 - `courseGroundGeometry.ts` is shared by ground rendering and outer-area judging. The outer-area failure severity belongs in `subject2Rules.ts`, while Subject 3 road containment remains in its state machine and scoring matrix.
 
 
+## Continuous frame collision detection
+
+- `src/sim/vehiclePhysics.ts` records the rigid-body start pose once per display frame before its internal bounded substeps. The shared `vehiclePoseBeforePhysics` snapshot in `vehicleCollision.ts` uses weak keys and must never enter persisted session, scoring or replay records.
+- `src/sim/sweptCollision.ts` finds the earliest contact along one frame's interpolated body path for compact circles, compound actors, convex buildings and fully oriented traffic vehicles. Moving actor previous/current world-space positions must participate in the relative sweep; never replace vehicle bodies with broad collision circles.
+- `useCollisionBody.ts` alone connects swept queries to `collisionResponse.ts`. Resolve the first actual contact with the established impulse, separation, animation, audio and existing score callback. A swept hit must not add a second infraction, change collision severity thresholds or bypass the normal vehicle physics.
+- If a start pose already overlaps an actor, retain normal discrete contact resolution; never rewind a car escaping an old overlap. Very large unrelated teleports and nonfinite shapes must not generate phantom impacts. Keep real near misses outside the geometry collision threshold.
+- Sweep checks must run after frame physics (-2), during shared collision resolution (-1), and before course judges, cameras and replay. The measured before/after frame pose must refer to the same mutable vehicle object.
+- Changes to collision sweeping require `tests/swept-collision.test.ts` coverage for forward and reverse thin-pole tunneling, crossing moving pedestrians, compact actor compounds, oriented cars, stationary buildings, rotated frames, genuine clearances, and stale/teleport rejection. Preserve existing coach and WebGL E2E gates.
+
 ## Browser and WebGL release gate
 
 Rendered driving behavior is release-critical and cannot be proven by Node-only state-machine tests.

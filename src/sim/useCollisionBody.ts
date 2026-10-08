@@ -5,15 +5,15 @@ import {
   applyCollisionMotion,
   collisionMotionPose,
   createCollisionMotion,
-  resolveCircleImpact,
-  resolveCircleCompoundImpact,
-  resolvePolygonImpact,
-  resolveVehicleImpact,
+  resolveSweptCircleImpact,
+  resolveSweptCircleCompoundImpact,
+  resolveSweptPolygonImpact,
+  resolveSweptVehicleImpact,
   stepCollisionMotion,
   type CollisionImpact,
   type CollisionKind,
 } from './collisionResponse'
-import type { CircleObstacle, InteractiveVehicle, VehiclePose } from './vehicleCollision'
+import { vehiclePoseBeforePhysics, type CircleObstacle, type InteractiveVehicle, type VehiclePose } from './vehicleCollision'
 import type { XZVector } from './vehicleFrame'
 
 /** Shared by every course. Shapes and velocities enter this adapter in world space.
@@ -37,6 +37,9 @@ export function useCollisionBody({
   const quietSeconds = useRef(Infinity)
   const reported = useRef(false)
   const lastSpeed = useRef(0)
+  const previousCircle = useRef<CircleObstacle | null>(null)
+  const previousCompound = useRef<CircleObstacle[] | null>(null)
+  const previousActor = useRef<VehiclePose | null>(null)
 
   const accept = (impact: CollisionImpact) => {
     if (!impact.collided) return impact
@@ -63,16 +66,33 @@ export function useCollisionBody({
       stepCollisionMotion(motion.current, kind, dt)
     },
     circle(obstacle: CircleObstacle, velocity?: XZVector) {
-      return player ? accept(resolveCircleImpact(player.current, obstacle, kind, velocity)) : undefined
+      const before = previousCircle.current ?? obstacle
+      previousCircle.current = { ...obstacle }
+      return player ? accept(resolveSweptCircleImpact(
+        player.current, vehiclePoseBeforePhysics(player.current),
+        obstacle, kind, velocity, before,
+      )) : undefined
     },
     circles(obstacles: readonly CircleObstacle[], velocity?: XZVector) {
-      return player ? accept(resolveCircleCompoundImpact(player.current, obstacles, kind, velocity)) : undefined
+      const before = previousCompound.current ?? obstacles
+      previousCompound.current = obstacles.map(circle => ({ ...circle }))
+      return player ? accept(resolveSweptCircleCompoundImpact(
+        player.current, vehiclePoseBeforePhysics(player.current),
+        obstacles, kind, velocity, before,
+      )) : undefined
     },
     vehicle(pose: VehiclePose, dimensions: { lengthMeters: number; widthMeters: number }, velocity?: XZVector) {
-      return player ? accept(resolveVehicleImpact(player.current, pose, dimensions, velocity)) : undefined
+      const before = previousActor.current ?? pose
+      previousActor.current = { ...pose }
+      return player ? accept(resolveSweptVehicleImpact(
+        player.current, vehiclePoseBeforePhysics(player.current),
+        pose, dimensions, velocity, before,
+      )) : undefined
     },
     polygon(points: readonly XZVector[]) {
-      return player ? accept(resolvePolygonImpact(player.current, points, 'building')) : undefined
+      return player ? accept(resolveSweptPolygonImpact(
+        player.current, vehiclePoseBeforePhysics(player.current), points,
+      )) : undefined
     },
     animate(heading: number) {
       const pose = collisionMotionPose(motion.current, kind, heading)

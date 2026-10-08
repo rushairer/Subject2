@@ -1,5 +1,6 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { forwardFromHeading, rightFromHeading } from './vehicleFrame'
+import { recordVehicleBeforePhysics } from './vehicleCollision'
 import {
   TRAINING_CAR_DYNAMICS,
   kinematicTireTelemetry,
@@ -446,6 +447,9 @@ export function stepVehiclePhysics(
   dt: number,
   options: PhysicsOptions,
 ): PhysicsStepResult {
+  // The collision pipeline runs after physics at frame priority -1. Expose
+  // the unmodified body pose once per frame, before any internal substeps.
+  recordVehicleBeforePhysics(vehicle)
   if (!Number.isFinite(dt)) {
     return stepVehiclePhysicsSubstep(vehicle, input, 0, options)
   }
