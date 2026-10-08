@@ -410,3 +410,47 @@ test('dynamic CG axle arms are consistent with the configured static weight dist
   )
   assert.ok(dynamics.cgForwardFromBodyCenterMeters > 0)
 })
+
+
+test('dynamic slide motion remains close across 30, 60 and 120 Hz frame rates', () => {
+  const simulate = (hz: number) => {
+    const roadAngle = 0.27
+    const car = vehicle({
+      speed: 10,
+      gear: 1,
+      engineOn: true,
+      engineRpm: 2200,
+      steering: roadAngle,
+      steeringWheelAngle: steeringWheelForRoadAngle(roadAngle),
+      handbrake: true,
+    })
+    let dynamicFrames = 0
+    for (let frame = 0; frame < hz * 3; frame += 1) {
+      if (frame >= hz * 0.3) car.handbrake = false
+      const recovering = frame >= hz * 0.3
+      const output = stepVehiclePhysics(car, {
+        throttle: recovering ? 0.38 : 0,
+        brake: 0,
+        clutch: 0,
+        steer: 0,
+        steeringWheelTarget: recovering ? 0 : steeringWheelForRoadAngle(roadAngle),
+      }, 1 / hz, { automatic: true, grade: 0 })
+      assert.ok(Number.isFinite(car.x) && Number.isFinite(car.z))
+      assert.ok(Number.isFinite(car.heading) && Number.isFinite(car.speed))
+      assert.ok(Number.isFinite(car.lateralSpeed) && Number.isFinite(car.yawRate))
+      if (output.tire.model === 'dynamic') dynamicFrames++
+    }
+    assert.ok(dynamicFrames > hz / 5, 'test must exercise dynamic tire integration')
+    assert.ok(car.speed > 1, 'recovered car must move forward')
+    return car
+  }
+
+  const baseline = simulate(120)
+  for (const hz of [30, 60]) {
+    const actual = simulate(hz)
+    const positionError = Math.hypot(actual.x - baseline.x, actual.z - baseline.z)
+    assert.ok(positionError < 2, `${hz}Hz drift location diverged by ${positionError}m`)
+    assert.ok(Math.abs(actual.speed - baseline.speed) < 1, `${hz}Hz speed diverged`)
+    assert.ok(Math.abs(actual.heading - baseline.heading) < 0.4, `${hz}Hz heading diverged`)
+  }
+})
