@@ -648,3 +648,10 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Stay in the dynamic model while meaningful slip/yaw residual remains, using ground speed rather than longitudinal speed alone for recovery gating. Return to the exact low-speed kinematic model only after residuals fall below shared recovery thresholds.
 - Dynamic yaw moments are solved about the physical center of gravity, not the geometric body center. Front/rear axle moment arms must remain consistent with the configured static axle-load fraction and sum to wheelbase; convert lateral velocity between CG and geometric body-center references at the tire-model boundary.
 - Reverse-gear Subject 2 motion remains on the deterministic kinematic bicycle even if stale forward-slip state is present; the forward-road-speed dynamic tire solver must never leak into parking reverse geometry. Changes to drift recovery require regressions for both a controlled handbrake slide that returns to stable forward travel after release/centering/moderate FWD throttle and reverse-gear isolation.
+
+
+## Deterministic dependency installs
+
+- Commit `package-lock.json` and keep it consistent with `package.json`. CI and ordinary local development must use `npm ci`; do not resolve unpinned transitive updates on each release.
+- GitHub Pages must run unit tests, TypeScript/Vite build, and Chromium/WebGL browser smoke before deployment. Keep npm caching keyed to the committed lockfile.
+- An intentional dependency upgrade updates both manifest and lockfile in the same PR, followed by the full test/build/E2E gate.
