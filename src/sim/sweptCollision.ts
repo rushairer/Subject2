@@ -151,14 +151,6 @@ function convexFootprintGap(a: readonly XZVector[], b: readonly XZVector[]) {
   return closest
 }
 
-function polygonCenter(points: readonly XZVector[]) {
-  const sum = points.reduce((center, point) => ({
-    x: center.x + point.x,
-    z: center.z + point.z,
-  }), { x: 0, z: 0 })
-  return { x: sum.x / points.length, z: sum.z / points.length }
-}
-
 /** Oriented training car vs. a stationary convex polygon (buildings). */
 export function sweptPolygonContactFraction(
   playerBefore: VehiclePose,
