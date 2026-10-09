@@ -655,6 +655,15 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Only a `surface: 'rain'`, **first-person** practice session mounts rain windshield details or shows wiper controls. Rear-view mirrors, external camera modes, other road presets, exams and full demonstrations must not inherit the glass overlay. Wiper mode is UI state and must never alter steering, collision, vehicle physics weather or scoring.
 - Regressions require `tests/rain-windshield-visual.test.ts` coverage for real depth-to-decal sampling, world-grid stability, rising water coverage, actual windshield body coordinates, bounded physical blade sweep, both cycles and drop clearing. Browser smoke must run a real rain practice session, cycle wipers and perspectives, verify the live rain HUD and surface stays operational, and preserve normal WebGL/error/Pages release gates.
 
+## Rain-practice Golden Driver defensive braking
+
+- `src/coach/rainDefensiveBraking.ts` owns the rain-only predictive stopping envelope, derived from `effectiveRoadFriction('rain', ...)` and the same `TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration` used by real physics; it is a coaching heuristic, **not** an exam rule or an independent rain friction model.
+- `stepSubject3Coach` may accept optional rain road conditions **only** during explicit `surface: 'rain'` training. Existing dry, wet, low-grip, exam, one-click demonstration and no-road-conditions callers must preserve their exact previous outputs.
+- Feed rain guidance from the measured `PhysicsVehicle.localWaterDepthMm` field published by the real integrator. A one-frame-late measurement is acceptable; do not estimate random water patches inside the coach, modify physics weather, or use any render mesh transforms as collision evidence.
+- Reuse existing `observeSubject3LeadVehicle`, `observeSubject3CutInHazard` and `observeSubject3PedestrianHazard` telemetry. In rain practice, expand warning gaps and hazard lookahead based on available braking physics; keep the legacy dry thresholds and all existing `Subject3TrafficState` definitions unchanged.
+- The coach may command only realistic brakes, throttle, steering, gear and clutch. Preserve C1 clutch-before-stall and recovery from first gear; do not teleport past a collision, synthesize a pass, bypass the course judge or write new scoring rules.
+- `tests/rain-coach-defensive.test.ts` must cover water-and-speed-dependent stopping estimates, no phantom brake on invalid/stopped input, earlier rainy lead/scooter/pedestrian hazard response, strict dry compatibility, and continuous C1/C2 real-physics lead stop and resumed driving without collision or engine stalls. Keep full coach/physics/WebGL gates green before merging.
+
 ## Training-car tire dynamics
 
 - The canonical training car is front-engine/front-wheel drive for handling simulation. Engine drive torque consumes front-axle tire grip; do not model propulsion as rear-wheel drive or all-wheel drive.

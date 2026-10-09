@@ -743,6 +743,12 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
             session.time === 'night',
             subject3Traffic.current,
             session.subject3Practice,
+            session.surface === 'rain'
+              ? {
+                  surface: 'rain',
+                  localWaterDepthMm: v.localWaterDepthMm ?? 0,
+                }
+              : undefined,
           )
         : null
     if (subject3CoachStep) {
