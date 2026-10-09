@@ -7,6 +7,7 @@ import {
   type VehiclePose,
 } from './vehicleCollision'
 import { orientedRectangleFootprint, vehicleBodyFootprint } from './vehicleFootprint'
+import { TRAINING_CAR_DYNAMICS } from './vehicleTireDynamics'
 import { forwardFromHeading, rightFromHeading, type XZVector } from './vehicleFrame'
 import {
   interpolateCollisionCircle,
@@ -200,19 +201,61 @@ function separateContact(player: InteractiveVehicle, normal: XZVector, penetrati
   player.z -= normal.z * separation
 }
 
+/**
+ * The SAT penetration normal points toward the obstacle. Average all support
+ * corners on its facing side to avoid inventing an angular lever for a flat,
+ * centered bumper or door impact.
+ */
+function playerFacingContactPoint(player: InteractiveVehicle, normal: XZVector): XZVector {
+  const corners = vehicleBodyFootprint(player)
+  const projections = corners.map(point => point.x * normal.x + point.z * normal.z)
+  const maximum = Math.max(...projections)
+  let x = 0
+  let z = 0
+  let count = 0
+  for (let i = 0; i < corners.length; i += 1) {
+    if (maximum - projections[i] > 1e-7) continue
+    x += corners[i].x
+    z += corners[i].z
+    count += 1
+  }
+  return { x: x / count, z: z / count }
+}
+
 function resolveContact(
   player: InteractiveVehicle,
   kind: CollisionKind,
   normal: XZVector,
   penetration: number,
   incomingActorVelocity: XZVector,
+  contactPoint?: XZVector,
 ): CollisionImpact {
   const profile = COLLISION_PROFILES[kind]
   const actorVelocity = profile.movable ? incomingActorVelocity : { x: 0, z: 0 }
   const forward = forwardFromHeading(player.heading)
+  const right = rightFromHeading(player.heading)
   const normalAlongForward = forward.x * normal.x + forward.z * normal.z
-  const playerNormalSpeed = player.speed * normalAlongForward
+  const normalAlongRight = right.x * normal.x + right.z * normal.z
   const actorNormalSpeed = actorVelocity.x * normal.x + actorVelocity.z * normal.z
+
+  // The tire solver owns (u, v, yawRate) at the geometric body center; this
+  // collision response shares its real CG offset and yaw inertia. Synthetic
+  // legacy callers without planar state retain the original 1D response.
+  const planar =
+    Number.isFinite(player.lateralSpeed) && Number.isFinite(player.yawRate)
+  const cgForward = TRAINING_CAR_DYNAMICS.cgForwardFromBodyCenterMeters
+  const yaw = planar ? (player.yawRate ?? 0) : 0
+  const lateralAtCg = planar ? (player.lateralSpeed ?? 0) + cgForward * yaw : 0
+  const contact = contactPoint ?? { x: player.x, z: player.z }
+  const dx = contact.x - player.x
+  const dz = contact.z - player.z
+  const contactForward = dx * forward.x + dz * forward.z
+  const contactRight = dx * right.x + dz * right.z
+  // The same contact point is used for both the velocity and angular impulse.
+  const momentArm = (contactForward - cgForward) * normalAlongRight -
+    contactRight * normalAlongForward
+  const playerNormalSpeed = player.speed * normalAlongForward +
+    (planar ? lateralAtCg * normalAlongRight + yaw * momentArm : 0)
   const impactSpeed = Math.max(0, playerNormalSpeed - actorNormalSpeed)
 
   // Position correction is independent of speed: stationary overlap and retreat
@@ -220,12 +263,33 @@ function resolveContact(
   separateContact(player, normal, penetration)
 
   const inverseActorMass = profile.movable ? 1 / profile.relativeMass : 0
-  const impulse = (1 + profile.restitution) * impactSpeed / (1 + inverseActorMass)
-  if (playerNormalSpeed > 0 && impactSpeed > 0) {
-    // The powertrain has one signed speed, not a lateral velocity state. Project
-    // the collision impulse onto its forward axis, retaining glancing motion.
-    // Clamping preserves the selected travel direction: no synthetic rebound
-    // into reverse, acceleration from contact, or braking when driving away.
+  const inverseYawInertiaPerMass =
+    TRAINING_CAR_DYNAMICS.massKg / TRAINING_CAR_DYNAMICS.yawInertiaKgM2
+  const angularResponse = planar
+    ? momentArm * momentArm * inverseYawInertiaPerMass
+    : 0
+  const impulse = (1 + profile.restitution) * impactSpeed /
+    (1 + inverseActorMass + angularResponse)
+
+  if (planar && impactSpeed > 0) {
+    const initialSpeed = player.speed
+    const projectedForwardSpeed = initialSpeed - impulse * normalAlongForward
+    // Retain the drivetrain's signed forward motion convention: a collision
+    // cannot manufacture a gear reversal or raise longitudinal speed.
+    player.speed = Math.sign(initialSpeed) *
+      Math.min(Math.abs(initialSpeed),
+        Math.max(0, projectedForwardSpeed * Math.sign(initialSpeed)))
+    const nextYaw = Math.max(-TRAINING_CAR_DYNAMICS.maximumYawRateRps,
+      Math.min(TRAINING_CAR_DYNAMICS.maximumYawRateRps,
+        yaw - impulse * momentArm * inverseYawInertiaPerMass))
+    // Resolve lateral momentum at the CG, then restore the public body-center
+    // velocity after the yaw impulse. This avoids an artificial extra shove.
+    player.lateralSpeed =
+      lateralAtCg - impulse * normalAlongRight - cgForward * nextYaw
+    player.yawRate = nextYaw
+  } else if (playerNormalSpeed > 0 && impactSpeed > 0) {
+    // Compatibility path for older collision callers that only expose a
+    // signed longitudinal speed and have no planar tire state.
     const speedLoss = impulse * Math.abs(normalAlongForward)
     player.speed = Math.sign(player.speed) * Math.max(0, Math.abs(player.speed) - speedLoss)
   }
@@ -252,7 +316,7 @@ export function resolveCircleImpact(
 ): CollisionImpact {
   const collision = checkVehicleCircleCollision(player, obstacle)
   return collision.colliding
-    ? resolveContact(player, kind, collision.normal, collision.penetration, actorVelocity)
+    ? resolveContact(player, kind, collision.normal, collision.penetration, actorVelocity, collision.contactPoint)
     : noImpact(kind, actorVelocity)
 }
 
@@ -278,7 +342,7 @@ export function resolveCircleCompoundImpact(
   const initialContact = deepestCircleContact(player, obstacles)
   if (!initialContact) return noImpact(kind, actorVelocity)
 
-  const impact = resolveContact(player, kind, initialContact.normal, initialContact.penetration, actorVelocity)
+  const impact = resolveContact(player, kind, initialContact.normal, initialContact.penetration, actorVelocity, initialContact.contactPoint)
   // Each following pass corrects only position, without replaying either the
   // car slowdown or the actor's outgoing impulse for every overlapping proxy.
   const maximumPasses = Math.min(16, Math.max(4, obstacles.length * 2))
@@ -337,10 +401,12 @@ function resolveFootprintImpact(
   if (!collision.intersecting) return noImpact(kind, actorVelocity)
   // Shared SAT returns obstacle→player; all collision-response callers use the
   // opposite, player→obstacle convention used by circle contact geometry.
-  return resolveContact(player, kind, {
+  const normal = {
     x: -collision.normal.x,
     z: -collision.normal.z,
-  }, collision.penetration, actorVelocity)
+  }
+  return resolveContact(player, kind, normal, collision.penetration,
+    actorVelocity, playerFacingContactPoint(player, normal))
 }
 
 /**

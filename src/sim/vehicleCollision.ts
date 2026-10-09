@@ -19,7 +19,12 @@ export interface VehiclePose {
 }
 
 export interface InteractiveVehicle extends VehiclePose {
+  /** Signed body-forward velocity at the geometric center, in m/s. */
   speed: number
+  /** Body-center velocity toward the vehicle's right, when tire dynamics is available. */
+  lateralSpeed?: number
+  /** Positive vehicle-right angular velocity, in radians per second. */
+  yawRate?: number
 }
 
 export type Vehicle = InteractiveVehicle
