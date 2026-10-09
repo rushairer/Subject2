@@ -1,6 +1,7 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { normalizeHeadingDelta } from '../sim/vehicleFrame'
 import { TRAINING_CAR_DYNAMICS } from '../sim/vehicleTireDynamics'
+import { assistCoachStability } from './coachStabilityAssist'
 import {
   SUBJECT3_EVENTS,
   SUBJECT3_ROUTE_LENGTH,
@@ -23,6 +24,8 @@ export interface Subject3CoachVehicle {
   heading: number
   speed: number
   gear: number
+  lateralSpeed?: number
+  yawRate?: number
 }
 
 export interface Subject3CoachRuntime {
@@ -394,8 +397,14 @@ export function stepSubject3Coach(
     throttle = 0
   }
 
+  const stability = assistCoachStability(vehicle, {
+    throttle, brake, steeringWheelTarget,
+  })
+
   const status = defensive.reason
     ? `科目三示范 · ${defensive.reason}`
+    : stability.active && !waitingForStart && !stoppingForPullOver
+      ? '科目三示范 · 检测到侧滑，减油并反打方向恢复车身稳定'
     : runtime.defensiveRecovery
       ? automatic
         ? '科目三示范 · 危险解除，平稳恢复行驶'
@@ -411,10 +420,10 @@ export function stepSubject3Coach(
   return {
     runtime,
     command: {
-      throttle,
-      brake,
+      throttle: stability.throttle,
+      brake: stability.brake,
       clutch,
-      steeringWheelTarget,
+      steeringWheelTarget: stability.steeringWheelTarget,
       gear,
       engineOn: true,
       handbrake,
