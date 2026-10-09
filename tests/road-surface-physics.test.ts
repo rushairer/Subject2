@@ -26,7 +26,7 @@ function car(overrides: Partial<PhysicsVehicle> = {}): PhysicsVehicle {
 const idle = { throttle: 0, brake: 0, clutch: 0, steer: 0 }
 
 test('road surfaces are explicit finite ordered simulator grip presets', () => {
-  assert.deepEqual(ROAD_SURFACE_IDS, ['dry', 'wet', 'lowGrip'])
+  assert.deepEqual(ROAD_SURFACE_IDS, ['dry', 'wet', 'lowGrip', 'rain'])
   assert.equal(roadSurfaceFriction('dry'), TRAINING_CAR_DYNAMICS.tireFrictionCoefficient)
   assert.equal(relativeRoadGrip('dry'), 1)
   assert.ok(ROAD_SURFACES.dry.frictionCoefficient > ROAD_SURFACES.wet.frictionCoefficient)
