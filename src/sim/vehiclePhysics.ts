@@ -1,6 +1,7 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { forwardFromHeading, rightFromHeading } from './vehicleFrame'
 import { recordVehicleBeforePhysics } from './vehicleCollision'
+import { relativeRoadGrip, roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
 import {
   TRAINING_CAR_DYNAMICS,
   kinematicTireTelemetry,
@@ -65,6 +66,8 @@ export interface PhysicsOptions {
   gradeHeading?: number
   /** Defaults to the training car's production ABS configuration. */
   absEnabled?: boolean
+  /** Optional training condition. Unspecified keeps the exact dry baseline. */
+  surface?: RoadSurfaceId
 }
 
 export function longitudinalGravityAcceleration(
@@ -100,6 +103,7 @@ function stepVehiclePhysicsSubstep(
       driveAcceleration: 0,
       brake: input.brake,
       handbrake: vehicle.handbrake,
+      surface: options.surface,
     }, { lateralSpeed, yawRate })
     const abs = createAbsAxleState()
     return { stalled: false, tire, abs }
@@ -109,6 +113,7 @@ function stepVehiclePhysicsSubstep(
     grade,
     gradeHeading = 0,
     absEnabled = true,
+    surface = 'dry',
   } = options
   const powertrain = VEHICLE_POWERTRAIN
   vehicle.throttle = input.throttle
@@ -215,7 +220,14 @@ function stepVehiclePhysicsSubstep(
     // Creep is idle torque at walking speed, never propulsion at road speed.
     const automaticCreep = automatic ? powertrain.automaticCreepAcceleration * creepHeadroom * (1 - input.throttle) : 0
     const driveForce = (throttleForce + biteAssist + automaticCreep) * driveFactor * clutchEngagement
-    driveAcceleration = driveForce
+    // A wet front-drive axle cannot put unlimited engine torque into the
+    // road. Keep the dry branch bit-for-bit identical for existing exams.
+    const frontAxleTraction = roadSurfaceFriction(surface) *
+      TRAINING_CAR_DYNAMICS.gravityMps2 *
+      TRAINING_CAR_DYNAMICS.frontStaticWeightFraction
+    driveAcceleration = surface === 'dry'
+      ? driveForce
+      : Math.min(driveForce, frontAxleTraction)
     vehicle.speed += driveAcceleration * direction * dt
 
     const closedThrottle = Math.max(0, 1 - input.throttle / powertrain.engineBrakeReleaseThrottle)
@@ -257,6 +269,7 @@ function stepVehiclePhysicsSubstep(
     frontServiceBrakeFactor: previousAbs.frontPressureFactor,
     rearServiceBrakeFactor: previousAbs.rearPressureFactor,
     lateralAccelerationEstimate: vehicle.speed * previewYawRate,
+    surface,
   }, {
     lateralSpeed: vehicle.lateralSpeed ?? 0,
     yawRate: vehicle.yawRate ?? previewYawRate,
@@ -284,11 +297,17 @@ function stepVehiclePhysicsSubstep(
       (1 - TRAINING_CAR_DYNAMICS.serviceBrakeFrontBias) *
         abs.rearPressureFactor
     )
-  const braking =
+  const requestedBraking =
     effectiveServiceBraking +
     (vehicle.handbrake
       ? TRAINING_CAR_DYNAMICS.parkingBrakeAcceleration
       : 0)
+  // Limit available longitudinal tire/road force in low-grip practice.
+  // The established dry tuning and low-speed parking path stay unchanged.
+  const braking = surface === 'dry'
+    ? requestedBraking
+    : Math.min(requestedBraking,
+        TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration * relativeRoadGrip(surface))
   if (Math.abs(vehicle.speed) > 0.001) {
     vehicle.speed -= Math.sign(vehicle.speed) * Math.min(
       Math.abs(vehicle.speed),
@@ -330,6 +349,7 @@ function stepVehiclePhysicsSubstep(
     handbrake: vehicle.handbrake,
     frontServiceBrakeFactor: abs.frontPressureFactor,
     rearServiceBrakeFactor: abs.rearPressureFactor,
+    surface,
   }
   const lateralRecoveryError = Math.abs(
     previousLateralSpeed - kinematicLateralSpeed,

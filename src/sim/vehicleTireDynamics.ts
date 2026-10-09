@@ -1,4 +1,5 @@
 import { TRAINING_CAR } from './vehicleDimensions'
+import { roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.max(minimum, Math.min(maximum, value))
@@ -31,7 +32,7 @@ export const TRAINING_CAR_DYNAMICS = {
   cgForwardFromBodyCenterMeters:
     CG_FORWARD_FROM_BODY_CENTER_METERS,
   centerOfMassHeightMeters: 0.52,
-  tireFrictionCoefficient: 0.92,
+  tireFrictionCoefficient: roadSurfaceFriction('dry'),
   frontCorneringAccelerationPerRadian: 43,
   rearCorneringAccelerationPerRadian: 46,
   serviceBrakeAcceleration: 9.4,
@@ -106,6 +107,8 @@ export interface TireDynamicsInput {
   /** ABS/service-brake pressure multiplier for the rear axle. */
   rearServiceBrakeFactor?: number
   lateralAccelerationEstimate?: number
+  /** Defaults to dry road, preserving existing exam behaviour. */
+  surface?: RoadSurfaceId
 }
 
 export function calculateWheelNormalLoads(
@@ -163,9 +166,9 @@ export function calculateWheelNormalLoads(
   }
 }
 
-function gripAcceleration(normalLoadN: number) {
+function gripAcceleration(normalLoadN: number, surface?: RoadSurfaceId) {
   return (
-    TRAINING_CAR_DYNAMICS.tireFrictionCoefficient *
+    roadSurfaceFriction(surface) *
     normalLoadN /
     TRAINING_CAR_DYNAMICS.massKg
   )
@@ -212,10 +215,10 @@ function forceBudget(
   const rearLongitudinal =
     rearServiceBraking + parkingBraking
 
-  const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN)
-  const frontRightGrip = gripAcceleration(normalLoads.frontRightN)
-  const rearLeftGrip = gripAcceleration(normalLoads.rearLeftN)
-  const rearRightGrip = gripAcceleration(normalLoads.rearRightN)
+  const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN, input.surface)
+  const frontRightGrip = gripAcceleration(normalLoads.frontRightN, input.surface)
+  const rearLeftGrip = gripAcceleration(normalLoads.rearLeftN, input.surface)
+  const rearRightGrip = gripAcceleration(normalLoads.rearRightN, input.surface)
   const frontWheelLongitudinal = frontLongitudinal / 2
   const rearWheelLongitudinal = rearLongitudinal / 2
   const rearCorneringFactor = input.handbrake

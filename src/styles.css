@@ -708,3 +708,19 @@
   .coach-demo-grid{grid-template-columns:1fr}
   .coach-demo-card p{min-height:0}
 }
+
+
+/* Grip presets affect optional practice physics, not the exam rule set. */
+.toolbar{flex-wrap:wrap;row-gap:12px}
+.surface-preset{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.surface-preset>span{font-size:12px;font-weight:800;color:#c4daec;white-space:nowrap}
+.surface-preset .segmented{flex-wrap:wrap}
+.surface-preset .segmented button{font-size:12px;padding:8px 10px;white-space:nowrap}
+.surface-preset small{font-size:10px;color:#829bb0;line-height:1.45}
+@media(max-width:720px){
+  .surface-preset{width:100%;align-items:flex-start}
+  .surface-preset small{flex-basis:100%}
+}
+
+/* A marked low-grip result must not force the score metadata offscreen. */
+.result-meta{flex-wrap:wrap}
