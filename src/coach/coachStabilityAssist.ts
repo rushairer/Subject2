@@ -33,6 +33,7 @@ export const COACH_STABILITY = {
   minimumForwardSpeedMps: 4.2,
   interventionSideslipRadians: 0.16,
   interventionYawErrorRps: 0.65,
+  interventionAbsoluteYawRps: 0.95,
   maximumRoadWheelCorrectionRadians: 0.18,
   maximumRecoveryThrottle: 0.08,
 } as const
@@ -58,8 +59,14 @@ export function assistCoachStability(
     maxSteeringWheelAngle * maxRoadWheelAngle, -maxRoadWheelAngle, maxRoadWheelAngle)
   const yawError = yawRate - kinematicYawRate(speed, plannedRoadWheel)
 
+  // Large requested steering does NOT mean the car is spinning. A normal
+  // corner starts with a yaw-rate tracking error before the car has turned;
+  // require measured slip or actual high yaw together with excess yaw error.
+  const excessiveSpin =
+    Math.abs(yawRate) >= COACH_STABILITY.interventionAbsoluteYawRps &&
+    Math.abs(yawError) >= COACH_STABILITY.interventionYawErrorRps
   if (Math.abs(sideslipAngleRadians) < COACH_STABILITY.interventionSideslipRadians &&
-      Math.abs(yawError) < COACH_STABILITY.interventionYawErrorRps) {
+      !excessiveSpin) {
     return { ...inactive, sideslipAngleRadians }
   }
 
