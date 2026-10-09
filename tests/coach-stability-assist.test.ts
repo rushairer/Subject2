@@ -37,6 +37,19 @@ test('normal aligned traffic and every low-speed or reverse parking state remain
   }
 })
 
+test('a sharp planned corner is not mistaken for measured spin before yaw builds', () => {
+  const maxWheel = DRIVING_RULES.steering.wheelTurnsLockToLock * Math.PI
+  for (const requested of [-maxWheel, maxWheel]) {
+    const result = assistCoachStability(
+      { speed: 9, lateralSpeed: 0, yawRate: 0.05 },
+      { steeringWheelTarget: requested, throttle: 0.34, brake: 0 },
+    )
+    assert.equal(result.active, false)
+    assert.equal(result.steeringWheelTarget, requested)
+    assert.equal(result.throttle, 0.34)
+  }
+})
+
 test('a clockwise spin with leftward slip counter-steers left without resetting yaw or braking', () => {
   const vehicle = { speed: 10, lateralSpeed: -3, yawRate: 0.85 }
   const planned = { steeringWheelTarget: 0, throttle: 0.38, brake: 0.7 }
