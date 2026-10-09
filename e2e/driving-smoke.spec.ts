@@ -765,7 +765,7 @@ test('rain training visibly accumulates water and exposes real aquaplaning evide
   await expect(rain).toContainText('水滑风险')
   await expect.poll(async () => {
     const value = await rain.locator('strong').textContent()
-    return Number.parseFloat(value?.match(/([0-9]+\\.[0-9]+)/)?.[1] ?? '0')
+    return Number.parseFloat(value?.trim().split(' ')[1] ?? '0')
   }).toBeGreaterThan(0)
   expect(runtimeErrors).toEqual([])
 })
