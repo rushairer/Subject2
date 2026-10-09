@@ -199,7 +199,9 @@ function defensiveTargetSpeedKmh(
   let reason = ''
   let minimumBrake = 0
 
-  const lead = observeSubject3LeadVehicle(vehicle, traffic)
+  const lead = observeSubject3LeadVehicle(vehicle, traffic, {
+    includeStoppedPlayer: true,
+  })
   if (lead) {
     const shortGap =
       lead.bumperGapMeters < 14 ||
