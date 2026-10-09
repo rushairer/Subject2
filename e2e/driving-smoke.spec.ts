@@ -726,3 +726,24 @@ test('training center coach demo auto-takes over without polluting personal hist
 
   expect(runtimeErrors, runtimeErrors.join('\n')).toEqual([])
 })
+
+
+test('training road-grip preset reaches the actual driving session and exams keep their dry baseline', async ({ page }) => {
+  test.setTimeout(90_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '路面附着训练考生')
+  const surfaces = page.getByRole('group', { name: '路面附着力训练' })
+  await expect(surfaces).toBeVisible()
+  await expect(surfaces.getByRole('button', { name: '干燥路面' })).toHaveAttribute('aria-pressed', 'true')
+
+  await page.getByRole('button', { name: '考试模式' }).click()
+  await expect(surfaces).toHaveCount(0)
+  await page.getByRole('button', { name: '训练模式' }).click()
+
+  await surfaces.getByRole('button', { name: '低附着路面' }).click()
+  await expect(surfaces.getByRole('button', { name: '低附着路面' })).toHaveAttribute('aria-pressed', 'true')
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('低附着路面')
+  expect(runtimeErrors).toEqual([])
+})
