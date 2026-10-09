@@ -411,7 +411,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
       <div className="recent-results-head"><div><span className="chapter">最近记录</span><h3>本地训练成绩</h3></div><span>仅保存在当前浏览器</span></div>
       <div className="recent-results-grid">
         {recentHistory.map(item => <div className="recent-result" key={item.id}>
-          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
+          <div><strong>{historyTitle(item.examId as ExamId, item.subject3Practice)}</strong><span>{item.mode === 'exam' ? '模拟考试' : '训练'} · {new Date(item.createdAt).toLocaleDateString()}{item.surface && item.surface !== 'dry' && ROAD_SURFACES[item.surface] ? ` · ${ROAD_SURFACES[item.surface].label}` : ''}{item.status === 'incomplete' ? ' · 未完成' : ''}</span></div>
           <b className={item.passed ? 'history-pass' : 'history-fail'}>{item.score}</b>
         </div>)}
       </div>
@@ -1522,7 +1522,7 @@ function Result({
         : session.examId === 'subject3'
           ? '科目三完整示范'
           : sessionTitle(session)
-      : sessionTitle(session)}</span><span>{coachDemo ? '仅供学习 · 不计入成绩' : `合格线 ${passLine}`}</span></div>
+      : sessionTitle(session)}</span><span>{coachDemo ? '仅供学习 · 不计入成绩' : `合格线 ${passLine}`}</span>{session.surface && session.surface !== 'dry' && <span>{ROAD_SURFACES[session.surface].label} · 进阶附着训练</span>}</div>
     {!coachDemo && <section className={'result-comment ' + status} aria-label="今日车评">
       <div className="result-comment-topline"><span>今日车评</span><b>{resultComment.badge}</b></div>
       <blockquote>{resultComment.headline}</blockquote>
@@ -1632,6 +1632,7 @@ export default function App() {
       licenseType: candidate.licenseType,
       examId: session.examId,
       subject3Practice: session.subject3Practice,
+      surface: session.surface,
       mode: session.mode,
       score,
       passed: outcome.passed,
