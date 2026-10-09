@@ -724,3 +724,20 @@
 
 /* A marked low-grip result must not force the score metadata offscreen. */
 .result-meta{flex-wrap:wrap}
+
+
+/* Weather HUD is instructional only; real weather evolves in the physics step. */
+.rain-readout{
+  position:absolute;left:18px;top:146px;
+  display:grid;gap:5px;max-width:270px;padding:12px 14px;
+  border:1px solid #8bbcd36a;border-radius:14px;background:#081d2ade;
+  color:#dceefa;box-shadow:0 12px 32px #0008;backdrop-filter:blur(10px)
+}
+.rain-readout>span{color:#81bedb;font-size:10px;letter-spacing:.08em;font-weight:900}
+.rain-readout>strong{font-size:16px;font-variant-numeric:tabular-nums}
+.rain-readout>small{color:#a5c2d4;font-size:10px;line-height:1.5}
+@media(max-width:760px){
+  .rain-readout{left:10px;top:164px;max-width:180px;padding:9px 11px}
+  .rain-readout>strong{font-size:13px}
+  .rain-readout>small{font-size:9px}
+}
