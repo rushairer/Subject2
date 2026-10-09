@@ -1,5 +1,6 @@
 import type { SessionResultStatus } from '../session/sessionResult'
 import type { Subject3PracticeSliceId } from '../subject3/subject3Practice'
+import type { RoadSurfaceId } from '../sim/roadSurface'
 
 export interface StoredCandidate {
   name: string
@@ -15,6 +16,8 @@ export interface ExamHistoryEntry {
   licenseType: 'C1' | 'C2'
   examId: string
   subject3Practice?: Subject3PracticeSliceId
+  /** Optional historical practice condition; older records mean dry. */
+  surface?: RoadSurfaceId
   mode: 'practice' | 'exam'
   score: number
   passed: boolean
