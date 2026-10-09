@@ -39,8 +39,8 @@ function carAt(progress: number, speed: number): PhysicsVehicle {
 }
 
 test('rain anticipatory stop envelope uses the same water/speed tire-road coefficient', () => {
-  const shallow = rainCoachStoppingEnvelope(16, 0, 12, 35)
-  const deep = rainCoachStoppingEnvelope(16, 7, 12, 35)
+  const shallow = rainCoachStoppingEnvelope(12, 0, 8, 35)
+  const deep = rainCoachStoppingEnvelope(12, 7, 8, 35)
   assert.ok(deep.availableDecelerationMps2 < shallow.availableDecelerationMps2)
   assert.ok(deep.predictedClosingStopMeters > shallow.predictedClosingStopMeters)
   assert.ok(deep.warningGapMeters > shallow.warningGapMeters)
