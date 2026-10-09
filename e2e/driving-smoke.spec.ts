@@ -769,3 +769,31 @@ test('rain training visibly accumulates water and exposes real aquaplaning evide
   }).toBeGreaterThan(0)
   expect(runtimeErrors).toEqual([])
 })
+
+
+test('real rain practice exposes first-person off/slow/fast wipers without leaking into external views', async ({ page }) => {
+  test.setTimeout(110_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '雨刮器E2E')
+  const surfaces = page.getByRole('group', { name: '路面附着力训练' })
+  await surfaces.getByRole('button', { name: '暴雨积水' }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+  await expect(page.getByRole('button', { name: '雨刮器：慢速' })).toBeVisible()
+  await page.getByRole('button', { name: '雨刮器：慢速' }).click()
+  await expect(page.getByRole('button', { name: '雨刮器：快速' })).toBeVisible()
+  await page.getByRole('button', { name: '雨刮器：快速' }).click()
+  await expect(page.getByRole('button', { name: '雨刮器：关闭' })).toBeVisible()
+  await page.getByRole('button', { name: /M · 第一人称/ }).click()
+  await expect(page.getByRole('button', { name: /M · 第二人称/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /雨刮器：/ })).toHaveCount(0)
+  for (const camera of [/M · 第二人称/, /M · 第三人称/, /M · 垂直俯视/]) {
+    await page.getByRole('button', { name: camera }).click()
+  }
+  await expect(page.getByRole('button', { name: /M · 第一人称/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: '雨刮器：关闭' })).toBeVisible()
+  await page.getByRole('button', { name: '雨刮器：关闭' }).click()
+  await expect(page.getByRole('button', { name: '雨刮器：慢速' })).toBeVisible()
+  await expect(page.getByRole('complementary', { name: '暴雨积水训练数据' })).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})

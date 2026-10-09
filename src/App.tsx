@@ -47,6 +47,7 @@ import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { createRainWaterState } from './sim/rainWater'
 import { RainPracticeScene } from './sim/RainPracticeScene'
+import type { WindshieldWiperMode } from './cockpit/windshieldWipers'
 import { ROAD_SURFACES, ROAD_SURFACE_IDS, type RoadSurfaceId } from './sim/roadSurface'
 import { TireSkidMarks } from './sim/TireSkidMarks'
 import { TireSmoke } from './sim/TireSmoke'
@@ -480,9 +481,10 @@ function Road() {
   </group>
 }
 
-function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, coachActive, cameraMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onIncident, onTick, onProjectStatus, onCoachStatus, onProjectComplete }: {
+function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudgingEnabled, controlsLocked, coachActive, cameraMode, rainWiperMode, onCycleCameraMode, onToggleHelp, onReady, onInfraction, onIncident, onTick, onProjectStatus, onCoachStatus, onProjectComplete }: {
   vehicle: React.MutableRefObject<Vehicle>, session: Session, automatic: boolean, continuousExam: boolean, projectJudgingEnabled: boolean, controlsLocked: boolean, coachActive: boolean,
   cameraMode: CameraMode,
+  rainWiperMode: WindshieldWiperMode,
   onCycleCameraMode: () => void,
   onToggleHelp: () => void,
   onReady: () => void,
@@ -1079,8 +1081,8 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
     <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
-    {session.surface === 'rain' && <RainPracticeScene vehicle={vehicle} />}
-    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} suspensionPose={suspensionPose} showClutch={!automatic} automatic={automatic} /></group>
+    {session.surface === 'rain' && <RainPracticeScene vehicle={vehicle} rainWater={rainWater} />}
+    <group ref={carGroup}><DrivingCockpit vehicle={vehicle} suspensionPose={suspensionPose} showClutch={!automatic} automatic={automatic} rainWiperMode={session.surface === 'rain' && cameraMode === 'first' ? rainWiperMode : undefined} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
 }
@@ -1121,6 +1123,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     !(activeExamId === 'subject3' && session.time === 'day' && !session.subject3Practice),
   )
   const [cameraMode, setCameraMode] = useState<CameraMode>('first')
+  const [rainWiperMode, setRainWiperMode] = useState<WindshieldWiperMode>('slow')
   const [coachActive, setCoachActive] = useState(() => coachDemo)
   const [coachStatus, setCoachStatus] = useState('')
   const cycleCameraMode = useCallback(() => setCameraMode(mode =>
@@ -1371,7 +1374,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
     }}
   >
     <DrivingCanvasBoundary onError={() => setRendererFailed(true)}>
-      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} coachActive={coachActive} cameraMode={cameraMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onIncident={addIncident} onTick={tick} onProjectStatus={setProjectStatus} onCoachStatus={setCoachStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
+      <Canvas camera={{ fov: 68, near: .05, far: 500 }} shadows={{ type: THREE.PCFSoftShadowMap }}><DrivingWorld vehicle={vehicle} session={effectiveSession} automatic={automatic} continuousExam={combinedExam} projectJudgingEnabled={subject2ProjectJudgingEnabled(combinedExam, activeEntryReached)} controlsLocked={!lightTestDone} coachActive={coachActive} cameraMode={cameraMode} rainWiperMode={rainWiperMode} onCycleCameraMode={cycleCameraMode} onToggleHelp={toggleHelp} onReady={markDrivingReady} onInfraction={addInfraction} onIncident={addIncident} onTick={tick} onProjectStatus={setProjectStatus} onCoachStatus={setCoachStatus} onProjectComplete={() => setProgress(current => completeExamProject(current, activeExamId))} /><DrivingRendererLifecycle /></Canvas>
     </DrivingCanvasBoundary>
     {!drivingReady && <div className="driving-loading" role="status">正在加载驾驶场景…</div>}
     <div className="hud">
@@ -1396,6 +1399,16 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
             }}
           >
             {coachActive ? '我来接管' : '教练接管'}
+          </button>}
+          {session.surface === 'rain' && cameraMode === 'first' && <button
+            type="button"
+            className="view-btn"
+            aria-label={`雨刮器：${rainWiperMode === 'off' ? '关闭' : rainWiperMode === 'slow' ? '慢速' : '快速'}`}
+            onClick={() => setRainWiperMode(mode =>
+              mode === 'off' ? 'slow' : mode === 'slow' ? 'fast' : 'off'
+            )}
+          >
+            雨刮器 · {rainWiperMode === 'off' ? '关闭' : rainWiperMode === 'slow' ? '慢速' : '快速'}
           </button>}
           <button className="view-btn" onClick={cycleCameraMode}>
             M · {cameraMode === 'first' ? '第一人称' : cameraMode === 'second' ? '第二人称' : cameraMode === 'third' ? '第三人称' : '垂直俯视'}
