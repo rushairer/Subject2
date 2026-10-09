@@ -27,9 +27,14 @@ export interface Subject3LeadVehicleObservation {
 export function observeSubject3LeadVehicle(
   player: { x: number; z: number; speed: number },
   traffic: Readonly<Subject3TrafficState>,
+  options: { includeStoppedPlayer?: boolean } = {},
 ): Subject3LeadVehicleObservation | undefined {
   const playerSpeed = player.speed
-  if (playerSpeed < SUBJECT3_LEAD_OBSERVATION.minimumPlayerSpeedMps) return undefined
+  // Replay/following-distance coaching still filters stationary samples.
+  // Golden Driver needs to see an already-stopped lead until it actually
+  // moves away; otherwise it accelerates into the same stopped obstacle.
+  if (!options.includeStoppedPlayer &&
+      playerSpeed < SUBJECT3_LEAD_OBSERVATION.minimumPlayerSpeedMps) return undefined
 
   const projection = projectToSubject3Route(player.x, player.z)
   let lead: Subject3TrafficVehicleState | undefined
@@ -72,7 +77,7 @@ export function observeSubject3LeadVehicle(
     vehicleId: lead.id,
     centerDistanceMeters: leadCenterDistance,
     bumperGapMeters,
-    timeGapSeconds: bumperGapMeters / playerSpeed,
+    timeGapSeconds: playerSpeed > 0 ? bumperGapMeters / playerSpeed : Infinity,
     leadSpeedMps: lead.speedMps,
     scenario: lead.scenario,
     closingSpeedMps,

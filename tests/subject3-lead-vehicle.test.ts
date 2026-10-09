@@ -156,3 +156,19 @@ test('oncoming observation respects the forward observation horizon and reverse 
   assert.equal(observeSubject3OncomingVehicle(playerAt(1000, 0, 10), traffic), undefined)
   assert.equal(observeSubject3OncomingVehicle(playerAt(1000, 0, -2), traffic), undefined)
 })
+
+
+test('Golden Driver can observe a stopped lead without changing normal replay telemetry filters', () => {
+  const traffic = createSubject3TrafficState()
+  updateSubject3TrafficVehicle(traffic, 'stopped-lead', 1010, 0, 0, false)
+  const stationary = playerAt(1000, 0, 0)
+  assert.equal(observeSubject3LeadVehicle(stationary, traffic), undefined)
+  const coach = observeSubject3LeadVehicle(stationary, traffic, {
+    includeStoppedPlayer: true,
+  })
+  assert.equal(coach?.vehicleId, 'stopped-lead')
+  assert.equal(coach?.leadSpeedMps, 0)
+  assert.equal(coach?.timeGapSeconds, Infinity)
+  assert.equal(coach?.timeToCollisionSeconds, undefined)
+  assert.ok(coach!.bumperGapMeters > 0)
+})

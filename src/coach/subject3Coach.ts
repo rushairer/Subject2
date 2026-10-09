@@ -1,5 +1,6 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { normalizeHeadingDelta } from '../sim/vehicleFrame'
+import { TRAINING_CAR_DYNAMICS } from '../sim/vehicleTireDynamics'
 import {
   SUBJECT3_EVENTS,
   SUBJECT3_ROUTE_LENGTH,
@@ -196,8 +197,11 @@ function defensiveTargetSpeedKmh(
 ) {
   let target = 22
   let reason = ''
+  let minimumBrake = 0
 
-  const lead = observeSubject3LeadVehicle(vehicle, traffic)
+  const lead = observeSubject3LeadVehicle(vehicle, traffic, {
+    includeStoppedPlayer: true,
+  })
   if (lead) {
     const shortGap =
       lead.bumperGapMeters < 14 ||
@@ -209,6 +213,22 @@ function defensiveTargetSpeedKmh(
       reason = lead.scenario === 'sudden-brake'
         ? '前车急刹，正在制动避让'
         : '前车距离较近，正在控制车距'
+
+      // Match the measured lead speed before the bumpers close. A fixed
+      // gentle pedal cannot safely absorb a large closing speed inside the
+      // remaining gap. Keep a modest buffer and a controller reaction margin;
+      // this is simulator driving control, NOT an exam-scoring threshold.
+      const closingSpeed = Math.max(0, lead.closingSpeedMps)
+      const availableDistance = Math.max(0.35,
+        lead.bumperGapMeters - 4.5 - closingSpeed * 0.35)
+      const decelerationNeeded =
+        closingSpeed * closingSpeed / (2 * availableDistance)
+      minimumBrake = clamp(
+        decelerationNeeded /
+          TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration,
+        0,
+        0.9,
+      )
     }
   }
 
@@ -241,7 +261,7 @@ function defensiveTargetSpeedKmh(
     reason = '人行横道有行人，停车让行'
   }
 
-  return { target, reason }
+  return { target, reason, minimumBrake }
 }
 
 /**
@@ -281,7 +301,7 @@ export function stepSubject3Coach(
     !waitingForStart &&
     !stoppingForPullOver &&
     defensive.reason.length > 0 &&
-    defensive.target <= 12
+    (defensive.target <= 12 || defensive.minimumBrake >= 0.5)
   const defensiveRecovery =
     defensiveLowSpeed ||
     (previous.defensiveRecovery &&
@@ -364,6 +384,14 @@ export function stepSubject3Coach(
     brake = 0.16
   } else {
     throttle = 0.08
+  }
+
+  // The speed controller uses gentle braking for normal cruise correction.
+  // A live closing hazard must be allowed to demand stronger real pedal
+  // input before the distance becomes unrecoverable.
+  if (defensive.minimumBrake > brake) {
+    brake = defensive.minimumBrake
+    throttle = 0
   }
 
   const status = defensive.reason
