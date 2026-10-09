@@ -721,3 +721,6 @@
   .surface-preset{width:100%;align-items:flex-start}
   .surface-preset small{flex-basis:100%}
 }
+
+/* A marked low-grip result must not force the score metadata offscreen. */
+.result-meta{flex-wrap:wrap}
