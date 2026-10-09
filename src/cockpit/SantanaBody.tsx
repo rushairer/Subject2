@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import { TRAINING_CAR as CAR } from '../sim/vehicleDimensions'
+import { FRONT_WINDSHIELD } from './windshieldGeometry'
 
 // Visual coachwork only. X = right, -Z = nose. Envelope and axle locations
 // remain those of the shared training car, rather than a second physics model.
@@ -115,8 +116,11 @@ function Plate({ rear }: { rear: boolean }) {
 }
 
 export const SantanaBody = memo(function SantanaBody({ headlights, braking }: { headlights: boolean; braking: boolean }) {
-  const roofFront = -0.38, roofRear = 0.83, cowl = -1.0, deck = 1.40
-  const low = 1.04, high = 1.64, roofX = 0.72, beltX = HALF - 0.035
+  const roofFront = FRONT_WINDSHIELD.upperZ, roofRear = 0.83
+  const cowl = FRONT_WINDSHIELD.lowerZ, deck = 1.40
+  const low = FRONT_WINDSHIELD.lowerY, high = FRONT_WINDSHIELD.upperY
+  const roofX = FRONT_WINDSHIELD.upperHalfWidth
+  const beltX = FRONT_WINDSHIELD.lowerHalfWidth
   return <group name="santana-2000-coachwork">
     <SideSkin side={-1} /><SideSkin side={1} />
     {/* Hood: crowned center and tapered shoulder facets. */}
