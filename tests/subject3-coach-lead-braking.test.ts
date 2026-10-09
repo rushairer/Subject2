@@ -4,11 +4,13 @@ import { createSubject3CoachRuntime, stepSubject3Coach } from '../src/coach/subj
 import { DRIVING_RULES } from '../src/rules/drivingRules'
 import { stepVehiclePhysics, type PhysicsVehicle } from '../src/sim/vehiclePhysics'
 import { MANUAL_GEARS } from '../src/sim/vehiclePowertrain'
+import { TRAINING_CAR } from '../src/sim/vehicleDimensions'
 import {
   actorRoutePose, poseAtRouteDistance, projectToSubject3Route,
 } from '../src/subject3/subject3Route'
 import {
   createSubject3TrafficState,
+  SUBJECT3_TRAFFIC_CAR,
   subject3VehicleCollision,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
@@ -111,7 +113,8 @@ function runPhysicalLeadingStopAndResume(automatic: boolean) {
 
     const observedProgress = projectToSubject3Route(car.x, car.z).progress
     const actor = actorRoutePose(leadProgress, 0)
-    const bumperGap = leadProgress - observedProgress - 4.3
+    const bumperGap = leadProgress - observedProgress -
+      (TRAINING_CAR.lengthMeters + SUBJECT3_TRAFFIC_CAR.lengthMeters) / 2
     assert.equal(subject3VehicleCollision(car, actor), false,
       `${automatic ? 'C2' : 'C1'} hit lead at ${frame}, gap ${bumperGap.toFixed(2)}m`)
     minimumGap = Math.min(minimumGap, bumperGap)
