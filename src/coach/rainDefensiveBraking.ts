@@ -7,7 +7,7 @@ import { TRAINING_CAR_DYNAMICS } from '../sim/vehicleTireDynamics'
  * road braking and this predictive driving input.
  */
 export const RAIN_COACH_DEFENSE = {
-  followingGapSeconds: 3.2,
+  followingGapSeconds: 4.0,
   reactionSeconds: 0.75,
   reserveBumperGapMeters: 6.5,
   minimumBrakingEfficiency: 0.78,
