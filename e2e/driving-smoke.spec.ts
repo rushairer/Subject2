@@ -747,3 +747,25 @@ test('training road-grip preset reaches the actual driving session and exams kee
   await expect(page.locator('.status-chip')).toContainText('低附着路面')
   expect(runtimeErrors).toEqual([])
 })
+
+
+test('rain training visibly accumulates water and exposes real aquaplaning evidence in WebGL', async ({ page }) => {
+  test.setTimeout(110_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '雨天附着训练考生')
+  const surfaces = page.getByRole('group', { name: '路面附着力训练' })
+  await surfaces.getByRole('button', { name: '暴雨积水' }).click()
+  await expect(surfaces.getByRole('button', { name: '暴雨积水' }))
+    .toHaveAttribute('aria-pressed', 'true')
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+  await expect(page.locator('.status-chip')).toContainText('暴雨积水')
+  const rain = page.getByRole('complementary', { name: '暴雨积水训练数据' })
+  await expect(rain).toBeVisible()
+  await expect(rain).toContainText('水滑风险')
+  await expect.poll(async () => {
+    const value = await rain.locator('strong').textContent()
+    return Number.parseFloat(value?.trim().split(' ')[1] ?? '0')
+  }).toBeGreaterThan(0)
+  expect(runtimeErrors).toEqual([])
+})

@@ -1,5 +1,6 @@
 import { TRAINING_CAR } from './vehicleDimensions'
-import { roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
+import { effectiveRoadFriction, roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
+import { aquaplaningSeverity } from './rainWater'
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.max(minimum, Math.min(maximum, value))
@@ -93,6 +94,8 @@ export interface TireTelemetry {
   longitudinalAccelerationMps2: number
   /** Body-right acceleration used for lateral load transfer. */
   lateralAccelerationMps2: number
+  /** Training-only hydraulic-contact risk; absent for all legacy surfaces. */
+  aquaplaningSeverity?: number
 }
 
 export interface TireDynamicsInput {
@@ -109,6 +112,10 @@ export interface TireDynamicsInput {
   lateralAccelerationEstimate?: number
   /** Defaults to dry road, preserving existing exam behaviour. */
   surface?: RoadSurfaceId
+  /** Standing water at the car's world position, supplied by road weather. */
+  localWaterDepthMm?: number
+  /** Measured vehicle ground-speed magnitude for rain-road adhesion. */
+  groundSpeedMps?: number
 }
 
 export function calculateWheelNormalLoads(
@@ -166,9 +173,13 @@ export function calculateWheelNormalLoads(
   }
 }
 
-function gripAcceleration(normalLoadN: number, surface?: RoadSurfaceId) {
+function gripAcceleration(normalLoadN: number, input: TireDynamicsInput) {
   return (
-    roadSurfaceFriction(surface) *
+    effectiveRoadFriction(
+      input.surface,
+      input.groundSpeedMps ?? Math.abs(input.longitudinalSpeed),
+      input.localWaterDepthMm ?? 0,
+    ) *
     normalLoadN /
     TRAINING_CAR_DYNAMICS.massKg
   )
@@ -215,10 +226,10 @@ function forceBudget(
   const rearLongitudinal =
     rearServiceBraking + parkingBraking
 
-  const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN, input.surface)
-  const frontRightGrip = gripAcceleration(normalLoads.frontRightN, input.surface)
-  const rearLeftGrip = gripAcceleration(normalLoads.rearLeftN, input.surface)
-  const rearRightGrip = gripAcceleration(normalLoads.rearRightN, input.surface)
+  const frontLeftGrip = gripAcceleration(normalLoads.frontLeftN, input)
+  const frontRightGrip = gripAcceleration(normalLoads.frontRightN, input)
+  const rearLeftGrip = gripAcceleration(normalLoads.rearLeftN, input)
+  const rearRightGrip = gripAcceleration(normalLoads.rearRightN, input)
   const frontWheelLongitudinal = frontLongitudinal / 2
   const rearWheelLongitudinal = rearLongitudinal / 2
   const rearCorneringFactor = input.handbrake
@@ -371,6 +382,12 @@ export function kinematicTireTelemetry(
     rearSkidSeverity: rearLongitudinalSkid,
     frontWheelRotationFactor: 1 - frontLongitudinalSkid,
     rearWheelRotationFactor: 1 - rearLongitudinalSkid,
+    ...(input.surface === 'rain' ? {
+      aquaplaningSeverity: aquaplaningSeverity(
+        input.groundSpeedMps ?? Math.abs(input.longitudinalSpeed),
+        input.localWaterDepthMm ?? 0,
+      ),
+    } : {}),
     normalLoads: budget.normalLoads,
     longitudinalAccelerationMps2: budget.longitudinalAccelerationMps2,
     lateralAccelerationMps2: lateralAcceleration,
@@ -568,6 +585,12 @@ export function stepTireDynamics(
         1 - longitudinalSkidSeverity(frontLongitudinalUsage),
       rearWheelRotationFactor:
         1 - longitudinalSkidSeverity(rearLongitudinalUsage),
+      ...(input.surface === 'rain' ? {
+        aquaplaningSeverity: aquaplaningSeverity(
+          input.groundSpeedMps ?? Math.hypot(longitudinalSpeed, lateralSpeed),
+          input.localWaterDepthMm ?? 0,
+        ),
+      } : {}),
       normalLoads: budget.normalLoads,
       longitudinalAccelerationMps2: budget.longitudinalAccelerationMps2,
       lateralAccelerationMps2,
