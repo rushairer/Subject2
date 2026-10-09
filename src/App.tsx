@@ -45,6 +45,7 @@ import {
 } from './coach/coachDemoSession'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
+import { ROAD_SURFACES, ROAD_SURFACE_IDS, type RoadSurfaceId } from './sim/roadSurface'
 import { TireSkidMarks } from './sim/TireSkidMarks'
 import { TireSmoke } from './sim/TireSmoke'
 import type { TireTelemetry } from './sim/vehicleTireDynamics'
@@ -163,6 +164,8 @@ interface Session {
   trainingPack?: TrainingPackSessionState
   subject3Practice?: Subject3PracticeSliceId
   coachDemo?: boolean
+  /** Optional low-adhesion practice; exams and standard demonstrations stay dry. */
+  surface?: RoadSurfaceId
 }
 
 function createTrainingPackSession(
@@ -299,6 +302,7 @@ function Profile({ onSubmit }: { onSubmit: (candidate: Candidate) => void }) {
 function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { candidate: Candidate, onStart: (s: Session) => void, onStartTrainingPack: (id: TrainingPackId, time: TimeOfDay) => void, onSwitchCandidate: () => void }) {
   const [mode, setMode] = useState<Mode>('practice')
   const [time, setTime] = useState<TimeOfDay>('day')
+  const [surface, setSurface] = useState<RoadSurfaceId>('dry')
   const visible = projects.filter(p => !(candidate.licenseType === 'C2' && p[0] === 'slope-start'))
   const recentHistory = useMemo(
     () => loadExamHistory().filter(item => item.candidateName === candidate.name).slice(0, 4),
@@ -334,6 +338,19 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
     <section className="toolbar">
       <div className="segmented"><button className={mode === 'practice' ? 'active' : ''} onClick={() => setMode('practice')}>训练模式</button><button className={mode === 'exam' ? 'active' : ''} onClick={() => setMode('exam')}>考试模式</button></div>
       <div className="segmented"><button className={time === 'day' ? 'active' : ''} onClick={() => setTime('day')}>白天</button><button className={time === 'night' ? 'active' : ''} onClick={() => setTime('night')}>夜间</button></div>
+      {mode === 'practice' && <div className="surface-preset" role="group" aria-label="路面附着力训练">
+        <span>训练路面</span>
+        <div className="segmented">
+          {ROAD_SURFACE_IDS.map(id => <button
+            key={id}
+            type="button"
+            aria-pressed={surface === id}
+            className={surface === id ? 'active' : ''}
+            onClick={() => setSurface(id)}
+          >{ROAD_SURFACES[id].label}</button>)}
+        </div>
+        <small title={ROAD_SURFACES[surface].description}>单项 / 短练适用 · 考试与完整示范保持干燥基线</small>
+      </div>}
     </section>
     <RacingWheelSetup />
     <section className="coach-demo-section" aria-label="教练示范">
@@ -402,7 +419,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
     <section>
       <div className="section-heading"><div><span className="chapter">第一章</span><h2>科目二 · 场地驾驶技能</h2></div><p>每个项目可单独训练，并提供组合模拟考试入口。</p></div>
       <div className="card-grid">
-        {visible.map((p, index) => <button key={p[0]} className="task-card" onClick={() => onStart({ examId: p[0] as ExamId, mode, time })}>
+        {visible.map((p, index) => <button key={p[0]} className="task-card" onClick={() => onStart({ examId: p[0] as ExamId, mode, time, surface: mode === 'practice' ? surface : undefined })}>
           <span className="task-index">{String(index + 1).padStart(2, '0')}</span><h3>{p[1]}</h3><b>{p[2]}</b><p>{p[3]}</p><span className="enter">开始 →</span>
         </button>)}
         <button className="task-card exam-card" onClick={() => onStart({ examId: 'subject2-exam', mode: 'exam', time })}>
@@ -412,7 +429,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
     </section>
     <section className="subject3-section">
       <div className="section-heading"><div><span className="chapter">第二章</span><h2>科目三 · 道路驾驶技能</h2></div><p>连续道路章节，包含动态交通和考试任务。</p></div>
-      <button className="subject3-card" onClick={() => onStart({ examId: 'subject3', mode, time })}>
+      <button className="subject3-card" onClick={() => onStart({ examId: 'subject3', mode, time, surface: mode === 'practice' ? surface : undefined })}>
         <div><span className="task-index">ROAD</span><h3>综合道路驾驶</h3><p>覆盖上车准备、起步、直线、加减挡、变道、靠边停车、路口、人行横道、学校、公交站、会车、超车、掉头、夜间行驶等训练场景。</p></div><span className="enter">进入 3D 道路 →</span>
       </button>
       <div className="subject3-practice-grid" aria-label="科目三专项短练">
@@ -424,6 +441,7 @@ function Menu({ candidate, onStart, onStartTrainingPack, onSwitchCandidate }: { 
             mode: 'practice',
             time,
             subject3Practice: slice.id,
+            surface,
           })}
         >
           <span className="task-index">DRILL</span>
@@ -781,6 +799,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       automatic,
       grade: slopeBeforeStep.grade,
       gradeHeading: slopeGradeHeading,
+      surface: session.surface,
     })
     tireTelemetry.current = physics.tire
     suspensionVisualState.current = stepSuspensionVisual(
@@ -1354,7 +1373,7 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
                 ? `专项训练 · ${trainingPack.title} ${session.trainingPack.index + 1}/${trainingPack.stages.length} · ${trainingPackStageLabel(session.trainingPack)}`
                 : session.subject3Practice
                   ? sessionTitle(session)
-                  : session.mode === 'exam' ? '模拟考试' : '训练'}`} · {session.time === 'night' ? '夜间' : '白天'}</div>
+                  : session.mode === 'exam' ? '模拟考试' : '训练'}`} · {session.time === 'night' ? '夜间' : '白天'}{session.surface && session.surface !== 'dry' ? ` · ${ROAD_SURFACES[session.surface].label}` : ''}</div>
         <div className="hud-actions">
           {coachSupported && <button
             className={coachActive ? 'view-btn coach-active' : 'view-btn'}
@@ -1681,6 +1700,7 @@ export default function App() {
       examId,
       mode: 'practice',
       time: session.time,
+      surface: session.surface,
     })}
     onStartTrainingPack={packId => startTrainingPack(packId, session.time)}
     onStartSubject3Practice={subject3Practice => startSession({
@@ -1688,6 +1708,7 @@ export default function App() {
       mode: 'practice',
       time: session.time,
       subject3Practice,
+      surface: session.surface,
     })}
     onContinueTrainingPack={trainingPack => {
       const stage = trainingPackStage(trainingPack)
