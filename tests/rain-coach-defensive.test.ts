@@ -22,6 +22,7 @@ import {
   createSubject3TrafficState,
   SUBJECT3_TRAFFIC_CAR,
   subject3VehicleCollision,
+  updateSubject3TrafficHazard,
   updateSubject3TrafficVehicle,
 } from '../src/subject3/subject3Traffic'
 
@@ -90,6 +91,27 @@ test('normal lead flow and exam traffic remain unchanged without a rain environm
   const explicitDry = stepSubject3Coach(vehicle, createSubject3CoachRuntime(),
     0.05, false, false, traffic, undefined, undefined)
   assert.deepEqual(implicit, explicitDry)
+})
+
+test('rain coach recognizes the same existing live cut-in and pedestrian conflicts sooner', () => {
+  const car = carAt(1500, 6)
+  const traffic = createSubject3TrafficState()
+  for (const [kind, delta] of [
+    ['cut-in-scooter', 19.5],
+    ['crosswalk-pedestrian', 25.5],
+  ] as const) {
+    traffic.hazards = {}
+    updateSubject3TrafficHazard(traffic, kind, kind,
+      1500 + delta, 0.4, 0, -1, true, true)
+    const normal = stepSubject3Coach(car, createSubject3CoachRuntime(),
+      0.05, true, false, traffic)
+    const rainy = stepSubject3Coach(car, createSubject3CoachRuntime(),
+      0.05, true, false, traffic, undefined, stoppingRoad)
+    assert.equal(normal.command.brake, 0, 'dry warning window must stay unchanged')
+    assert.ok(rainy.command.brake >= 0.78,
+      `${kind} did not trigger wet-road defensive braking`)
+    assert.equal(rainy.command.throttle, 0)
+  }
 })
 
 function runRealRainStopAndResume(automatic: boolean) {
