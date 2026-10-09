@@ -1,5 +1,6 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { normalizeHeadingDelta } from '../sim/vehicleFrame'
+import { assistCoachStability } from './coachStabilityAssist'
 
 export interface CoachVehicleState {
   x: number
@@ -7,6 +8,8 @@ export interface CoachVehicleState {
   heading: number
   speed: number
   gear: number
+  lateralSpeed?: number
+  yawRate?: number
 }
 
 export interface CoachWaypoint {
@@ -311,14 +314,17 @@ export function stepCoachController(
     : Math.abs(vehicle.speed) < 0.75
       ? 0.46
       : 0.06
+  const stability = assistCoachStability(vehicle, {
+    throttle, brake, steeringWheelTarget,
+  })
 
   return {
     runtime,
     command: {
-      throttle,
-      brake,
+      throttle: stability.throttle,
+      brake: stability.brake,
       clutch,
-      steeringWheelTarget: runtime.completed ? 0 : steeringWheelTarget,
+      steeringWheelTarget: runtime.completed ? 0 : stability.steeringWheelTarget,
       gear: target.gear,
       engineOn: true,
       handbrake:
@@ -330,7 +336,9 @@ export function stepCoachController(
       rightIndicator: target.rightIndicator ?? false,
       waypointIndex: runtime.waypointIndex,
       completed: runtime.completed,
-      status: target.label ?? `教练驾驶 · 路径点 ${runtime.waypointIndex + 1}/${plan.waypoints.length}`,
+      status: stability.active
+        ? '教练驾驶 · 车辆侧滑，减油并反打方向'
+        : target.label ?? `教练驾驶 · 路径点 ${runtime.waypointIndex + 1}/${plan.waypoints.length}`,
     },
   }
 }
