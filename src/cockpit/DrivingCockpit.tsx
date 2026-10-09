@@ -11,6 +11,8 @@ import { SantanaBody } from './SantanaBody'
 import { VehicleMirrors } from './VehicleMirrors'
 import { CarContactShadow } from './DrivingLighting'
 import { CabinInterior } from './CabinInterior'
+import { RainWindshield } from './RainWindshield'
+import type { WindshieldWiperMode } from './windshieldWipers'
 import { Dashboard } from './Dashboard'
 import { Rod, Upholstery } from './interiorParts'
 
@@ -101,11 +103,13 @@ export function DrivingCockpit({
   suspensionPose,
   showClutch,
   automatic,
+  rainWiperMode,
 }: {
   vehicle: MutableRefObject<CockpitVehicleState>
   suspensionPose: MutableRefObject<SuspensionVisualPose>
   showClutch: boolean
   automatic: boolean
+  rainWiperMode?: WindshieldWiperMode
 }): ReactElement {
   const root = useRef<THREE.Group>(null)
   const sprungBody = useRef<THREE.Group>(null)
@@ -185,6 +189,7 @@ export function DrivingCockpit({
     >
       <group position={[0, -SUSPENSION_VISUAL.rollCenterHeightMeters, 0]}>
         <SantanaBody headlights={v.lowBeam || v.highBeam} braking={v.brake > 0.05} />
+        {rainWiperMode && <RainWindshield mode={rainWiperMode} />}
 
         <Dashboard vehicle={vehicle} automatic={automatic} />
     <Rod from={[-0.43, 0.90, -0.73]} to={[-0.43, 0.965, -0.42]} radius={0.037} />

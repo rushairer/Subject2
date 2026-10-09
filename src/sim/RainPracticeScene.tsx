@@ -1,9 +1,12 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { RAIN_PUDDLES, rainPuddlesNear } from './rainPuddles'
+import type { RainWaterState } from './rainWater'
 
 const DROP_COUNT = 176
 const RAIN_HEIGHT_METERS = 9
+const MAX_PUDDLES = (RAIN_PUDDLES.visibleCellRadius * 2 + 1) ** 2
 
 function fraction(value: number): number {
   return value - Math.floor(value)
@@ -20,11 +23,18 @@ function seeded(index: number, salt: number): number {
  */
 export function RainPracticeScene({
   vehicle,
+  rainWater,
 }: {
   vehicle: { current: { x: number; z: number } }
+  rainWater: { current: RainWaterState }
 }) {
   const frame = useRef<THREE.Group>(null)
   const elapsed = useRef(0)
+  const waterSurfaces = useRef<THREE.InstancedMesh>(null)
+  const instance = useMemo(() => new THREE.Object3D(), [])
+  const shallowColor = useMemo(() => new THREE.Color('#668d9c'), [])
+  const deepColor = useMemo(() => new THREE.Color('#b2ced8'), [])
+  const tint = useMemo(() => new THREE.Color(), [])
   const geometry = useMemo(() => {
     const buffer = new Float32Array(DROP_COUNT * 6)
     const attribute = new THREE.BufferAttribute(buffer, 3)
@@ -58,11 +68,54 @@ export function RainPracticeScene({
       positions[start + 5] = z + 0.05
     }
     ;(geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
+
+    // Decals remain fixed to the actual world grid while the rain follows
+    // the observer. Sample the EXACT local depth field used by tire physics.
+    const mesh = waterSurfaces.current
+    if (!mesh) return
+    const samples = rainPuddlesNear(
+      rainWater.current, vehicle.current.x, vehicle.current.z,
+    )
+    for (let i = 0; i < MAX_PUDDLES; i += 1) {
+      const sample = samples[i]
+      instance.position.set(sample?.x ?? 0, 0.018, sample?.z ?? 0)
+      instance.rotation.set(-Math.PI / 2, 0, 0)
+      instance.scale.set(
+        sample?.radiusX ?? 0,
+        sample?.radiusZ ?? 0,
+        1,
+      )
+      instance.updateMatrix()
+      mesh.setMatrixAt(i, instance.matrix)
+      tint.copy(shallowColor).lerp(deepColor, sample?.intensity ?? 0)
+      mesh.setColorAt(i, tint)
+    }
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
   })
 
-  return <group ref={frame}>
+  return <>
+  <group ref={frame}>
     <lineSegments geometry={geometry} frustumCulled={false}>
       <lineBasicMaterial color="#a9cce3" opacity={0.52} transparent depthWrite={false} />
     </lineSegments>
   </group>
+  <instancedMesh
+      ref={waterSurfaces}
+      args={[undefined, undefined, MAX_PUDDLES]}
+      frustumCulled={false}
+      name="world-anchored-rain-puddles"
+    >
+      <circleGeometry args={[1, 28]} />
+      <meshBasicMaterial
+        color="#d1e5f0"
+        transparent
+        opacity={0.22}
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        side={THREE.DoubleSide}
+      />
+    </instancedMesh>
+  </>
 }
