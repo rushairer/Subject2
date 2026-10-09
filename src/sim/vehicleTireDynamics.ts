@@ -22,6 +22,8 @@ export const TRAINING_CAR_DYNAMICS = {
   driveAxle: 'front',
   massKg: 1250,
   yawInertiaKgM2: 2250,
+  // Shared numerical bound for tire dynamics and collision-induced rotation.
+  maximumYawRateRps: 3.5,
   gravityMps2: 9.81,
   frontStaticWeightFraction: FRONT_STATIC_WEIGHT_FRACTION,
   frontAxleFromCgMeters: FRONT_AXLE_FROM_CG_METERS,
@@ -472,7 +474,9 @@ export function stepTireDynamics(
     yawRate *= Math.exp(-0.06 * h)
   }
 
-  yawRate = clamp(yawRate, -3.5, 3.5)
+  yawRate = clamp(yawRate,
+    -TRAINING_CAR_DYNAMICS.maximumYawRateRps,
+    TRAINING_CAR_DYNAMICS.maximumYawRateRps)
   let lateralSpeed =
     lateralSpeedAtCg - cgForwardOffset * yawRate
   const groundSpeed = Math.hypot(
