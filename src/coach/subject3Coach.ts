@@ -2,6 +2,7 @@ import { DRIVING_RULES } from '../rules/drivingRules'
 import { normalizeHeadingDelta } from '../sim/vehicleFrame'
 import { TRAINING_CAR_DYNAMICS } from '../sim/vehicleTireDynamics'
 import { assistCoachStability } from './coachStabilityAssist'
+import { rainCoachStoppingEnvelope, RAIN_COACH_DEFENSE } from './rainDefensiveBraking'
 import {
   SUBJECT3_EVENTS,
   SUBJECT3_ROUTE_LENGTH,
@@ -26,6 +27,12 @@ export interface Subject3CoachVehicle {
   gear: number
   lateralSpeed?: number
   yawRate?: number
+}
+
+export interface Subject3CoachRoadConditions {
+  /** Only set for explicitly chosen advanced rain practice. */
+  surface: 'rain'
+  localWaterDepthMm: number
 }
 
 export interface Subject3CoachRuntime {
@@ -197,7 +204,11 @@ function defensiveTargetSpeedKmh(
   vehicle: Subject3CoachVehicle,
   traffic: Readonly<Subject3TrafficState>,
   progress: number,
+  roadConditions?: Subject3CoachRoadConditions,
 ) {
+  // Preserve the exact established dry-road coach path for exams/demos.
+  const rainy = roadConditions?.surface === 'rain'
+  const depth = rainy ? roadConditions.localWaterDepthMm : 0
   let target = 22
   let reason = ''
   let minimumBrake = 0
@@ -206,16 +217,29 @@ function defensiveTargetSpeedKmh(
     includeStoppedPlayer: true,
   })
   if (lead) {
+    const rainEnvelope = rainy
+      ? rainCoachStoppingEnvelope(
+          vehicle.speed,
+          depth,
+          lead.closingSpeedMps,
+          lead.bumperGapMeters,
+        )
+      : undefined
     const shortGap =
       lead.bumperGapMeters < 14 ||
       (lead.timeGapSeconds > 0 && lead.timeGapSeconds < 2.2) ||
       (lead.timeToCollisionSeconds != null &&
-        lead.timeToCollisionSeconds < 3.2)
+        lead.timeToCollisionSeconds < 3.2) ||
+      (rainEnvelope != null && (
+        lead.bumperGapMeters < rainEnvelope.warningGapMeters ||
+        (lead.timeGapSeconds > 0 &&
+          lead.timeGapSeconds < RAIN_COACH_DEFENSE.followingGapSeconds)
+      ))
     if (shortGap) {
       target = Math.min(target, Math.max(0, lead.leadSpeedMps * 3.6))
       reason = lead.scenario === 'sudden-brake'
-        ? '前车急刹，正在制动避让'
-        : '前车距离较近，正在控制车距'
+        ? rainy ? '雨天前车急刹，提前制动避让' : '前车急刹，正在制动避让'
+        : rainy ? '积水路面，提前制动并增大车距' : '前车距离较近，正在控制车距'
 
       // Match the measured lead speed before the bumpers close. A fixed
       // gentle pedal cannot safely absorb a large closing speed inside the
@@ -226,33 +250,43 @@ function defensiveTargetSpeedKmh(
         lead.bumperGapMeters - 4.5 - closingSpeed * 0.35)
       const decelerationNeeded =
         closingSpeed * closingSpeed / (2 * availableDistance)
-      minimumBrake = clamp(
-        decelerationNeeded /
-          TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration,
-        0,
-        0.9,
-      )
+      minimumBrake = rainEnvelope
+        ? rainEnvelope.requestedBrake
+        : clamp(
+            decelerationNeeded /
+              TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration,
+            0,
+            0.9,
+          )
     }
   }
 
+  const rainHazardLookahead = rainy
+    ? rainCoachStoppingEnvelope(vehicle.speed, depth, vehicle.speed, 40)
+        .earlyHazardLookaheadMeters
+    : 0
   const cutIn = observeSubject3CutInHazard(vehicle, traffic)
   if (
     cutIn?.conflict &&
     cutIn.progressDeltaMeters >= -1 &&
-    cutIn.progressDeltaMeters <= 18
+    cutIn.progressDeltaMeters <= 18 + rainHazardLookahead
   ) {
     target = 0
-    reason = '电动车加塞冲突，正在制动避让'
+    reason = rainy
+      ? '雨天电动车加塞，提前制动避让'
+      : '电动车加塞冲突，正在制动避让'
+    if (rainy) minimumBrake = Math.max(minimumBrake, 0.78)
   }
 
   const pedestrian = observeSubject3PedestrianHazard(vehicle, traffic)
   if (
     pedestrian?.conflict &&
     pedestrian.progressDeltaMeters >= -2 &&
-    pedestrian.progressDeltaMeters <= 24
+    pedestrian.progressDeltaMeters <= 24 + rainHazardLookahead
   ) {
     target = 0
-    reason = '行人横穿冲突，停车让行'
+    reason = rainy ? '积水路面行人横穿，提前停车让行' : '行人横穿冲突，停车让行'
+    if (rainy) minimumBrake = Math.max(minimumBrake, 0.78)
   }
 
   if (
@@ -261,7 +295,8 @@ function defensiveTargetSpeedKmh(
     progress <= 2605
   ) {
     target = 0
-    reason = '人行横道有行人，停车让行'
+    reason = rainy ? '雨天人行横道有行人，提前停车让行' : '人行横道有行人，停车让行'
+    if (rainy) minimumBrake = Math.max(minimumBrake, 0.78)
   }
 
   return { target, reason, minimumBrake }
@@ -281,6 +316,7 @@ export function stepSubject3Coach(
   night: boolean,
   traffic: Readonly<Subject3TrafficState>,
   practiceSlice?: Subject3PracticeSliceId,
+  roadConditions?: Subject3CoachRoadConditions,
 ): { runtime: Subject3CoachRuntime; command: Subject3CoachCommand } {
   const elapsedSeconds =
     previous.elapsedSeconds + Math.max(0, dt)
@@ -294,6 +330,7 @@ export function stepSubject3Coach(
     vehicle,
     traffic,
     progress,
+    roadConditions,
   )
   const defensiveStopping =
     !waitingForStart &&
