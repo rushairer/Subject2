@@ -32,7 +32,7 @@ export const TRAINING_CAR_DYNAMICS = {
   cgForwardFromBodyCenterMeters:
     CG_FORWARD_FROM_BODY_CENTER_METERS,
   centerOfMassHeightMeters: 0.52,
-  tireFrictionCoefficient: 0.92,
+  tireFrictionCoefficient: roadSurfaceFriction('dry'),
   frontCorneringAccelerationPerRadian: 43,
   rearCorneringAccelerationPerRadian: 46,
   serviceBrakeAcceleration: 9.4,
