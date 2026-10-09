@@ -64,7 +64,7 @@ test('wiper glass points share exact Santana production windshield endpoints', (
   assert.equal(outsideLeft[0], -FRONT_WINDSHIELD.upperHalfWidth)
   const inward = frontWindshieldPoint(0, 0.2, 0.03)
   assert.ok(inward[2] > frontWindshieldPoint(0, 0.2)[2],
-    'droplets are positioned on the driver's side of the glass')
+    "droplets are positioned on the driver-side surface of the glass")
 })
 
 test('physical wiper arms and rubber blades stay on the glass at every sweep stage', () => {
