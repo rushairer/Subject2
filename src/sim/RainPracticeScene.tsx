@@ -94,11 +94,13 @@ export function RainPracticeScene({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
   })
 
-  return <group ref={frame}>
+  return <>
+  <group ref={frame}>
     <lineSegments geometry={geometry} frustumCulled={false}>
       <lineBasicMaterial color="#a9cce3" opacity={0.52} transparent depthWrite={false} />
     </lineSegments>
-    <instancedMesh
+  </group>
+  <instancedMesh
       ref={waterSurfaces}
       args={[undefined, undefined, MAX_PUDDLES]}
       frustumCulled={false}
@@ -115,5 +117,5 @@ export function RainPracticeScene({
         side={THREE.DoubleSide}
       />
     </instancedMesh>
-  </group>
+  </>
 }
