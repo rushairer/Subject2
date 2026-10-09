@@ -45,6 +45,8 @@ import {
 } from './coach/coachDemoSession'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
+import { createRainWaterState } from './sim/rainWater'
+import { RainPracticeScene } from './sim/RainPracticeScene'
 import { ROAD_SURFACES, ROAD_SURFACE_IDS, type RoadSurfaceId } from './sim/roadSurface'
 import { TireSkidMarks } from './sim/TireSkidMarks'
 import { TireSmoke } from './sim/TireSmoke'
@@ -146,6 +148,8 @@ interface Vehicle {
   absActive?: boolean
   lateralSpeed?: number
   yawRate?: number
+  localWaterDepthMm?: number
+  aquaplaningSeverity?: number
 }
 interface Infraction {
   id: string
@@ -513,6 +517,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
   const runtimeProject = useRef(session.examId)
   const carGroup = useRef<THREE.Group>(null)
   const tireTelemetry = useRef<TireTelemetry | null>(null)
+  const rainWater = useRef(createRainWaterState())
   const suspensionVisualState = useRef(createSuspensionVisualState())
   const suspensionPose = useRef<SuspensionVisualPose>({ pitch: 0, roll: 0 })
   const lastProjectStatus = useRef('')
@@ -800,6 +805,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       grade: slopeBeforeStep.grade,
       gradeHeading: slopeGradeHeading,
       surface: session.surface,
+      rainWater: session.surface === 'rain' ? rainWater.current : undefined,
     })
     tireTelemetry.current = physics.tire
     suspensionVisualState.current = stepSuspensionVisual(
@@ -1067,6 +1073,7 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
     <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
+    {session.surface === 'rain' && <RainPracticeScene vehicle={vehicle} />}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} suspensionPose={suspensionPose} showClutch={!automatic} automatic={automatic} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>
@@ -1420,6 +1427,12 @@ function Driving({ session, candidate, onIncident, onDone, onExit }: { session: 
           </aside>
         : hudProjectStatus && <div className={`project-status${navigatingToProject ? ' route-status' : ''}`}>{hudProjectStatus}</div>}
       <DrivingHelp automatic={automatic} expanded={helpExpanded} onToggle={toggleHelp} />
+      {session.surface === 'rain' && <aside className="rain-readout" aria-label="暴雨积水训练数据">
+        <span>动态积水 · 模拟训练</span>
+        <strong>局部水深 {(display.localWaterDepthMm ?? 0).toFixed(1)} mm</strong>
+        <small>水滑风险 {(display.aquaplaningSeverity ?? 0) < 0.14
+          ? '较低' : (display.aquaplaningSeverity ?? 0) < 0.45 ? '升高' : '较高'} · 车速越快越应提前减速</small>
+      </aside>}
       <div className="steering-hud" aria-label="方向盘位置">
         <div className="steering-hud-ring">
           <div className="steering-hud-rotor" style={{ transform: `rotate(${display.steeringWheelAngle}rad)` }}>
