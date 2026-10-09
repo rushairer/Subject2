@@ -45,7 +45,7 @@ import {
 } from './coach/coachDemoSession'
 import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
-import { createRainWaterState } from './sim/rainWater'
+import { createRainWaterState, localRainWaterDepthMm } from './sim/rainWater'
 import { RainPracticeScene } from './sim/RainPracticeScene'
 import { ROAD_SURFACES, ROAD_SURFACE_IDS, type RoadSurfaceId } from './sim/roadSurface'
 import { TireSkidMarks } from './sim/TireSkidMarks'
@@ -741,6 +741,14 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
             session.time === 'night',
             subject3Traffic.current,
             session.subject3Practice,
+            session.surface === 'rain'
+              ? {
+                  surface: 'rain',
+                  localWaterDepthMm: localRainWaterDepthMm(
+                    rainWater.current, v.x, v.z,
+                  ),
+                }
+              : undefined,
           )
         : null
     if (subject3CoachStep) {
