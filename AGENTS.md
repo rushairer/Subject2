@@ -632,11 +632,20 @@ The “本次优先改进” block must remain readable inside the result-card c
 
 ## Training road adhesion presets
 
-- `src/sim/roadSurface.ts` exclusively owns optional dry/wet/low-grip friction presets. Values are reproducible simulator tuning coefficients, not weather data, tire certification figures, statutory braking thresholds or claims about a specific Chinese examination site.
+- `src/sim/roadSurface.ts` exclusively owns optional dry/wet/low-grip/rain friction presets. Values are reproducible simulator tuning coefficients, not weather data, tire certification figures, statutory braking thresholds or claims about a specific Chinese examination site.
 - The default and explicitly selected dry road must remain bit-for-bit identical across normal physics, reverse Subject 2 maneuvers, C1/C2 Golden Driver, ABS, collisions and scoring. Keep the historical low-speed kinematic bicycle; do not smuggle a new dynamic solver into reverse parking.
 - Optional training surface must reach the same `stepVehiclePhysics(..., options.surface)` call as actual driving input, and its coefficient must feed all four wheel friction budgets, ABS preview and physically available braking/drive force. Never merely change a road label or visual and leave physics unchanged.
-- Only individually launched `practice` sessions and Subject 3 short drills may select wet/low-grip surfaces in the menu. Formal exam mode, complete coach demonstrations and training-pack performance baselines remain dry. Do not alter score or infraction matrices as a consequence of a surface choice.
+- Only individually launched `practice` sessions and Subject 3 short drills may select wet/low-grip/rain surfaces in the menu. Formal exam mode, complete coach demonstrations and training-pack performance baselines remain dry. Do not alter score or infraction matrices as a consequence of a surface choice.
 - Add deterministic coverage in `tests/road-surface-physics.test.ts` for strict dry compatibility, ordered braking distance, front drive traction, grip usage, low-grip nonlinear steering, 30/60 Hz substep agreement and reverse geometry. Browser smoke must exercise the menu selection and verify it is present in the driving HUD, with exam selection separated.
+
+## Dynamic rainwater and aquaplaning practice
+
+- `src/sim/rainWater.ts` owns the rain-only evolving water volume, drainage, coordinate-anchored local pooling and bounded speed-and-depth contact-risk proxy. These are **simulator learning heuristics**, not verified weather measurements, a real tire hydrodynamics model or an additional statutory exam threshold.
+- Only the explicit `surface: 'rain'` practice option activates accumulating road water. Evolve its shared `RainWaterState` from `stepVehiclePhysicsSubstep` so a 30 FPS frame and equal 60 FPS substeps agree; do not use React render clocks or wall time to advance physics weather. All prior surfaces and formal exams ignore this state.
+- The water-risk estimate may **only** reduce available tire-road contact through `effectiveRoadFriction(...)`; this exact coefficient must feed all four wheel normal-load grip budgets, ABS telemetry, front-drive traction and service/parking braking. Do not add arbitrary sideways yaw impulses, snap speeds to zero, fabricate ABS events or mutate judge/score state.
+- Keep plain wet grip distinct from pooled-water risk. An unmeasured or absent water-depth input cannot trigger water slip. At zero or low road speed, standing water cannot invoke high-speed aquaplaning. Preserve rear-axle low-speed/reverse geometry and coach demos unchanged.
+- `src/sim/RainPracticeScene.tsx` renders optional, bounded-density rain streaks while the driver's HUD displays the actual current local water depth and shared tire risk from the physics state. Rendering and HUD must never simulate a second rain clock, contact coefficient or scoring rule.
+- `tests/rain-water-dynamics.test.ts` must cover bounded rainfall and runoff, spatial continuity, monotonic speed/depth risk, exact dry/wet/low-grip compatibility, longer physical rain braking, full tire load/grip telemetry, C1/C2 reverse isolation, and 30/60 FPS weather+vehicle equivalence. Add browser coverage for selecting rain in practice, seeing a real WebGL scene and reading a nonzero water depth; Pages must still await all gates.
 
 ## Training-car tire dynamics
 
