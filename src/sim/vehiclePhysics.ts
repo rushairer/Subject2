@@ -1,7 +1,13 @@
 import { DRIVING_RULES } from '../rules/drivingRules'
 import { forwardFromHeading, rightFromHeading } from './vehicleFrame'
 import { recordVehicleBeforePhysics } from './vehicleCollision'
-import { relativeRoadGrip, roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
+import { effectiveRoadFriction, relativeRoadGrip, roadSurfaceFriction, type RoadSurfaceId } from './roadSurface'
+import {
+  advanceRainWater,
+  createRainWaterState,
+  localRainWaterDepthMm,
+  type RainWaterState,
+} from './rainWater'
 import {
   TRAINING_CAR_DYNAMICS,
   kinematicTireTelemetry,
@@ -43,6 +49,9 @@ export interface PhysicsVehicle {
   absFrontPressureFactor?: number
   absRearPressureFactor?: number
   absActive?: boolean
+  /** Shallow local water depth and contact-risk indicators for practice HUD. */
+  localWaterDepthMm?: number
+  aquaplaningSeverity?: number
 }
 
 export interface PhysicsInput {
@@ -68,6 +77,8 @@ export interface PhysicsOptions {
   absEnabled?: boolean
   /** Optional training condition. Unspecified keeps the exact dry baseline. */
   surface?: RoadSurfaceId
+  /** Shared mutable rain accumulation state, stepped by the physics integrator. */
+  rainWater?: RainWaterState
 }
 
 export function longitudinalGravityAcceleration(
@@ -114,7 +125,15 @@ function stepVehiclePhysicsSubstep(
     gradeHeading = 0,
     absEnabled = true,
     surface = 'dry',
+    rainWater,
   } = options
+  // Advance weather on exactly the same bounded substeps as the vehicle.
+  // The optional rain preset never mutates an exam or ordinary dry session.
+  if (surface === 'rain' && rainWater) advanceRainWater(rainWater, dt)
+  const localWaterDepthMm = surface === 'rain'
+    ? localRainWaterDepthMm(rainWater ?? createRainWaterState(), vehicle.x, vehicle.z)
+    : 0
+  const roadGroundSpeed = () => Math.hypot(vehicle.speed, vehicle.lateralSpeed ?? 0)
   const powertrain = VEHICLE_POWERTRAIN
   vehicle.throttle = input.throttle
   vehicle.brake = input.brake
@@ -222,8 +241,9 @@ function stepVehiclePhysicsSubstep(
     const driveForce = (throttleForce + biteAssist + automaticCreep) * driveFactor * clutchEngagement
     // A wet front-drive axle cannot put unlimited engine torque into the
     // road. Keep the dry branch bit-for-bit identical for existing exams.
-    const frontAxleTraction = roadSurfaceFriction(surface) *
-      TRAINING_CAR_DYNAMICS.gravityMps2 *
+    const frontAxleTraction = effectiveRoadFriction(
+      surface, roadGroundSpeed(), localWaterDepthMm,
+    ) * TRAINING_CAR_DYNAMICS.gravityMps2 *
       TRAINING_CAR_DYNAMICS.frontStaticWeightFraction
     driveAcceleration = surface === 'dry'
       ? driveForce
@@ -270,6 +290,8 @@ function stepVehiclePhysicsSubstep(
     rearServiceBrakeFactor: previousAbs.rearPressureFactor,
     lateralAccelerationEstimate: vehicle.speed * previewYawRate,
     surface,
+    localWaterDepthMm,
+    groundSpeedMps: roadGroundSpeed(),
   }, {
     lateralSpeed: vehicle.lateralSpeed ?? 0,
     yawRate: vehicle.yawRate ?? previewYawRate,
@@ -307,7 +329,11 @@ function stepVehiclePhysicsSubstep(
   const braking = surface === 'dry'
     ? requestedBraking
     : Math.min(requestedBraking,
-        TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration * relativeRoadGrip(surface))
+        TRAINING_CAR_DYNAMICS.serviceBrakeAcceleration *
+          (surface === 'rain'
+            ? effectiveRoadFriction(surface, roadGroundSpeed(), localWaterDepthMm) /
+              roadSurfaceFriction('dry')
+            : relativeRoadGrip(surface)))
   if (Math.abs(vehicle.speed) > 0.001) {
     vehicle.speed -= Math.sign(vehicle.speed) * Math.min(
       Math.abs(vehicle.speed),
@@ -350,6 +376,8 @@ function stepVehiclePhysicsSubstep(
     frontServiceBrakeFactor: abs.frontPressureFactor,
     rearServiceBrakeFactor: abs.rearPressureFactor,
     surface,
+    localWaterDepthMm,
+    groundSpeedMps: groundSpeedBefore,
   }
   const lateralRecoveryError = Math.abs(
     previousLateralSpeed - kinematicLateralSpeed,
@@ -446,6 +474,10 @@ function stepVehiclePhysicsSubstep(
     )
   }
 
+  if (surface === 'rain') {
+    vehicle.localWaterDepthMm = localWaterDepthMm
+    vehicle.aquaplaningSeverity = tire.aquaplaningSeverity ?? 0
+  }
   vehicle.frontWheelRotationFactor = tire.frontWheelRotationFactor
   vehicle.rearWheelRotationFactor = tire.rearWheelRotationFactor
   return { stalled, tire, abs }
