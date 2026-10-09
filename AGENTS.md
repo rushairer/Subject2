@@ -627,6 +627,14 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Physics regressions must prove that higher gears extend usable road speed, reverse remains naturally bounded, and downhill gravity can exceed any historical low speed ceiling without numerical runaway.
 
 
+## Training road adhesion presets
+
+- `src/sim/roadSurface.ts` exclusively owns optional dry/wet/low-grip friction presets. Values are reproducible simulator tuning coefficients, not weather data, tire certification figures, statutory braking thresholds or claims about a specific Chinese examination site.
+- The default and explicitly selected dry road must remain bit-for-bit identical across normal physics, reverse Subject 2 maneuvers, C1/C2 Golden Driver, ABS, collisions and scoring. Keep the historical low-speed kinematic bicycle; do not smuggle a new dynamic solver into reverse parking.
+- Optional training surface must reach the same `stepVehiclePhysics(..., options.surface)` call as actual driving input, and its coefficient must feed all four wheel friction budgets, ABS preview and physically available braking/drive force. Never merely change a road label or visual and leave physics unchanged.
+- Only individually launched `practice` sessions and Subject 3 short drills may select wet/low-grip surfaces in the menu. Formal exam mode, complete coach demonstrations and training-pack performance baselines remain dry. Do not alter score or infraction matrices as a consequence of a surface choice.
+- Add deterministic coverage in `tests/road-surface-physics.test.ts` for strict dry compatibility, ordered braking distance, front drive traction, grip usage, low-grip nonlinear steering, 30/60 Hz substep agreement and reverse geometry. Browser smoke must exercise the menu selection and verify it is present in the driving HUD, with exam selection separated.
+
 ## Training-car tire dynamics
 
 - The canonical training car is front-engine/front-wheel drive for handling simulation. Engine drive torque consumes front-axle tire grip; do not model propulsion as rear-wheel drive or all-wheel drive.
