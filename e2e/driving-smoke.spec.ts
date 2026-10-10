@@ -813,8 +813,8 @@ test('rain WebGL workload probe records live FPS, render budget and wiper cleari
       .__subject2RainPerf?.sampleFrames ?? 0,
   ), { timeout: 20_000 }).toBeGreaterThan(0)
 
-  const perf = await page.evaluate(() => (
-    window as Window & {
+  const perf = await page.evaluate(() => {
+    const rain = window as Window & {
       __subject2RainPerf?: {
         fps: number; peakFrameDrawCalls: number; peakFrameTriangles: number;
         geometries: number; textures: number;
@@ -826,7 +826,12 @@ test('rain WebGL workload probe records live FPS, render budget and wiper cleari
         totalDrops: number; visibleDrops: number; hiddenDrops: number;
       }
     }
-  ))
+    return {
+      __subject2RainPerf: rain.__subject2RainPerf,
+      __subject2RainScene: rain.__subject2RainScene,
+      __subject2RainGlass: rain.__subject2RainGlass,
+    }
+  })
   expect(perf.__subject2RainPerf?.fps).toBeGreaterThan(0)
   expect(perf.__subject2RainPerf?.peakFrameDrawCalls).toBeGreaterThan(0)
   expect(perf.__subject2RainPerf?.geometries).toBeGreaterThan(0)
