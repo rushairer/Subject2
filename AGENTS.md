@@ -716,3 +716,13 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Aggregate transient events (especially a C1 engine stall) across every substep; returning only the final substep's `stalled` flag hides a genuine failure.
 - Use the same powertrain, brake, tire, rear-axle parking geometry and shared telemetry on every substep; do not bypass course judges or teleport poses.
 - Changes require deterministic comparisons of long-frame and equivalent repeated short-frame behavior across reverse parking, dynamic handbrake slip, hard ABS braking and rotated uphill rollback.
+
+
+## Rain scene authenticity and rendering acceptance
+
+- Rain-puddle visual footprints and color bands must increase consistently with the one shared rain-water depth field. No decals for almost-dry water, and no independent grip, collision or score logic. Keep the existing world-anchored grid fixed as the vehicle moves.
+- `rainPuddleSamplingKey` gates GPU instance uploads by vehicle grid cell and a shallow water-depth bucket. Do not rebuild all water instances each animation frame. This is a visual cache only; tire contact keeps sampling the exact unquantized authoritative water state.
+- Rain streak positions/speeds and glass droplet properties are seeded once; animation moves only the existing bounded buffers. Avoid per-droplet trigonometric hashes or new Vector3 allocations every frame.
+- Glass clearing must track the entire physical blade arc between frames and work at 30/60 Hz, without clearing outside the blade radius or affecting rear/side windows. Rain windshield objects mount only in rainy first-person practice.
+- For a diagnostic rain session add `?renderDiagnostics=1` to expose opt-in `window.__subject2RainPerf` (sampled FPS, peak draw calls/triangles, GPU geometry/texture object counts), `window.__subject2RainScene` (instance budgets and refresh count) and `window.__subject2RainGlass` (droplet/clearance counts). Never treat software SwiftShader FPS as physical GPU performance: collect real-device baselines separately for low-end integrated GPUs and high-DPI screens.
+- Preserve the existing `npm test`, `npm run build`, `npm run test:e2e` release gates. Acceptance must document physical screenshot/first-person sightline inspection and per-hardware FPS measurements separately from automated deterministic checks.

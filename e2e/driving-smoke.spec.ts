@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
-async function createC2Candidate(page: Page, name = 'E2E考生') {
-  await page.goto('./')
+async function createC2Candidate(page: Page, name = 'E2E考生', query = '') {
+  await page.goto(`./${query}`)
   await expect(page).toHaveTitle(/科目二/)
 
   await page.getByLabel('姓名').fill(name)
@@ -795,5 +795,51 @@ test('real rain practice exposes first-person off/slow/fast wipers without leaki
   await page.getByRole('button', { name: '雨刮器：关闭' }).click()
   await expect(page.getByRole('button', { name: '雨刮器：慢速' })).toBeVisible()
   await expect(page.getByRole('complementary', { name: '暴雨积水训练数据' })).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
+
+
+test('rain WebGL workload probe records live FPS, render budget and wiper clearing', async ({ page }) => {
+  test.setTimeout(110_000)
+  const runtimeErrors = captureRuntimeErrors(page)
+  await createC2Candidate(page, '雨天性能验收', '?renderDiagnostics=1')
+  await page.getByRole('group', { name: '路面附着力训练' })
+    .getByRole('button', { name: '暴雨积水' }).click()
+  await page.locator('.task-card').filter({ hasText: '倒车入库' }).click()
+  await expectHealthyDrivingScene(page)
+
+  await expect.poll(async () => page.evaluate(() =>
+    (window as Window & { __subject2RainPerf?: { sampleFrames: number } })
+      .__subject2RainPerf?.sampleFrames ?? 0,
+  ), { timeout: 20_000 }).toBeGreaterThan(0)
+
+  const perf = await page.evaluate(() => {
+    const rain = window as Window & {
+      __subject2RainPerf?: {
+        fps: number; peakFrameDrawCalls: number; peakFrameTriangles: number;
+        geometries: number; textures: number;
+      }
+      __subject2RainScene?: {
+        puddleRefreshes: number; rainStreaks: number; maxPuddles: number;
+      }
+      __subject2RainGlass?: {
+        totalDrops: number; visibleDrops: number; hiddenDrops: number;
+      }
+    }
+    return {
+      __subject2RainPerf: rain.__subject2RainPerf,
+      __subject2RainScene: rain.__subject2RainScene,
+      __subject2RainGlass: rain.__subject2RainGlass,
+    }
+  })
+  expect(perf.__subject2RainPerf?.fps).toBeGreaterThan(0)
+  expect(perf.__subject2RainPerf?.peakFrameDrawCalls).toBeGreaterThan(0)
+  expect(perf.__subject2RainPerf?.geometries).toBeGreaterThan(0)
+  expect(perf.__subject2RainPerf?.textures).toBeGreaterThanOrEqual(0)
+  expect(perf.__subject2RainScene?.rainStreaks).toBe(176)
+  expect(perf.__subject2RainScene?.maxPuddles).toBe(81)
+  expect(perf.__subject2RainGlass?.totalDrops).toBe(112)
+  expect(perf.__subject2RainGlass?.hiddenDrops).toBeGreaterThanOrEqual(0)
+  expect(perf.__subject2RainGlass?.visibleDrops).toBeLessThanOrEqual(112)
   expect(runtimeErrors).toEqual([])
 })

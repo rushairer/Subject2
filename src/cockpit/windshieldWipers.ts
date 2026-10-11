@@ -94,6 +94,36 @@ export function isGlassDropBeingWiped(
 }
 
 /** Returns the point on the single canonical glass, toward the driver. */
+/**
+ * Sweep-aware contact against the radial rubber-blade footprint. Unlike a
+ * current-frame-only test, this covers every angle traversed between 30 Hz or
+ * 60 Hz frames without spawning intermediate Three.js geometry.
+ */
+export function isGlassDropWipedDuringSweep(
+  point: GlassCoordinate,
+  previousPhase: number,
+  currentPhase: number,
+): boolean {
+  if (![point.x, point.y, previousPhase, currentPhase].every(Number.isFinite)) return false
+  if (point.y < 0 || point.y > WINDSHIELD_HEIGHT) return false
+  const from = WINDSHIELD_WIPERS.parkedAngleRadians +
+    Math.max(0, Math.min(1, previousPhase)) * WINDSHIELD_WIPERS.sweepRadians
+  const to = WINDSHIELD_WIPERS.parkedAngleRadians +
+    Math.max(0, Math.min(1, currentPhase)) * WINDSHIELD_WIPERS.sweepRadians
+  for (const arm of WIPER_ARMS) {
+    const distance = Math.hypot(point.x - arm.x, point.y - arm.y)
+    const near = arm.armMeters - arm.bladeHalfMeters
+    const far = arm.armMeters + arm.bladeHalfMeters
+    const clearance = WINDSHIELD_WIPERS.bladeClearanceMeters
+    if (distance < near - clearance || distance > far + clearance) continue
+    const angle = Math.atan2(point.y - arm.y, point.x - arm.x)
+    const angularClearance = Math.asin(Math.min(1, clearance / Math.max(distance, clearance)))
+    if (angle >= Math.min(from, to) - angularClearance &&
+        angle <= Math.max(from, to) + angularClearance) return true
+  }
+  return false
+}
+
 export function wiperGlassPoint(
   coordinate: GlassCoordinate,
   offset = 0.027,

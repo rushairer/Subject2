@@ -1,5 +1,6 @@
 import {
   localRainWaterDepthMm,
+  RAIN_WATER,
   type RainWaterState,
 } from './rainWater'
 
@@ -11,8 +12,10 @@ import {
 export const RAIN_PUDDLES = {
   cellMeters: 7,
   visibleCellRadius: 4,
-  minimumDepthMm: 2.05,
-  maximumVisualDepthMm: 7.5,
+  minimumDepthMm: 1.8,
+  maximumVisualDepthMm: 8,
+  // Do not rebuild the same 81 instance matrices at 60 Hz for sub-pixel depth changes.
+  sampleDepthStepMm: 0.08,
 } as const
 
 export interface RainPuddleVisual {
@@ -23,6 +26,19 @@ export interface RainPuddleVisual {
   radiusX: number
   radiusZ: number
   intensity: number
+}
+
+/** Cache key: fixed world grid plus a visually meaningful water-depth bucket. */
+export function rainPuddleSamplingKey(
+  state: Readonly<RainWaterState>,
+  worldX: number,
+  worldZ: number,
+): string | null {
+  if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) return null
+  const depth = Number.isFinite(state.averageDepthMm)
+    ? Math.max(0, Math.min(RAIN_WATER.maximumAverageDepthMm, state.averageDepthMm))
+    : 0
+  return `${Math.floor(worldX / RAIN_PUDDLES.cellMeters)}:${Math.floor(worldZ / RAIN_PUDDLES.cellMeters)}:${Math.floor(depth / RAIN_PUDDLES.sampleDepthStepMm)}`
 }
 
 const clamp = (value: number, low: number, high: number) =>
@@ -59,7 +75,7 @@ export function rainPuddlesNear(
         (depthMm - minimumDepthMm) / (maximumVisualDepthMm - minimumDepthMm),
         0, 1,
       )
-      const footprint = 0.55 + intensity * 1.95
+      const footprint = 0.28 + intensity * 2.2
       puddles.push({
         x,
         z,
