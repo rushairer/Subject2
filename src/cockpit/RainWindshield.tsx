@@ -1,15 +1,15 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
-  frontWindshieldPoint,
+  frontWindshieldPointInto,
   WINDSHIELD_INCLINE,
 } from './windshieldGeometry'
 import {
   isGlassDropWipedDuringSweep,
   windshieldWiperStrokes,
-  wiperGlassPoint,
   wiperSweepPosition,
+  type GlassCoordinate,
   type WindshieldWiperMode,
 } from './windshieldWipers'
 
@@ -26,14 +26,15 @@ function seeded(index: number, salt: number): number {
 
 function setRod(
   mesh: THREE.Mesh | null,
-  a: [number, number, number],
-  b: [number, number, number],
+  a: GlassCoordinate,
+  b: GlassCoordinate,
   start: THREE.Vector3,
   end: THREE.Vector3,
+  offset = 0.027,
 ): void {
   if (!mesh) return
-  start.set(...a)
-  end.set(...b)
+  frontWindshieldPointInto(start, a.x, a.y, offset)
+  frontWindshieldPointInto(end, b.x, b.y, offset)
   const length = end.distanceTo(start)
   mesh.position.copy(start).add(end).multiplyScalar(0.5)
   mesh.quaternion.setFromUnitVectors(UNIT_VERTICAL, end.sub(start).normalize())
@@ -51,6 +52,7 @@ export function RainWindshield({
 }: {
   mode: WindshieldWiperMode
 }) {
+  const { camera } = useThree()
   const leftArm = useRef<THREE.Mesh>(null)
   const rightArm = useRef<THREE.Mesh>(null)
   const leftBlade = useRef<THREE.Mesh>(null)
@@ -60,6 +62,8 @@ export function RainWindshield({
   const wiperElapsed = useRef(0)
   const previousMode = useRef<WindshieldWiperMode>(mode)
   const previousSweep = useRef(0)
+  const cumulativeClears = useRef(0)
+  const peakFocusClears = useRef(0)
   const hiddenUntil = useRef(new Float32Array(DROP_COUNT))
   const diagnosticsEnabled = useMemo(
     () => typeof window !== 'undefined' &&
@@ -81,6 +85,7 @@ export function RainWindshield({
   )
   const scratchA = useMemo(() => new THREE.Vector3(), [])
   const scratchB = useMemo(() => new THREE.Vector3(), [])
+  const projectedDrop = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => () => {
     if (diagnosticsEnabled) {
@@ -102,18 +107,21 @@ export function RainWindshield({
     const strokes = windshieldWiperStrokes(sweep)
     for (const [index, stroke] of strokes.entries()) {
       setRod(index === 0 ? leftArm.current : rightArm.current,
-        wiperGlassPoint(stroke.pivot),
-        wiperGlassPoint(stroke.armEnd),
-        scratchA, scratchB)
+        stroke.pivot, stroke.armEnd, scratchA, scratchB)
       setRod(index === 0 ? leftBlade.current : rightBlade.current,
-        wiperGlassPoint(stroke.bladeStart, 0.038),
-        wiperGlassPoint(stroke.bladeEnd, 0.038),
-        scratchA, scratchB)
+        stroke.bladeStart, stroke.bladeEnd, scratchA, scratchB, 0.038)
     }
 
     const mesh = rainBeads.current
     if (!mesh) return
+    if (diagnosticsEnabled) {
+      // Read real projected driver-eye screen positions, not invented glass X/Y rectangles.
+      camera.updateMatrixWorld()
+      mesh.updateWorldMatrix(true, false)
+    }
     let hiddenDrops = 0
+    let sightlineDrops = 0
+    let sightlineCleared = 0
     for (let i = 0; i < DROP_COUNT; i += 1) {
       const drop = drops[i]
       const y = 0.09 + fraction(drop.initialHeight -
@@ -121,12 +129,22 @@ export function RainWindshield({
       if (mode !== 'off' && isGlassDropWipedDuringSweep(
         { x: drop.x, y }, previousSweep.current, sweep,
       )) {
+        if (elapsed.current >= hiddenUntil.current[i]) cumulativeClears.current += 1
         hiddenUntil.current[i] = elapsed.current + 0.55
       }
-      droplet.position.set(...frontWindshieldPoint(drop.x, y, 0.045))
+      frontWindshieldPointInto(droplet.position, drop.x, y, 0.045)
       droplet.quaternion.copy(planeRotation)
       const hidden = elapsed.current < hiddenUntil.current[i]
       if (hidden) hiddenDrops += 1
+      if (diagnosticsEnabled) {
+        projectedDrop.copy(droplet.position).applyMatrix4(mesh.matrixWorld).project(camera)
+        const centered = projectedDrop.z >= -1 && projectedDrop.z <= 1 &&
+          Math.abs(projectedDrop.x) <= 0.55 && Math.abs(projectedDrop.y) <= 0.55
+        if (centered) {
+          sightlineDrops += 1
+          if (hidden) sightlineCleared += 1
+        }
+      }
       const size = hidden ? 0 : drop.size
       droplet.scale.set(size, size * drop.stretch, 1)
       droplet.updateMatrix()
@@ -135,12 +153,18 @@ export function RainWindshield({
     previousSweep.current = sweep
     mesh.instanceMatrix.needsUpdate = true
     if (diagnosticsEnabled) {
+      peakFocusClears.current = Math.max(peakFocusClears.current, sightlineCleared)
       (window as Window & { __subject2RainGlass?: object }).__subject2RainGlass = {
         mode,
         phase: sweep,
         totalDrops: DROP_COUNT,
         visibleDrops: DROP_COUNT - hiddenDrops,
         hiddenDrops,
+        cumulativeClears: cumulativeClears.current,
+        driverFocusDrops: sightlineDrops,
+        driverFocusVisible: sightlineDrops - sightlineCleared,
+        driverFocusCleared: sightlineCleared,
+        peakDriverFocusCleared: peakFocusClears.current,
       }
     }
   })
