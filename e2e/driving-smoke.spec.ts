@@ -841,5 +841,9 @@ test('rain WebGL workload probe records live FPS, render budget and wiper cleari
   expect(perf.__subject2RainGlass?.totalDrops).toBe(112)
   expect(perf.__subject2RainGlass?.hiddenDrops).toBeGreaterThanOrEqual(0)
   expect(perf.__subject2RainGlass?.visibleDrops).toBeLessThanOrEqual(112)
+  await expect.poll(async () => page.evaluate(() =>
+    (window as Window & { __subject2RainSpray?: { capacity: number } })
+      .__subject2RainSpray?.capacity ?? 0,
+  )).toBe(128)
   expect(runtimeErrors).toEqual([])
 })

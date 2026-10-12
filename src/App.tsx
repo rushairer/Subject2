@@ -47,6 +47,7 @@ import { subject3Infraction } from './rules/subject3Rules'
 import { stepVehiclePhysics } from './sim/vehiclePhysics'
 import { createRainWaterState } from './sim/rainWater'
 import { RainPracticeScene } from './sim/RainPracticeScene'
+import { RainTireSpray } from './sim/RainTireSpray'
 import { RainRenderDiagnostics } from './sim/RainRenderDiagnostics'
 import type { WindshieldWiperMode } from './cockpit/windshieldWipers'
 import { ROAD_SURFACES, ROAD_SURFACE_IDS, type RoadSurfaceId } from './sim/roadSurface'
@@ -1081,8 +1082,12 @@ function DrivingWorld({ vehicle, session, automatic, continuousExam, projectJudg
       <Road />
     )}
     <TireSkidMarks vehicle={vehicle} telemetry={tireTelemetry} />
-    <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />
-    {session.surface === 'rain' && <><RainPracticeScene vehicle={vehicle} rainWater={rainWater} /><RainRenderDiagnostics /></>}
+    {session.surface !== 'rain' && <TireSmoke vehicle={vehicle} telemetry={tireTelemetry} />}
+    {session.surface === 'rain' && <>
+      <RainPracticeScene vehicle={vehicle} rainWater={rainWater} />
+      <RainTireSpray vehicle={vehicle} rainWater={rainWater} />
+      <RainRenderDiagnostics />
+    </>}
     <group ref={carGroup}><DrivingCockpit vehicle={vehicle} suspensionPose={suspensionPose} showClutch={!automatic} automatic={automatic} rainWiperMode={session.surface === 'rain' && cameraMode === 'first' ? rainWiperMode : undefined} /></group>
     <mesh rotation-x={-Math.PI / 2} position={[0, -.08, -185]}><planeGeometry args={[260, 500]} /><meshStandardMaterial color={night ? '#14201a' : '#657b59'} /></mesh>
   </>

@@ -726,3 +726,13 @@ The “本次优先改进” block must remain readable inside the result-card c
 - Glass clearing must track the entire physical blade arc between frames and work at 30/60 Hz, without clearing outside the blade radius or affecting rear/side windows. Rain windshield objects mount only in rainy first-person practice.
 - For a diagnostic rain session add `?renderDiagnostics=1` to expose opt-in `window.__subject2RainPerf` (sampled FPS, peak draw calls/triangles, GPU geometry/texture object counts), `window.__subject2RainScene` (instance budgets and refresh count) and `window.__subject2RainGlass` (droplet/clearance counts). Never treat software SwiftShader FPS as physical GPU performance: collect real-device baselines separately for low-end integrated GPUs and high-DPI screens.
 - Preserve the existing `npm test`, `npm run build`, `npm run test:e2e` release gates. Acceptance must document physical screenshot/first-person sightline inspection and per-hardware FPS measurements separately from automated deterministic checks.
+
+
+## Rain tire-water spray
+
+- `src/sim/rainTireSpray.ts` owns the rain-only, bounded speed-and-depth visual emission function. It is not a tire force model, aquaplaning proxy, driving rule or examination threshold.
+- `RainTireSpray.tsx` samples only `localRainWaterDepthMm(rainWater.current, wheel.center.x, wheel.center.z)` at the canonical `wheelContactFootprints` world positions; no new puddle maps, road collision geometry, React weather clock or alternate wheel dimensions.
+- Sprays must vanish when parked or when the shared water is too shallow, respond monotonically to actual wheel speed/depth, remain valid while reversing, and render at most `RAIN_TIRE_SPRAY.capacity` instanced particles from one geometry/material.
+- Suppress dry rubber smoke while the explicit rain preset renders water spray; never change shared tire-slip telemetry or judging for visual effects. Other surfaces and formal exams must preserve their existing smoke rendering.
+- Opt-in `?renderDiagnostics=1` adds `window.__subject2RainSpray` with particle capacity, active count and total emissions. Keep this diagnostic entirely outside the default UI and avoid wall-clock physics.
+- Run `tests/rain-tire-spray.test.ts`, complete project tests, build and browser WebGL smoke before merging. A successful software-WebGL smoke run does not certify physical GPU performance.
