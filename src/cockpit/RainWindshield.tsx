@@ -154,7 +154,7 @@ export function RainWindshield({
     mesh.instanceMatrix.needsUpdate = true
     if (diagnosticsEnabled) {
       peakFocusClears.current = Math.max(peakFocusClears.current, sightlineCleared)
-      (window as Window & { __subject2RainGlass?: object }).__subject2RainGlass = {
+      ;(window as Window & { __subject2RainGlass?: object }).__subject2RainGlass = {
         mode,
         phase: sweep,
         totalDrops: DROP_COUNT,
