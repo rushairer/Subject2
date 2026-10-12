@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as THREE from 'three'
+import { DRIVER_EYE } from '../src/cockpit/mirrorLayout'
 import { createRainWaterState, advanceRainWater, localRainWaterDepthMm } from '../src/sim/rainWater'
 import { RAIN_PUDDLES, rainPuddleSamplingKey, rainPuddlesNear } from '../src/sim/rainPuddles'
 import {
   FRONT_WINDSHIELD, WINDSHIELD_HEIGHT,
   frontWindshieldPoint,
+  frontWindshieldPointInto,
 } from '../src/cockpit/windshieldGeometry'
 import {
   WINDSHIELD_WIPERS,
@@ -179,4 +182,37 @@ test('fast wipers clear the same physical target at 30 and 60 FPS', () => {
     }
     assert.ok(cleared, `fast sweep must clear target even at ${hz} FPS`)
   }
+})
+
+
+test('allocation-free glass point placement agrees exactly with the canonical windshield', () => {
+  const target = new THREE.Vector3()
+  for (const height of [0, 0.17, 0.33, WINDSHIELD_HEIGHT]) {
+    for (const x of [-1, -0.43, 0.0, 0.7, 1]) {
+      for (const offset of [0, 0.027, 0.045]) {
+        assert.equal(frontWindshieldPointInto(target, x, height, offset), target)
+        assert.deepEqual(target.toArray(), frontWindshieldPoint(x, height, offset))
+      }
+    }
+  }
+})
+
+test('real first-person camera projection puts the primary swept area in driver sightline', () => {
+  const camera = new THREE.PerspectiveCamera(68, 16 / 9, 0.05, 500)
+  camera.position.set(DRIVER_EYE.right, DRIVER_EYE.height, -DRIVER_EYE.forward)
+  camera.rotation.set(-0.015, 0, 0)
+  camera.updateMatrixWorld()
+  camera.updateProjectionMatrix()
+
+  const blade = windshieldWiperStrokes(0.62)[0]
+  const point = {
+    x: (blade.bladeStart.x + blade.bladeEnd.x) / 2,
+    y: (blade.bladeStart.y + blade.bladeEnd.y) / 2,
+  }
+  const ndc = new THREE.Vector3(...frontWindshieldPoint(point.x, point.y, 0.045))
+    .project(camera)
+  assert.ok(ndc.z >= -1 && ndc.z <= 1, 'wiper blade must be in front of driver eye')
+  assert.ok(Math.abs(ndc.x) <= 0.55 && Math.abs(ndc.y) <= 0.55,
+    `wiped region misses forward first-person sightline: ${ndc.toArray()}`)
+  assert.ok(isGlassDropWipedDuringSweep(point, 0.15, 0.9))
 })
