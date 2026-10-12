@@ -30,6 +30,9 @@ interface SprayParticle {
 }
 
 const PARTICLE_CAPACITY = RAIN_TIRE_SPRAY.capacity
+const WHEEL_IDS: readonly WheelId[] = [
+  'front-left', 'front-right', 'rear-left', 'rear-right',
+]
 const newParticles = (): SprayParticle[] => Array.from(
   { length: PARTICLE_CAPACITY },
   (_, i) => ({
@@ -57,7 +60,10 @@ export function RainTireSpray({
   const particles = useRef(newParticles())
   const cursor = useRef(0)
   const emittedTotal = useRef(0)
-  const emission = useRef<Partial<Record<WheelId, number>>>({})
+  const activeCount = useRef(0)
+  const emission = useRef<Record<WheelId, number>>({
+    'front-left': 0, 'front-right': 0, 'rear-left': 0, 'rear-right': 0,
+  })
   const matrix = useRef(new THREE.Matrix4())
   const position = useRef(new THREE.Vector3())
   const quaternion = useRef(new THREE.Quaternion())
@@ -117,7 +123,20 @@ export function RainTireSpray({
         }
       }
     } else {
-      emission.current = {}
+      for (const wheelId of WHEEL_IDS) emission.current[wheelId] = 0
+    }
+
+    if (!emitting && activeCount.current === 0) {
+      instanced.count = 0
+      if (diagnosticEnabled.current) {
+        (window as Window & { __subject2RainSpray?: object }).__subject2RainSpray = {
+          capacity: PARTICLE_CAPACITY,
+          activeParticles: 0,
+          emittedTotal: emittedTotal.current,
+          emitting: false,
+        }
+      }
+      return
     }
 
     let visible = 0
@@ -150,6 +169,7 @@ export function RainTireSpray({
       )
       instanced.setMatrixAt(i, matrix.current)
     }
+    activeCount.current = visible
     instanced.count = visible ? PARTICLE_CAPACITY : 0
     if (visible) instanced.instanceMatrix.needsUpdate = true
 
